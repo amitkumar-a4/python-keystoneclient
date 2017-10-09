@@ -201,7 +201,7 @@ def _remove_data(context, snapshot_id):
         context, snapshot_id, read_deleted='yes')
     if snapshot_with_data.status != 'deleted':
         return
-    if snapshot_with_data.data_deleted == True:
+    if snapshot_with_data.data_deleted:
         return
     try:
         LOG.info(_('Deleting the data of snapshot %s of workload %s') %
@@ -314,11 +314,13 @@ def download_snapshot_vm_from_object_store(
     workload = db.workload_get(context, snapshot.workload_id)
 
     object_store_download_time = 0
-    object_store_download_time += vault.download_snapshot_vm_from_object_store(context,
-                                                                               {'restore_id': restore_id,
-                                                                                'workload_id': snapshot.workload_id,
-                                                                                'snapshot_id': snapshot.id,
-                                                                                'snapshot_vm_id': snapshot_vm_id})
+    object_store_download_time += vault.download_snapshot_vm_from_object_store(
+        context,
+        {
+            'restore_id': restore_id,
+            'workload_id': snapshot.workload_id,
+            'snapshot_id': snapshot.id,
+            'snapshot_vm_id': snapshot_vm_id})
 
     parent_snapshots = db.get_snapshot_parents(context, snapshot_id)
 
@@ -326,12 +328,14 @@ def download_snapshot_vm_from_object_store(
         parent_snapshot_vms = db.snapshot_vms_get(context, parent_snapshot_id)
         for parent_snapshot_vm in parent_snapshot_vms:
             if parent_snapshot_vm.vm_id == snapshot_vm_id:
-                object_store_download_time += vault.download_snapshot_vm_from_object_store(context,
-                                                                                           {'restore_id': restore_id,
-                                                                                            'workload_id': snapshot.workload_id,
-                                                                                            'workload_name': workload.display_name,
-                                                                                            'snapshot_id': parent_snapshot_id,
-                                                                                            'snapshot_vm_id': snapshot_vm_id})
+                object_store_download_time += vault.download_snapshot_vm_from_object_store(
+                    context,
+                    {
+                        'restore_id': restore_id,
+                        'workload_id': snapshot.workload_id,
+                        'workload_name': workload.display_name,
+                        'snapshot_id': parent_snapshot_id,
+                        'snapshot_vm_id': snapshot_vm_id})
     return object_store_download_time
 
 
@@ -346,15 +350,17 @@ def download_snapshot_vm_resource_from_object_store(
 
     object_store_download_time = 0
     while snapshot_vm_resource:
-        object_store_download_time += vault.download_snapshot_vm_resource_from_object_store(context,
-                                                                                            {'restore_id': restore_id,
-                                                                                             'workload_id': snapshot.workload_id,
-                                                                                             'workload_name': workload.display_name,
-                                                                                             'snapshot_id': snapshot_vm_resource.snapshot_id,
-                                                                                             'snapshot_vm_id': snapshot_vm_resource.vm_id,
-                                                                                             'snapshot_vm_name': snapshot_vm.vm_name,
-                                                                                             'snapshot_vm_resource_id': snapshot_vm_resource.id,
-                                                                                             'snapshot_vm_resource_name': snapshot_vm_resource.resource_name})
+        object_store_download_time += vault.download_snapshot_vm_resource_from_object_store(
+            context,
+            {
+                'restore_id': restore_id,
+                'workload_id': snapshot.workload_id,
+                'workload_name': workload.display_name,
+                'snapshot_id': snapshot_vm_resource.snapshot_id,
+                'snapshot_vm_id': snapshot_vm_resource.vm_id,
+                'snapshot_vm_name': snapshot_vm.vm_name,
+                'snapshot_vm_resource_id': snapshot_vm_resource.id,
+                'snapshot_vm_resource_name': snapshot_vm_resource.resource_name})
         vm_disk_resource_snaps = db.vm_disk_resource_snaps_get(
             context, snapshot_vm_resource.id)
         for vm_disk_resource_snap in vm_disk_resource_snaps:
@@ -379,10 +385,12 @@ def purge_snapshot_vm_from_staging_area(context, snapshot_id, snapshot_vm_id):
 
     backup_target = vault.get_backup_target(backup_endpoint)
 
-    backup_target.purge_snapshot_vm_from_staging_area(context,
-                                                      {'workload_id': snapshot.workload_id,
-                                                       'snapshot_id': snapshot_id,
-                                                       'snapshot_vm_id': snapshot_vm_id})
+    backup_target.purge_snapshot_vm_from_staging_area(
+        context,
+        {
+            'workload_id': snapshot.workload_id,
+            'snapshot_id': snapshot_id,
+            'snapshot_vm_id': snapshot_vm_id})
 
     parent_snapshots = db.get_snapshot_parents(context, snapshot_id)
 
@@ -390,10 +398,12 @@ def purge_snapshot_vm_from_staging_area(context, snapshot_id, snapshot_vm_id):
         parent_snapshot_vms = db.snapshot_vms_get(context, parent_snapshot_id)
         for parent_snapshot_vm in parent_snapshot_vms:
             if parent_snapshot_vm.vm_id == snapshot_vm_id:
-                backup_target.purge_snapshot_vm_from_staging_area(context,
-                                                                  {'workload_id': snapshot.workload_id,
-                                                                   'snapshot_id': parent_snapshot_id,
-                                                                   'snapshot_vm_id': snapshot_vm_id})
+                backup_target.purge_snapshot_vm_from_staging_area(
+                    context,
+                    {
+                        'workload_id': snapshot.workload_id,
+                        'snapshot_id': parent_snapshot_id,
+                        'snapshot_vm_id': snapshot_vm_id})
 
 
 def purge_snapshot_vm_resource_from_staging_area(
@@ -410,13 +420,15 @@ def purge_snapshot_vm_resource_from_staging_area(
         context, snapshot_vm_resource.vm_id, snapshot.id)
 
     while snapshot_vm_resource:
-        backup_target.purge_snapshot_vm_resource_from_staging_area(context,
-                                                                   {'workload_id': snapshot.workload_id,
-                                                                    'snapshot_id': snapshot_vm_resource.snapshot_id,
-                                                                    'snapshot_vm_id': snapshot_vm_resource.vm_id,
-                                                                    'snapshot_vm_name': snapshot_vm.vm_name,
-                                                                    'snapshot_vm_resource_id': snapshot_vm_resource.id,
-                                                                    'snapshot_vm_resource_name': snapshot_vm_resource.resource_name})
+        backup_target.purge_snapshot_vm_resource_from_staging_area(
+            context,
+            {
+                'workload_id': snapshot.workload_id,
+                'snapshot_id': snapshot_vm_resource.snapshot_id,
+                'snapshot_vm_id': snapshot_vm_resource.vm_id,
+                'snapshot_vm_name': snapshot_vm.vm_name,
+                'snapshot_vm_resource_id': snapshot_vm_resource.id,
+                'snapshot_vm_resource_name': snapshot_vm_resource.resource_name})
         vm_disk_resource_snap = db.vm_disk_resource_snap_get_top(
             context, snapshot_vm_resource.id)
         if vm_disk_resource_snap.vm_disk_resource_snap_backing_id:
@@ -436,11 +448,13 @@ def purge_restore_vm_from_staging_area(
                                             'backup_media_target')
 
     backup_target = vault.get_backup_target(backup_endpoint)
-    backup_target.purge_restore_vm_from_staging_area(context,
-                                                     {'restore_id': restore_id,
-                                                      'workload_id': snapshot.workload_id,
-                                                      'snapshot_id': snapshot_id,
-                                                      'snapshot_vm_id': snapshot_vm_id})
+    backup_target.purge_restore_vm_from_staging_area(
+        context,
+        {
+            'restore_id': restore_id,
+            'workload_id': snapshot.workload_id,
+            'snapshot_id': snapshot_id,
+            'snapshot_vm_id': snapshot_vm_id})
     """
     parent_snapshots = db.get_snapshot_parents(context, snapshot_id)
 
@@ -469,14 +483,16 @@ def purge_restore_vm_resource_from_staging_area(
         context, snapshot_vm_resource.vm_id, snapshot.id)
 
     while snapshot_vm_resource:
-        backup_target.purge_restore_vm_resource_from_staging_area(context,
-                                                                  {'restore_id': restore_id,
-                                                                   'workload_id': snapshot.workload_id,
-                                                                   'snapshot_id': snapshot_vm_resource.snapshot_id,
-                                                                   'snapshot_vm_id': snapshot_vm_resource.vm_id,
-                                                                   'snapshot_vm_name': snapshot_vm.vm_name,
-                                                                   'snapshot_vm_resource_id': snapshot_vm_resource.id,
-                                                                   'snapshot_vm_resource_name': snapshot_vm_resource.resource_name})
+        backup_target.purge_restore_vm_resource_from_staging_area(
+            context,
+            {
+                'restore_id': restore_id,
+                'workload_id': snapshot.workload_id,
+                'snapshot_id': snapshot_vm_resource.snapshot_id,
+                'snapshot_vm_id': snapshot_vm_resource.vm_id,
+                'snapshot_vm_name': snapshot_vm.vm_name,
+                'snapshot_vm_resource_id': snapshot_vm_resource.id,
+                'snapshot_vm_resource_name': snapshot_vm_resource.resource_name})
         vm_disk_resource_snap = db.vm_disk_resource_snap_get_top(
             context, snapshot_vm_resource.id)
         if vm_disk_resource_snap.vm_disk_resource_snap_backing_id:
@@ -500,8 +516,8 @@ def common_apply_retention_policy(cntx, instances, snapshot):
                                                     'backup_media_target')
             backup_target = vault.get_backup_target(backup_endpoint)
 
-            snapshots_all = db.snapshot_get_all_by_project_workload(cntx, cntx.project_id,
-                                                                    workload_obj.id, read_deleted='yes')
+            snapshots_all = db.snapshot_get_all_by_project_workload(
+                cntx, cntx.project_id, workload_obj.id, read_deleted='yes')
 
             snap_chains = []
             snap_chain = []
@@ -519,17 +535,18 @@ def common_apply_retention_policy(cntx, instances, snapshot):
                     if snap.status != 'deleted':
                         deleted_chain = False
                         break
-                if deleted_chain == True:
+                if deleted_chain:
                     deleted_snap_chains.append(snap_chain)
 
             for snap_chain in deleted_snap_chains:
                 for snap in snap_chain:
-                    if snap.deleted == True and snap.data_deleted == False:
-                        LOG.info(_('Deleting the data of snapshot %s %s %s of workload %s') % (snap.display_name,
-                                                                                               snap.id,
-                                                                                               snap.created_at.strftime(
-                                                                                                   "%d-%m-%Y %H:%M:%S"),
-                                                                                               workload_obj.display_name))
+                    if snap.deleted and snap.data_deleted == False:
+                        LOG.info(
+                            _('Deleting the data of snapshot %s %s %s of workload %s') %
+                            (snap.display_name,
+                             snap.id,
+                             snap.created_at.strftime("%d-%m-%Y %H:%M:%S"),
+                             workload_obj.display_name))
                         db.snapshot_update(
                             cntx, snap.id, {
                                 'data_deleted': True})
@@ -625,7 +642,7 @@ def common_apply_retention_disk_check(
                 if snapshot_vm_resource.resource_type != 'disk':
                     continue
                 if snapshot_vm_resource.snapshot_type == 'full' and \
-                   snapshot_vm_resource.status != 'deleted' and all_disks_deleted == True:
+                   snapshot_vm_resource.status != 'deleted' and all_disks_deleted:
                     db.snapshot_vm_resource_delete(
                         cntx, snapshot_vm_resource.id)
                     continue
@@ -650,11 +667,12 @@ def common_apply_retention_disk_check(
         db.snapshot_delete(cntx, snap.id)
         db.snapshot_update(cntx, snap.id, {'data_deleted': True})
         try:
-            LOG.info(_('Deleting the data of snapshot %s %s %s of workload %s') % (snap.display_name,
-                                                                                   snap.id,
-                                                                                   snap.created_at.strftime(
-                                                                                       "%d-%m-%Y %H:%M:%S"),
-                                                                                   workload_obj.display_name))
+            LOG.info(
+                _('Deleting the data of snapshot %s %s %s of workload %s') %
+                (snap.display_name,
+                 snap.id,
+                 snap.created_at.strftime("%d-%m-%Y %H:%M:%S"),
+                 workload_obj.display_name))
             backup_target.snapshot_delete(cntx,
                                           {'workload_id': snap.workload_id,
                                            'workload_name': workload_obj.display_name,
@@ -668,14 +686,15 @@ def common_apply_retention_snap_delete(cntx, snap, workload_obj):
     backup_endpoint = db.get_metadata_value(workload_obj.metadata,
                                             'backup_media_target')
     backup_target = vault.get_backup_target(backup_endpoint)
-    if snap.data_deleted == False:
+    if not snap.data_deleted:
         db.snapshot_update(cntx, snap.id, {'data_deleted': True})
         try:
-            LOG.info(_('Deleting the data of snapshot %s %s %s of workload %s') % (snap.display_name,
-                                                                                   snap.id,
-                                                                                   snap.created_at.strftime(
-                                                                                       "%d-%m-%Y %H:%M:%S"),
-                                                                                   workload_obj.display_name))
+            LOG.info(
+                _('Deleting the data of snapshot %s %s %s of workload %s') %
+                (snap.display_name,
+                 snap.id,
+                 snap.created_at.strftime("%d-%m-%Y %H:%M:%S"),
+                 workload_obj.display_name))
             backup_target.snapshot_delete(cntx,
                                           {'workload_id': snap.workload_id,
                                            'workload_name': workload_obj.display_name,
@@ -688,9 +707,9 @@ def common_apply_retention_db_backing_update(cntx, snapshot_vm_resource,
                                              vm_disk_resource_snap,
                                              vm_disk_resource_snap_backing,
                                              affected_snapshots):
-    vm_disk_resource_snap_values = {'size': vm_disk_resource_snap_backing.size,
-                                    'vm_disk_resource_snap_backing_id': vm_disk_resource_snap_backing.vm_disk_resource_snap_backing_id
-                                    }
+    vm_disk_resource_snap_values = {
+        'size': vm_disk_resource_snap_backing.size,
+        'vm_disk_resource_snap_backing_id': vm_disk_resource_snap_backing.vm_disk_resource_snap_backing_id}
     db.vm_disk_resource_snap_update(
         cntx,
         vm_disk_resource_snap.id,
@@ -698,9 +717,10 @@ def common_apply_retention_db_backing_update(cntx, snapshot_vm_resource,
 
     snapshot_vm_resource_backing = db.snapshot_vm_resource_get(
         cntx, vm_disk_resource_snap_backing.snapshot_vm_resource_id)
-    snapshot_vm_resource_values = {'size': snapshot_vm_resource_backing.size,
-                                   'snapshot_type': snapshot_vm_resource_backing.snapshot_type,
-                                   'time_taken': snapshot_vm_resource_backing.time_taken}
+    snapshot_vm_resource_values = {
+        'size': snapshot_vm_resource_backing.size,
+        'snapshot_type': snapshot_vm_resource_backing.snapshot_type,
+        'time_taken': snapshot_vm_resource_backing.time_taken}
 
     db.snapshot_vm_resource_update(
         cntx,

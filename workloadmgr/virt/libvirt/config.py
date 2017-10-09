@@ -812,8 +812,9 @@ class LibvirtConfigGuestInterface(LibvirtConfigGuestDevice):
         if self.vif_inbound_average or self.vif_outbound_average:
             bandwidth = etree.Element("bandwidth")
             if self.vif_inbound_average is not None:
-                vif_inbound = etree.Element("inbound",
-                                            average=str(self.vif_inbound_average))
+                vif_inbound = etree.Element(
+                    "inbound", average=str(
+                        self.vif_inbound_average))
                 if self.vif_inbound_peak is not None:
                     vif_inbound.set("peak", str(self.vif_inbound_peak))
                 if self.vif_inbound_burst is not None:
@@ -821,8 +822,9 @@ class LibvirtConfigGuestInterface(LibvirtConfigGuestDevice):
                 bandwidth.append(vif_inbound)
 
             if self.vif_outbound_average is not None:
-                vif_outbound = etree.Element("outbound",
-                                             average=str(self.vif_outbound_average))
+                vif_outbound = etree.Element(
+                    "outbound", average=str(
+                        self.vif_outbound_average))
                 if self.vif_outbound_peak is not None:
                     vif_outbound.set("peak", str(self.vif_outbound_peak))
                 if self.vif_outbound_burst is not None:

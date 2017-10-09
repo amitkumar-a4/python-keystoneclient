@@ -48,8 +48,9 @@ class BaseVaultTestCase(test.TestCase):
     def setUp(self):
         super(BaseVaultTestCase, self).setUp()
 
-        CONF.set_default('vault_storage_nfs_export',
-                         'server1:nfsshare1, server2:nfsshare2, server3:nfsshare3')
+        CONF.set_default(
+            'vault_storage_nfs_export',
+            'server1:nfsshare1, server2:nfsshare2, server3:nfsshare3')
 
         self.context = context.get_admin_context()
         patch('sys.stderr').start()
@@ -247,7 +248,7 @@ class BaseVaultTestCase(test.TestCase):
             for snap in os.listdir(workload_path):
                 if snapname in snap:
                     continue
-                if not "snapshot_" in snap:
+                if "snapshot_" not in snap:
                     continue
                 snaps.append(snap)
 
@@ -324,8 +325,8 @@ class BaseVaultTestCase(test.TestCase):
 
     @patch('subprocess.check_call')
     @patch('workloadmgr.vault.vault.NfsTrilioVaultBackupTarget.is_online')
-    def test_get_nfs_share_for_workload_by_free_overcommit_distro(self, mock_method1,
-                                                                  mock_method3):
+    def test_get_nfs_share_for_workload_by_free_overcommit_distro(
+            self, mock_method1, mock_method3):
 
         import workloadmgr.vault.vault
 

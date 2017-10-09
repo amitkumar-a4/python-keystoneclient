@@ -181,9 +181,12 @@ class VMwareVolumeOps(object):
 
     def _get_vmdk_base_volume_device(self, volume_ref):
         # Get the vmdk file name that the VM is pointing to
-        hardware_devices = self._session._call_method(vim_util,
-                                                      "get_dynamic_property", volume_ref,
-                                                      "VirtualMachine", "config.hardware.device")
+        hardware_devices = self._session._call_method(
+            vim_util,
+            "get_dynamic_property",
+            volume_ref,
+            "VirtualMachine",
+            "config.hardware.device")
         return vm_util.get_vmdk_volume_disk(hardware_devices)
 
     def _attach_volume_vmdk(self, connection_info, instance, mountpoint):
@@ -240,9 +243,12 @@ class VMwareVolumeOps(object):
             raise volume_util.StorageError(_("Unable to find iSCSI Target"))
 
         # Get the vmdk file name that the VM is pointing to
-        hardware_devices = self._session._call_method(vim_util,
-                                                      "get_dynamic_property", vm_ref,
-                                                      "VirtualMachine", "config.hardware.device")
+        hardware_devices = self._session._call_method(
+            vim_util,
+            "get_dynamic_property",
+            vm_ref,
+            "VirtualMachine",
+            "config.hardware.device")
         vmdk_file_path, controller_key, adapter_type, disk_type, unit_number \
             = vm_util.get_vmdk_path_and_adapter_type(hardware_devices)
 
@@ -366,9 +372,12 @@ class VMwareVolumeOps(object):
 
     def _get_vmdk_backed_disk_device(self, vm_ref, connection_info_data):
         # Get the vmdk file name that the VM is pointing to
-        hardware_devices = self._session._call_method(vim_util,
-                                                      "get_dynamic_property", vm_ref,
-                                                      "VirtualMachine", "config.hardware.device")
+        hardware_devices = self._session._call_method(
+            vim_util,
+            "get_dynamic_property",
+            vm_ref,
+            "VirtualMachine",
+            "config.hardware.device")
 
         # Get disk uuid
         disk_uuid = self._get_volume_uuid(vm_ref,
@@ -415,9 +424,12 @@ class VMwareVolumeOps(object):
             raise volume_util.StorageError(_("Unable to find iSCSI Target"))
 
         # Get the vmdk file name that the VM is pointing to
-        hardware_devices = self._session._call_method(vim_util,
-                                                      "get_dynamic_property", vm_ref,
-                                                      "VirtualMachine", "config.hardware.device")
+        hardware_devices = self._session._call_method(
+            vim_util,
+            "get_dynamic_property",
+            vm_ref,
+            "VirtualMachine",
+            "config.hardware.device")
         device = vm_util.get_rdm_disk(hardware_devices, uuid)
         if device is None:
             raise volume_util.StorageError(_("Unable to find volume"))

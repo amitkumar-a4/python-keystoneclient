@@ -230,8 +230,10 @@ def execute_cmd(cmdspec, env=None):
     # TODO: throw exception  on error?
     output, error = process.communicate()
     if process.returncode:
-        raise exception.ProcessExecutionError(cmd=" ".join(cmdspec),
-                                              description=error, exit_code=process.returncode)
+        raise exception.ProcessExecutionError(
+            cmd=" ".join(cmdspec),
+            description=error,
+            exit_code=process.returncode)
     return output, error
 
 
@@ -503,7 +505,7 @@ def get_usedblockslist_from_part(mountpath, usedblockfile, part, blocksize):
     partoff = int(part['start']) * 512
     with open(usedblockfile, 'a') as f:
         for line in usedblocks.split("\n"):
-            if not "startblk" in line or not "length" in line:
+            if "startblk" in line or not "length" not in line:
                 continue
 
             extoff = int(re.findall(r'\d+', line)[0])
@@ -544,19 +546,19 @@ def get_usedblockslist_from_lv(mountpath, usedblockfiles, lv, pvinfo,
 
     lvoffset = 0
     for line in usedblocks.split("\n"):
-        if not "startblk" in line or not "length" in line:
+        if "startblk" in line or not "length" not in line:
             continue
 
         extoff = int(re.findall(r'\d+', line)[0])
         length = int(re.findall(r'\d+', line)[1])
 
-        extoffsec = getlogicaladdrtopvaddr(lv, pvinfo,
-                                           extoff * blocksize, length * blocksize)
+        extoffsec = getlogicaladdrtopvaddr(
+            lv, pvinfo, extoff * blocksize, length * blocksize)
 
         for extoff in extoffsec:
             eoff = int(extoff['offset']) + int(extoff['pv']['PV_DISK_OFFSET'])
-            filehandles[extoff['pv']['filename']].write(str(eoff) +
-                                                        "," + str(extoff['length']) + "\n")
+            filehandles[extoff['pv']['filename']].write(
+                str(eoff) + "," + str(extoff['length']) + "\n")
             totalblockscopied[extoff['pv']['filename']
                               ] += int(extoff['length']) / blocksize
 
@@ -645,10 +647,10 @@ def copy_free_bitmap_from_lv(hostip, username, password, vmspec, devmap,
                     LOG.info(_("copying bitmapblock: " + str(bitmapblock)))
                     LOG.info(_("copying inodeblock: " + str(bitmapblock)))
 
-                bitmapsec = getlogicaladdrtopvaddr(lvinfo, pvlist,
-                                                   bitmapblock * blocksize, blocksize)
-                inodesec = getlogicaladdrtopvaddr(lvinfo, pvlist,
-                                                  inodeblock * blocksize, blocksize)
+                bitmapsec = getlogicaladdrtopvaddr(
+                    lvinfo, pvlist, bitmapblock * blocksize, blocksize)
+                inodesec = getlogicaladdrtopvaddr(
+                    lvinfo, pvlist, inodeblock * blocksize, blocksize)
                 for bsec in bitmapsec:
                     boff = int(bsec['offset']) + \
                         int(bsec['pv']['PV_DISK_OFFSET'])
@@ -691,8 +693,14 @@ def copy_free_bitmap_from_lv(hostip, username, password, vmspec, devmap,
 def copy_used_blocks(hostip, username, password, vmspec, dev,
                      mountpath, usedblocksfile):
 
-    populate_extents(hostip, username, password, vmspec, dev['backing']['fileName'],
-                     mountpath, usedblocksfile)
+    populate_extents(
+        hostip,
+        username,
+        password,
+        vmspec,
+        dev['backing']['fileName'],
+        mountpath,
+        usedblocksfile)
 
 
 def read_partition_table(mountpath=None):
@@ -965,14 +973,13 @@ def getlogicaladdrtopvaddr(lvinfo, pvlist, startoffset, length):
     # first find the LVM segment that this belongs to
     iosegs = []
     for lvseg in lvinfo['LVM_LE_SEGMENTS']:
-        if length and int(lvseg['LVM2_SEG_START']) <= startoffset and\
-           int(lvseg['LVM2_SEG_START']) + int(lvseg['LVM2_SEG_SIZE']) > startoffset:
+        if length and int(lvseg['LVM2_SEG_START']) <= startoffset and int(
+                lvseg['LVM2_SEG_START']) + int(lvseg['LVM2_SEG_SIZE']) > startoffset:
 
             seglength = min(length, int(lvseg['LVM2_SEG_START']) +
                             int(lvseg['LVM2_SEG_SIZE']) - startoffset)
-            iosegs.append({'lvseg': lvseg,
-                           'startoffset': startoffset - int(lvseg['LVM2_SEG_START']),
-                           'length': seglength})
+            iosegs.append({'lvseg': lvseg, 'startoffset': startoffset -
+                           int(lvseg['LVM2_SEG_START']), 'length': seglength})
             startoffset += seglength
             length -= seglength
 
@@ -1045,8 +1052,8 @@ def performlvthickcopy(hostip, username, password, vmspec, devmap,
 
         for pvs, vgs, lvs, mountinfo in mountlvmvgs(hostip, username, password,
                                                     vmspec, devmap):
-            totalblocks = get_usedblockslist_from_lv(lvsrc['LVM2_LV_PATH'], extentsfile,
-                                                     lvsrc, srcpvlist, blocksize)
+            totalblocks = get_usedblockslist_from_lv(
+                lvsrc['LVM2_LV_PATH'], extentsfile, lvsrc, srcpvlist, blocksize)
     except Exception as ex:
         LOG.exception(ex)
         LOG.error(_("Cannot open lv: %s") % (lvsrc['LVM2_LV_PATH']))
@@ -1091,10 +1098,11 @@ def mountlvmvgs(hostip, username, password, vmspec, devmap):
 
                     for dmap in devmap:
                         if dmap['localvmdkpath'] == key:
-                            mountinfo[key] = {'mountpath': mountpath,
-                                              'devpath': devpath,
-                                              'localvmdkpath': key,
-                                              'filename': dmap['dev']['backing']['fileName']}
+                            mountinfo[key] = {
+                                'mountpath': mountpath,
+                                'devpath': devpath,
+                                'localvmdkpath': key,
+                                'filename': dmap['dev']['backing']['fileName']}
 
                 # explore VGs and volumes on the disk
                 vgs = getvgs()
@@ -1243,9 +1251,16 @@ def process_partitions(hostip, username, password, vmspec, devmap,
             # copy bitmap blocks and inode blocks to empty vmdk
             blocksize = partblockgroups[0]
             blockgroups = partblockgroups[1]
-            copy_free_bitmap_from_part(hostip, username, password, vmspec, filename,
-                                       localvmdkpath, partition['start'],
-                                       blocksize, blockgroups)
+            copy_free_bitmap_from_part(
+                hostip,
+                username,
+                password,
+                vmspec,
+                filename,
+                localvmdkpath,
+                partition['start'],
+                blocksize,
+                blockgroups)
 
             # Get the list of used blocks for each file system
             with mount_local_vmdk(listfile, mntlist, diskonly=True) as mountpaths:
@@ -1262,9 +1277,13 @@ def process_partitions(hostip, username, password, vmspec, devmap,
                                                       stderr=subprocess.STDOUT)
                     freedev = freedev.strip("\n")
 
-                    subprocess.check_output(["losetup", freedev, mountpath, "-o",
+                    subprocess.check_output(["losetup",
+                                             freedev,
+                                             mountpath,
+                                             "-o",
                                              str(int(
-                                                 partition['start']) * 512), "--sizelimit",
+                                                 partition['start']) * 512),
+                                             "--sizelimit",
                                              partition['blocks'] + "KiB"],
                                             stderr=subprocess.STDOUT)
                     blocksize = partblockgroups[0]
@@ -1390,10 +1409,14 @@ def _thickcopyextents(hostip, username, password, vmspec, devmap):
                 f.write(str(0) + "," + str(400 * 512) + "\n")
             totalblocks[filename] += 400 * 512 / 4096
 
-            partitions[filename] = get_partition_table_from_vmdk(hostip, username,
-                                                                 password, vmspec, filename,
-                                                                 dmap['localvmdkpath'],
-                                                                 extentsfiles[filename])
+            partitions[filename] = get_partition_table_from_vmdk(
+                hostip,
+                username,
+                password,
+                vmspec,
+                filename,
+                dmap['localvmdkpath'],
+                extentsfiles[filename])
 
             # if no partitions found, see if this is raw LVM PV
             if len(partitions[filename]) > 0:
@@ -1414,8 +1437,8 @@ def _thickcopyextents(hostip, username, password, vmspec, devmap):
         # do vg scan
         # sort the partitions/disks into lvms and partitions
         # sort lvs and partitions into ext fs and not ext fs
-        logicalobjects = discover_lvs_and_partitions(hostip, username, password,
-                                                     vmspec, devmap, partitions)
+        logicalobjects = discover_lvs_and_partitions(
+            hostip, username, password, vmspec, devmap, partitions)
 
         # identify rest of partitions that were not part of LVM configuration
         lvmtotalblocks = lvmextents_in_partition(hostip, username, password,

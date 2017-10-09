@@ -35,8 +35,9 @@ class BaseWorkloadTestCase(test.TestCase):
         super(BaseWorkloadTestCase, self).setUp()
         self.context = context.get_admin_context()
 
-        CONF.set_default('vault_storage_nfs_export',
-                         'server1:nfsshare1, server2:nfsshare2, server3:nfsshare3')
+        CONF.set_default(
+            'vault_storage_nfs_export',
+            'server1:nfsshare1, server2:nfsshare2, server3:nfsshare3')
 
         patch('sys.stderr').start()
         self.is_online_patch = patch(

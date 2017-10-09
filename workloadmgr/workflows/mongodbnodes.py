@@ -98,11 +98,13 @@ def find_alive_nodes(defaultnode, SSHPort, Username,
         for host in nodes:
             try:
                 LOG.info(_('Connecting to MongoDB node %s') % host)
-                pssh_exec_command([host],
-                                  int(SSHPort),
-                                  Username,
-                                  Password,
-                                  'mongo --eval ' + '"printjson(db.adminCommand(\'listDatabases\'))"')
+                pssh_exec_command(
+                    [host],
+                    int(SSHPort),
+                    Username,
+                    Password,
+                    'mongo --eval ' +
+                    '"printjson(db.adminCommand(\'listDatabases\'))"')
                 LOG.info(_("Selected '" + host + "' for MongoDB mongo"))
                 nodelist.append(host)
             except AuthenticationException as ex:
@@ -215,8 +217,8 @@ def get_databases(hosts, port, username, password, dbport, dbuser, dbpassword):
                     primary_host = replica['name'].split(":")[0]
                     primary_dbport = replica['name'].split(":")[1]
                     if primary_host != host:  # break the recursion
-                        clusterinfo = get_databases([primary_host], port,
-                                                    username, password, primary_dbport, dbuser, dbpassword)
+                        clusterinfo = get_databases(
+                            [primary_host], port, username, password, primary_dbport, dbuser, dbpassword)
                     else:
                         msg = _(
                             "Failed to execute 'mongo --eval' successfully. Error %s") % (clusterinfo['errmsg'])
@@ -286,13 +288,14 @@ def main(argv):
 
     except getopt.GetoptError as ex:
         LOG.exception(ex)
-        usage = _("Usage: mongodbnodes.py --config-file /etc/workloadmgr/workloadmgr.conf --defaultnode mongodb1 "
-                  "--port 22 --username ubuntu --password password "
-                  "--dbport <mongos/mongodport> "
-                  "--dbuser <mongo admin> "
-                  "--dbpassword <password> "
-                  "--addlnodes 'mongodb1;mongodb2;mongodb3' "
-                  "--outfile /tmp/mongodbnodes.txt --errfile /tmp/mongodbnodes_error.txt")
+        usage = _(
+            "Usage: mongodbnodes.py --config-file /etc/workloadmgr/workloadmgr.conf --defaultnode mongodb1 "
+            "--port 22 --username ubuntu --password password "
+            "--dbport <mongos/mongodport> "
+            "--dbuser <mongo admin> "
+            "--dbpassword <password> "
+            "--addlnodes 'mongodb1;mongodb2;mongodb3' "
+            "--outfile /tmp/mongodbnodes.txt --errfile /tmp/mongodbnodes_error.txt")
         LOG.info(usage)
         with open(errfile, 'w') as errfilehandle:
             errfilehandle.write(usage)

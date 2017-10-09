@@ -89,11 +89,13 @@ class WorkloadMgrAPI(workloadmgr.openstack.common.rpc.proxy.RpcProxy):
             workload_id)
         topic = rpc.queue_get_for(ctxt, self.topic, host)
         LOG.debug("create queue topic=%s", topic)
-        topology = self.call(ctxt,
-                             self.make_msg(
-                                 'workload_get_topology', workload_id=workload_id),
-                             topic=topic,
-                             timeout=300)
+        topology = self.call(
+            ctxt,
+            self.make_msg(
+                'workload_get_topology',
+                workload_id=workload_id),
+            topic=topic,
+            timeout=300)
         return topology
 
     @autolog.log_method(logger=Logger)
@@ -212,5 +214,9 @@ class WorkloadMgrAPI(workloadmgr.openstack.common.rpc.proxy.RpcProxy):
         LOG.debug("config_backup in rpcapi backup_id:%s", backup_id)
         topic = rpc.queue_get_for(ctxt, self.topic, host)
         LOG.debug("create queue topic=%s", topic)
-        self.cast(ctxt,
-                  self.make_msg('config_backup', backup_id=backup_id), topic=topic)
+        self.cast(
+            ctxt,
+            self.make_msg(
+                'config_backup',
+                backup_id=backup_id),
+            topic=topic)

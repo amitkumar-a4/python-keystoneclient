@@ -229,8 +229,8 @@ class API(base.Base):
                         raise exception.PortInUse(port_id=port_id)
                     if hypervisor_macs is not None:
                         if port['mac_address'] not in hypervisor_macs:
-                            raise exception.PortNotUsable(port_id=port_id,
-                                                          instance=instance['display_name'])
+                            raise exception.PortNotUsable(
+                                port_id=port_id, instance=instance['display_name'])
                         else:
                             # Don't try to use this MAC if we need to create a
                             # port on the fly later. Identical MACs may be
@@ -407,10 +407,9 @@ class API(base.Base):
                                    network_id=None, requested_ip=None,
                                    conductor_api=None):
         """Allocate a port for the instance."""
-        return self.allocate_for_instance(context, instance,
-                                          requested_networks=[
-                                              (network_id, requested_ip, port_id)],
-                                          conductor_api=conductor_api)
+        return self.allocate_for_instance(
+            context, instance, requested_networks=[
+                (network_id, requested_ip, port_id)], conductor_api=conductor_api)
 
     @refresh_cache
     def deallocate_port_for_instance(self, context, instance, port_id,

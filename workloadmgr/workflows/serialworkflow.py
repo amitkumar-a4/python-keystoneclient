@@ -79,10 +79,11 @@ def get_vms(cntx, workload_id):
         }
 
         if hasattr(
-                vm_instance, 'key_name') and vm_instance.key_name and not vm_instance.key_name in keypairs:
+                vm_instance,
+                'key_name') and vm_instance.key_name and vm_instance.key_name not in keypairs:
             try:
-                keypair = compute_service.get_keypair_by_name(cntx,
-                                                              vm_instance.key_name)
+                keypair = compute_service.get_keypair_by_name(
+                    cntx, vm_instance.key_name)
                 if keypair:
                     keypairs[vm_instance.key_name] = \
                         pickle.dumps(keypair._info, 0)
@@ -90,7 +91,8 @@ def get_vms(cntx, workload_id):
                 pass
 
         if hasattr(
-                vm_instance, 'key_name') and vm_instance.key_name and vm_instance.key_name in keypairs:
+                vm_instance,
+                'key_name') and vm_instance.key_name and vm_instance.key_name in keypairs:
             vm['vm_metadata']['key_name'] = vm_instance.key_name
             vm['vm_metadata']['key_data'] = keypairs[vm_instance.key_name]
 

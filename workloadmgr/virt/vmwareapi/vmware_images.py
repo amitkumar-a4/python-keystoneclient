@@ -49,8 +49,8 @@ def start_transfer(context, read_file_handle, data_size,
     # to be sure of the status of the image on glance changing to active.
     # The GlanceWriteThread handles the same for us.
     elif image_service and image_id:
-        write_thread = io_util.GlanceWriteThread(context, thread_safe_pipe,
-                                                 image_service, image_id, image_meta)
+        write_thread = io_util.GlanceWriteThread(
+            context, thread_safe_pipe, image_service, image_id, image_meta)
     # Start the read and write threads.
     read_event = read_thread.start()
     write_event = write_thread.start()

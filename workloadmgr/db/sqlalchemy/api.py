@@ -520,10 +520,15 @@ def workload_type_update(context, id, values, purge_metadata=False):
 def workload_types_get(context):
     session = get_session()
     try:
-        query = model_query(context, models.WorkloadTypes, session=session,
-                            read_deleted="no")\
-            .options(sa_orm.joinedload(models.WorkloadTypes.metadata))\
-            .filter((models.WorkloadTypes.project_id == context.project_id) | (models.WorkloadTypes.is_public == True))
+        query = model_query(
+            context,
+            models.WorkloadTypes,
+            session=session,
+            read_deleted="no") .options(
+            sa_orm.joinedload(
+                models.WorkloadTypes.metadata)) .filter(
+                (models.WorkloadTypes.project_id == context.project_id) | (
+                    models.WorkloadTypes.is_public))
 
         # TODO(gbasava): filter out deleted workload_types if context disallows
         # it
@@ -539,9 +544,11 @@ def workload_types_get(context):
 def workload_type_get(context, id):
     session = get_session()
     try:
-        query = session.query(models.WorkloadTypes)\
-                       .options(sa_orm.joinedload(models.WorkloadTypes.metadata))\
-                       .filter_by(id=id)
+        query = session.query(
+            models.WorkloadTypes) .options(
+            sa_orm.joinedload(
+                models.WorkloadTypes.metadata)) .filter_by(
+                id=id)
 
         # TODO(gbasava): filter out deleted workload_types if context disallows
         # it
@@ -684,8 +691,14 @@ def workload_get_all(context, **kwargs):
 
     if is_admin_context(context):
         if 'nfs_share' in kwargs and kwargs['nfs_share'] is not None and kwargs['nfs_share'] != '':
-            qs = qs.filter(and_(models.Workloads.metadata.any(models.WorkloadMetadata.key.in_(['backup_media_target'])),
-                                models.Workloads.metadata.any(models.WorkloadMetadata.value.in_([kwargs['nfs_share']]))))
+            qs = qs.filter(
+                and_(
+                    models.Workloads.metadata.any(
+                        models.WorkloadMetadata.key.in_(
+                            ['backup_media_target'])), models.Workloads.metadata.any(
+                        models.WorkloadMetadata.value.in_(
+                            [
+                                kwargs['nfs_share']]))))
         else:
             if 'dashboard_item' in kwargs:
                 if kwargs.get('dashboard_item') == 'activities':
@@ -694,18 +707,24 @@ def workload_get_all(context, **kwargs):
                     else:
                         time_in_minutes = 0
                     time_delta = ((time_in_minutes / 60) / 24) * -1
-                    qs = model_query(context,
-                                     models.Workloads.id,
-                                     models.Workloads.deleted,
-                                     models.Workloads.deleted_at,
-                                     models.Workloads.display_name,
-                                     models.Workloads.status,
-                                     models.Workloads.created_at,
-                                     models.Workloads.user_id,
-                                     models.Workloads.project_id,
-                                     **kwargs). \
-                        filter(or_(models.Workloads.created_at > func.adddate(func.now(), time_delta),
-                                   models.Workloads.deleted_at > func.adddate(func.now(), time_delta)))
+                    qs = model_query(
+                        context,
+                        models.Workloads.id,
+                        models.Workloads.deleted,
+                        models.Workloads.deleted_at,
+                        models.Workloads.display_name,
+                        models.Workloads.status,
+                        models.Workloads.created_at,
+                        models.Workloads.user_id,
+                        models.Workloads.project_id,
+                        **kwargs). filter(
+                        or_(
+                            models.Workloads.created_at > func.adddate(
+                                func.now(),
+                                time_delta),
+                            models.Workloads.deleted_at > func.adddate(
+                                func.now(),
+                                time_delta)))
         if 'all_workloads' in kwargs and kwargs['all_workloads'] is not True:
             qs = qs.filter_by(project_id=context.project_id)
     else:
@@ -966,10 +985,11 @@ def workload_vm_get_by_id(context, vm_id, **kwargs):
 @require_context
 def _workload_vm_get(context, id, session):
     try:
-        query = session.query(models.WorkloadVMs)\
-                       .options(sa_orm.joinedload(models.WorkloadVMs.metadata))\
-                       .filter_by(id=id)\
-
+        query = session.query(
+            models.WorkloadVMs) .options(
+            sa_orm.joinedload(
+                models.WorkloadVMs.metadata)) .filter_by(
+                id=id)
         # TODO(gbasava): filter out deleted workload_vms if context disallows
         # it
         workload_vm = query.first()
@@ -1121,8 +1141,12 @@ def _snapshot_update(context, values, snapshot_id, purge_metadata, session):
         metadata = values.pop('metadata', {})
 
         if snapshot_id:
-            snapshot_ref = model_query(context, models.Snapshots, session=session, read_deleted="yes").\
-                filter_by(id=snapshot_id).first()
+            snapshot_ref = model_query(
+                context,
+                models.Snapshots,
+                session=session,
+                read_deleted="yes"). filter_by(
+                id=snapshot_id).first()
             if not snapshot_ref:
                 lock.release()
                 raise exception.SnapshotNotFound(snapshot_id=snapshot_id)
@@ -1210,10 +1234,14 @@ def snapshot_get_running_snapshots_by_host(context, **kwargs):
     if kwargs.get('session') is None:
         kwargs['session'] = get_session()
 
-    result = model_query(context, models.Snapshots.host, func.count(models.Snapshots.host), **kwargs).\
-        filter(and_(~models.Snapshots.status.in_(['available', 'error', 'deleted', 'cancelled'])), models.Snapshots.host != '').\
-        group_by(models.Snapshots.host).\
-        all()
+    result = model_query(context,
+                         models.Snapshots.host,
+                         func.count(models.Snapshots.host),
+                         **kwargs). filter(and_(~models.Snapshots.status.in_(['available',
+                                                                              'error',
+                                                                              'deleted',
+                                                                              'cancelled'])),
+                                           models.Snapshots.host != ''). group_by(models.Snapshots.host). all()
     return result
 
 
@@ -1231,8 +1259,14 @@ def snapshot_get_all(context, **kwargs):
             date_to = kwargs['date_to']
         else:
             date_to = datetime.now()
-        qs = qs.filter(and_(models.Snapshots.created_at >= func.date_format(kwargs['date_from'], '%y-%m-%dT%H:%i:%s'),
-                            models.Snapshots.created_at <= func.date_format(date_to, '%y-%m-%dT%H:%i:%s')))
+        qs = qs.filter(
+            and_(
+                models.Snapshots.created_at >= func.date_format(
+                    kwargs['date_from'],
+                    '%y-%m-%dT%H:%i:%s'),
+                models.Snapshots.created_at <= func.date_format(
+                    date_to,
+                    '%y-%m-%dT%H:%i:%s')))
 
     if not is_admin_context(context):
         qs = qs.filter_by(project_id=context.project_id)
@@ -1303,10 +1337,14 @@ def snapshot_get_all_by_project_workload(
 @require_context
 def snapshot_show(context, snapshot_id, **kwargs):
     session = get_session()
-    result = model_query(context, models.Snapshots, session=session, **kwargs).\
-        options(sa_orm.joinedload(models.Snapshots.metadata)).\
-        filter_by(id=snapshot_id).\
-        first()
+    result = model_query(
+        context,
+        models.Snapshots,
+        session=session,
+        **kwargs). options(
+        sa_orm.joinedload(
+            models.Snapshots.metadata)). filter_by(
+                id=snapshot_id). first()
 
     if not result:
         raise exception.SnapshotNotFound(snapshot_id=snapshot_id)
@@ -1366,8 +1404,10 @@ def snapshot_type_time_size_update(context, snapshot_id):
                 if vm_disk_resource_snap.vault_url is None:
                     continue
 
-                resource_snap_path = os.path.join(backup_target.mount_path,
-                                                  vm_disk_resource_snap.vault_url.strip(os.sep))
+                resource_snap_path = os.path.join(
+                    backup_target.mount_path,
+                    vm_disk_resource_snap.vault_url.strip(
+                        os.sep))
                 vm_disk_resource_snap_size = backup_target.get_object_size(
                     resource_snap_path)
                 if vm_disk_resource_snap_size == 0:
@@ -1376,10 +1416,12 @@ def snapshot_type_time_size_update(context, snapshot_id):
                 disk_format = get_metadata_value(
                     vm_disk_resource_snap.metadata, 'disk_format')
                 if disk_format == 'vmdk':
-                    vault_path = os.path.join(backup_target.mount_path,
-                                              vm_disk_resource_snap.vault_url.strip(os.sep))
-                    vm_disk_resource_snap_restore_size = vault.get_restore_size(vault_path,
-                                                                                disk_format, disk_type)
+                    vault_path = os.path.join(
+                        backup_target.mount_path,
+                        vm_disk_resource_snap.vault_url.strip(
+                            os.sep))
+                    vm_disk_resource_snap_restore_size = vault.get_restore_size(
+                        vault_path, disk_format, disk_type)
                 else:
                     vm_disk_resource_snap_restore_size = qemuimages.get_effective_size(
                         resource_snap_path)
@@ -1399,15 +1441,17 @@ def snapshot_type_time_size_update(context, snapshot_id):
                                 vm_disk_resource_snap_backing.restore_size
                         vm_disk_resource_snap_backing_id = vm_disk_resource_snap_backing.vm_disk_resource_snap_backing_id
 
-                vm_disk_resource_snap_update(context, vm_disk_resource_snap.id, {'size': vm_disk_resource_snap_size,
-                                                                                 'restore_size': vm_disk_resource_snap_restore_size})
+                vm_disk_resource_snap_update(
+                    context, vm_disk_resource_snap.id, {
+                        'size': vm_disk_resource_snap_size, 'restore_size': vm_disk_resource_snap_restore_size})
                 snapshot_vm_resource_size = snapshot_vm_resource_size + vm_disk_resource_snap_size
 
             vm_disk_resource_snap_top = vm_disk_resource_snap_get_top(
                 context, snapshot_vm_resource.id)
             snapshot_vm_resource_restore_size = vm_disk_resource_snap_top.restore_size
-            snapshot_vm_resource_update(context, snapshot_vm_resource.id, {'size': snapshot_vm_resource_size,
-                                                                           'restore_size': snapshot_vm_resource_restore_size})
+            snapshot_vm_resource_update(
+                context, snapshot_vm_resource.id, {
+                    'size': snapshot_vm_resource_size, 'restore_size': snapshot_vm_resource_restore_size})
             snapshot_size = snapshot_size + snapshot_vm_resource_size
             snapshot_restore_size = snapshot_restore_size + snapshot_vm_resource_restore_size
 
@@ -1430,12 +1474,18 @@ def snapshot_type_time_size_update(context, snapshot_id):
             snapshot_vm_data_transfer_time += snapshot_vm_resource.time_taken
             snapshot_vm_object_store_transfer_time += int(get_metadata_value(
                 snapshot_vm_resource.metadata, 'object_store_transfer_time', '0'))
-        snapshot_vm_update(context, snapshot_vm.vm_id, snapshot_id, {'size': snapshot_vm_size,
-                                                                     'restore_size': snapshot_vm_restore_size,
-                                                                     'metadata': {'data_transfer_time': snapshot_vm_data_transfer_time,
-                                                                                  'object_store_transfer_time': snapshot_vm_object_store_transfer_time,
-                                                                                  },
-                                                                     })
+        snapshot_vm_update(
+            context,
+            snapshot_vm.vm_id,
+            snapshot_id,
+            {
+                'size': snapshot_vm_size,
+                'restore_size': snapshot_vm_restore_size,
+                'metadata': {
+                    'data_transfer_time': snapshot_vm_data_transfer_time,
+                    'object_store_transfer_time': snapshot_vm_object_store_transfer_time,
+                },
+            })
         snapshot_data_transfer_time += snapshot_vm_data_transfer_time
         snapshot_object_store_transfer_time += snapshot_vm_object_store_transfer_time
 
@@ -1457,15 +1507,20 @@ def snapshot_type_time_size_update(context, snapshot_id):
     else:
         snapshot_type = 'full'
 
-    return snapshot_update(context, snapshot_id, {'snapshot_type': snapshot_type,
-                                                  'time_taken': time_taken,
-                                                  'size': snapshot_size,
-                                                  'restore_size': snapshot_restore_size,
-                                                  'uploaded_size': snapshot_size,
-                                                  'metadata': {'data_transfer_time': snapshot_data_transfer_time,
-                                                               'object_store_transfer_time': snapshot_object_store_transfer_time,
-                                                               },
-                                                  })
+    return snapshot_update(
+        context,
+        snapshot_id,
+        {
+            'snapshot_type': snapshot_type,
+            'time_taken': time_taken,
+            'size': snapshot_size,
+            'restore_size': snapshot_restore_size,
+            'uploaded_size': snapshot_size,
+            'metadata': {
+                'data_transfer_time': snapshot_data_transfer_time,
+                'object_store_transfer_time': snapshot_object_store_transfer_time,
+            },
+        })
 
 
 @require_context
@@ -1664,10 +1719,11 @@ def snapshot_vm_update(context, vm_id, snapshot_id,
 def snapshot_vms_get(context, snapshot_id, **kwargs):
     session = kwargs.get('session') or get_session()
     try:
-        query = session.query(models.SnapshotVMs)\
-                       .options(sa_orm.joinedload(models.SnapshotVMs.metadata))\
-                       .filter_by(snapshot_id=snapshot_id)\
-
+        query = session.query(
+            models.SnapshotVMs) .options(
+            sa_orm.joinedload(
+                models.SnapshotVMs.metadata)) .filter_by(
+                snapshot_id=snapshot_id)
         snapshot_vms = query.all()
 
     except sa_orm.exc.NoResultFound:
@@ -1679,9 +1735,11 @@ def snapshot_vms_get(context, snapshot_id, **kwargs):
 @require_context
 def _snapshot_vm_get(context, vm_id, snapshot_id, session):
     try:
-        query = session.query(models.SnapshotVMs)\
-                       .options(sa_orm.joinedload(models.SnapshotVMs.metadata))\
-                       .filter_by(vm_id=vm_id)
+        query = session.query(
+            models.SnapshotVMs) .options(
+            sa_orm.joinedload(
+                models.SnapshotVMs.metadata)) .filter_by(
+                vm_id=vm_id)
 
         if snapshot_id is not None:
             query = query.filter_by(snapshot_id=snapshot_id)
@@ -1767,8 +1825,12 @@ def vm_recent_snapshot_delete(context, vm_id):
 
 
 @require_context
-def _set_metadata_for_snapshot_vm_resource(context, snapshot_vm_resource_ref, metadata,
-                                           purge_metadata, session):
+def _set_metadata_for_snapshot_vm_resource(
+        context,
+        snapshot_vm_resource_ref,
+        metadata,
+        purge_metadata,
+        session):
     """
     Create or update a set of snapshot_vm_resource_metadata for a given snapshot resource
 
@@ -1782,9 +1844,10 @@ def _set_metadata_for_snapshot_vm_resource(context, snapshot_vm_resource_ref, me
         orig_metadata[metadata_ref.key] = metadata_ref
 
     for key, value in metadata.iteritems():
-        metadata_values = {'snapshot_vm_resource_id': snapshot_vm_resource_ref.id,
-                           'key': key,
-                           'value': value}
+        metadata_values = {
+            'snapshot_vm_resource_id': snapshot_vm_resource_ref.id,
+            'key': key,
+            'value': value}
         if key in orig_metadata:
             metadata_ref = orig_metadata[key]
             _snapshot_vm_resource_metadata_update(
@@ -1884,10 +1947,12 @@ def snapshot_vm_resource_update(
 def snapshot_vm_resources_get(context, vm_id, snapshot_id):
     session = get_session()
     try:
-        query = session.query(models.SnapshotVMResources)\
-                       .options(sa_orm.joinedload(models.SnapshotVMResources.metadata))\
-                       .filter_by(vm_id=vm_id)\
-                       .filter_by(snapshot_id=snapshot_id)
+        query = session.query(
+            models.SnapshotVMResources) .options(
+            sa_orm.joinedload(
+                models.SnapshotVMResources.metadata)) .filter_by(
+                vm_id=vm_id) .filter_by(
+                    snapshot_id=snapshot_id)
 
         # TODO(gbasava): filter out deleted snapshots if context disallows it
         snapshot_vm_resources = query.all()
@@ -1903,9 +1968,11 @@ def snapshot_vm_resources_get(context, vm_id, snapshot_id):
 def snapshot_resources_get(context, snapshot_id, **kwargs):
     session = kwargs.get('session') or get_session()
     try:
-        query = session.query(models.SnapshotVMResources)\
-                       .options(sa_orm.joinedload(models.SnapshotVMResources.metadata))\
-                       .filter_by(snapshot_id=snapshot_id)
+        query = session.query(
+            models.SnapshotVMResources) .options(
+            sa_orm.joinedload(
+                models.SnapshotVMResources.metadata)) .filter_by(
+                snapshot_id=snapshot_id)
 
         # TODO(gbasava): filter out deleted snapshots if context disallows it
         snapshot_resources = query.all()
@@ -1921,19 +1988,20 @@ def snapshot_vm_resource_get_by_resource_name(
         context, vm_id, snapshot_id, resource_name):
     session = get_session()
     try:
-        query = session.query(models.SnapshotVMResources)\
-                       .options(sa_orm.joinedload(models.SnapshotVMResources.metadata))\
-                       .filter_by(vm_id=vm_id)\
-                       .filter_by(snapshot_id=snapshot_id)\
-                       .filter_by(resource_name=resource_name)
+        query = session.query(
+            models.SnapshotVMResources) .options(
+            sa_orm.joinedload(
+                models.SnapshotVMResources.metadata)) .filter_by(
+                vm_id=vm_id) .filter_by(
+                    snapshot_id=snapshot_id) .filter_by(
+                        resource_name=resource_name)
 
         # TODO(gbasava): filter out deleted snapshots if context disallows it
         snapshot_vm_resource = query.first()
 
     except sa_orm.exc.NoResultFound:
-        raise exception.SnapshotVMResourceWithNameNotFound(resource_name=resource_name,
-                                                           snapshot_vm_id=vm_id,
-                                                           snapshot_id=snapshot_id)
+        raise exception.SnapshotVMResourceWithNameNotFound(
+            resource_name=resource_name, snapshot_vm_id=vm_id, snapshot_id=snapshot_id)
 
     return snapshot_vm_resource
 
@@ -1943,19 +2011,20 @@ def snapshot_vm_resource_get_by_resource_pit_id(
         context, vm_id, snapshot_id, resource_pit_id):
     session = get_session()
     try:
-        query = session.query(models.SnapshotVMResources)\
-                       .options(sa_orm.joinedload(models.SnapshotVMResources.metadata))\
-                       .filter_by(vm_id=vm_id)\
-                       .filter_by(snapshot_id=snapshot_id)\
-                       .filter_by(resource_pit_id=resource_pit_id)
+        query = session.query(
+            models.SnapshotVMResources) .options(
+            sa_orm.joinedload(
+                models.SnapshotVMResources.metadata)) .filter_by(
+                vm_id=vm_id) .filter_by(
+                    snapshot_id=snapshot_id) .filter_by(
+                        resource_pit_id=resource_pit_id)
 
         # TODO(gbasava): filter out deleted snapshots if context disallows it
         snapshot_vm_resource = query.first()
 
     except sa_orm.exc.NoResultFound:
-        raise exception.SnapshotVMResourceWithNameNotFound(resource_pit_id=resource_pit_id,
-                                                           snapshot_vm_id=vm_id,
-                                                           snapshot_id=snapshot_id)
+        raise exception.SnapshotVMResourceWithNameNotFound(
+            resource_pit_id=resource_pit_id, snapshot_vm_id=vm_id, snapshot_id=snapshot_id)
 
     return snapshot_vm_resource
 
@@ -1963,9 +2032,11 @@ def snapshot_vm_resource_get_by_resource_pit_id(
 @require_context
 def _snapshot_vm_resource_get(context, id, session):
     try:
-        query = session.query(models.SnapshotVMResources)\
-                       .options(sa_orm.joinedload(models.SnapshotVMResources.metadata))\
-                       .filter_by(id=id)
+        query = session.query(
+            models.SnapshotVMResources) .options(
+            sa_orm.joinedload(
+                models.SnapshotVMResources.metadata)) .filter_by(
+                id=id)
 
         # TODO(gbasava): filter out deleted snapshots if context disallows it
         snapshot_vm_resource = query.first()
@@ -1997,8 +2068,12 @@ def snapshot_vm_resource_delete(context, id):
 """ disk resource snapshot functions """
 
 
-def _set_metadata_for_vm_disk_resource_snap(context, vm_disk_resource_snap_ref, metadata,
-                                            purge_metadata, session):
+def _set_metadata_for_vm_disk_resource_snap(
+        context,
+        vm_disk_resource_snap_ref,
+        metadata,
+        purge_metadata,
+        session):
     """
     Create or update a set of vm_disk_resource_snap_metadata for a given snapshot
 
@@ -2012,9 +2087,10 @@ def _set_metadata_for_vm_disk_resource_snap(context, vm_disk_resource_snap_ref, 
         orig_metadata[metadata_ref.key] = metadata_ref
 
     for key, value in metadata.iteritems():
-        metadata_values = {'vm_disk_resource_snap_id': vm_disk_resource_snap_ref.id,
-                           'key': key,
-                           'value': value}
+        metadata_values = {
+            'vm_disk_resource_snap_id': vm_disk_resource_snap_ref.id,
+            'key': key,
+            'value': value}
         if key in orig_metadata:
             metadata_ref = orig_metadata[key]
             _vm_disk_resource_snap_metadata_update(
@@ -2112,9 +2188,11 @@ def vm_disk_resource_snap_update(
 def vm_disk_resource_snaps_get(context, snapshot_vm_resource_id, **kwargs):
     session = kwargs.get('session') or get_session()
     try:
-        query = session.query(models.VMDiskResourceSnaps)\
-                       .options(sa_orm.joinedload(models.VMDiskResourceSnaps.metadata))\
-                       .filter_by(snapshot_vm_resource_id=snapshot_vm_resource_id)
+        query = session.query(
+            models.VMDiskResourceSnaps) .options(
+            sa_orm.joinedload(
+                models.VMDiskResourceSnaps.metadata)) .filter_by(
+                snapshot_vm_resource_id=snapshot_vm_resource_id)
 
         # TODO(gbasava): filter out deleted snapshots if context disallows it
         vm_disk_resource_snaps = query.all()
@@ -2130,10 +2208,12 @@ def vm_disk_resource_snaps_get(context, snapshot_vm_resource_id, **kwargs):
 def vm_disk_resource_snap_get_top(context, snapshot_vm_resource_id):
     session = get_session()
     try:
-        query = session.query(models.VMDiskResourceSnaps)\
-                       .options(sa_orm.joinedload(models.VMDiskResourceSnaps.metadata))\
-                       .filter_by(snapshot_vm_resource_id=snapshot_vm_resource_id)\
-                       .filter_by(top=True)
+        query = session.query(
+            models.VMDiskResourceSnaps) .options(
+            sa_orm.joinedload(
+                models.VMDiskResourceSnaps.metadata)) .filter_by(
+                snapshot_vm_resource_id=snapshot_vm_resource_id) .filter_by(
+                    top=True)
 
         # TODO(gbasava): filter out resource snapshots if context disallows it
         vm_disk_resource_snap = query.one()
@@ -2162,9 +2242,11 @@ def vm_disk_resource_snap_get_bottom(context, snapshot_vm_resource_id):
 @require_context
 def _vm_disk_resource_snap_get(context, vm_disk_resource_snap_id, session):
     try:
-        query = session.query(models.VMDiskResourceSnaps)\
-                       .options(sa_orm.joinedload(models.VMDiskResourceSnaps.metadata))\
-                       .filter_by(id=vm_disk_resource_snap_id)
+        query = session.query(
+            models.VMDiskResourceSnaps) .options(
+            sa_orm.joinedload(
+                models.VMDiskResourceSnaps.metadata)) .filter_by(
+                id=vm_disk_resource_snap_id)
 
         # TODO(gbasava): filter out deleted resource snapshots if context
         # disallows it
@@ -2207,8 +2289,12 @@ def vm_disk_resource_snap_delete(context, vm_disk_resource_snap_id):
 """ network resource snapshot functions """
 
 
-def _set_metadata_for_vm_network_resource_snap(context, vm_network_resource_snap_ref, metadata,
-                                               purge_metadata, session):
+def _set_metadata_for_vm_network_resource_snap(
+        context,
+        vm_network_resource_snap_ref,
+        metadata,
+        purge_metadata,
+        session):
     """
     Create or update a set of vm_network_resource_snap_metadata for a given snapshot
 
@@ -2222,9 +2308,10 @@ def _set_metadata_for_vm_network_resource_snap(context, vm_network_resource_snap
         orig_metadata[metadata_ref.key] = metadata_ref
 
     for key, value in metadata.iteritems():
-        metadata_values = {'vm_network_resource_snap_id': vm_network_resource_snap_ref.vm_network_resource_snap_id,
-                           'key': key,
-                           'value': value}
+        metadata_values = {
+            'vm_network_resource_snap_id': vm_network_resource_snap_ref.vm_network_resource_snap_id,
+            'key': key,
+            'value': value}
         if key in orig_metadata:
             metadata_ref = orig_metadata[key]
             _vm_network_resource_snap_metadata_update(
@@ -2321,9 +2408,11 @@ def vm_network_resource_snap_update(
 def vm_network_resource_snaps_get(context, snapshot_vm_resource_id, **kwargs):
     session = kwargs.get('session') or get_session()
     try:
-        query = session.query(models.VMNetworkResourceSnaps)\
-                       .options(sa_orm.joinedload(models.VMNetworkResourceSnaps.metadata))\
-                       .filter_by(vm_network_resource_snap_id=snapshot_vm_resource_id)
+        query = session.query(
+            models.VMNetworkResourceSnaps) .options(
+            sa_orm.joinedload(
+                models.VMNetworkResourceSnaps.metadata)) .filter_by(
+                vm_network_resource_snap_id=snapshot_vm_resource_id)
 
         # TODO(gbasava): filter out deleted snapshots if context disallows it
         vm_network_resource_snaps = query.all()
@@ -2339,9 +2428,11 @@ def vm_network_resource_snaps_get(context, snapshot_vm_resource_id, **kwargs):
 def vm_network_resource_snap_get(context, vm_network_resource_snap_id):
     session = get_session()
     try:
-        query = session.query(models.VMNetworkResourceSnaps)\
-                       .options(sa_orm.joinedload(models.VMNetworkResourceSnaps.metadata))\
-                       .filter_by(vm_network_resource_snap_id=vm_network_resource_snap_id)
+        query = session.query(
+            models.VMNetworkResourceSnaps) .options(
+            sa_orm.joinedload(
+                models.VMNetworkResourceSnaps.metadata)) .filter_by(
+                vm_network_resource_snap_id=vm_network_resource_snap_id)
 
         # TODO(gbasava): filter out deleted resource snapshots if context
         # disallows it
@@ -2369,8 +2460,12 @@ def vm_network_resource_snap_delete(context, vm_network_resource_snap_id):
 """ security group rule snapshot functions """
 
 
-def _set_metadata_for_vm_security_group_rule_snap(context, vm_security_group_rule_snap_ref, metadata,
-                                                  purge_metadata, session):
+def _set_metadata_for_vm_security_group_rule_snap(
+        context,
+        vm_security_group_rule_snap_ref,
+        metadata,
+        purge_metadata,
+        session):
     """
     Create or update a set of vm_security_group_rule_snap_metadata for a given snapshot
 
@@ -2384,9 +2479,10 @@ def _set_metadata_for_vm_security_group_rule_snap(context, vm_security_group_rul
         orig_metadata[metadata_ref.key] = metadata_ref
 
     for key, value in metadata.iteritems():
-        metadata_values = {'vm_security_group_rule_snap_id': vm_security_group_rule_snap_ref.id,
-                           'key': key,
-                           'value': value}
+        metadata_values = {
+            'vm_security_group_rule_snap_id': vm_security_group_rule_snap_ref.id,
+            'key': key,
+            'value': value}
         if key in orig_metadata:
             metadata_ref = orig_metadata[key]
             _vm_security_group_rule_snap_metadata_update(
@@ -2442,7 +2538,12 @@ def _vm_security_group_rule_snap_metadata_delete(
 
 
 def _vm_security_group_rule_snap_update(
-        context, id, vm_security_group_snap_id, values, purge_metadata, session):
+        context,
+        id,
+        vm_security_group_snap_id,
+        values,
+        purge_metadata,
+        session):
 
     metadata = values.pop('metadata', {})
 
@@ -2481,9 +2582,11 @@ def vm_security_group_rule_snaps_get(
         context, vm_security_group_snap_id, **kwargs):
     session = kwargs.get('session') or get_session()
     try:
-        query = session.query(models.VMSecurityGroupRuleSnaps)\
-                       .options(sa_orm.joinedload(models.VMSecurityGroupRuleSnaps.metadata))\
-                       .filter_by(vm_security_group_snap_id=vm_security_group_snap_id)
+        query = session.query(
+            models.VMSecurityGroupRuleSnaps) .options(
+            sa_orm.joinedload(
+                models.VMSecurityGroupRuleSnaps.metadata)) .filter_by(
+                vm_security_group_snap_id=vm_security_group_snap_id)
 
         # TODO(gbasava): filter out deleted snapshots if context disallows it
         vm_security_group_rule_snaps = query.all()
@@ -2499,10 +2602,12 @@ def vm_security_group_rule_snaps_get(
 def vm_security_group_rule_snap_get(context, id, vm_security_group_snap_id):
     session = get_session()
     try:
-        query = session.query(models.VMSecurityGroupRuleSnaps)\
-                       .options(sa_orm.joinedload(models.VMSecurityGroupRuleSnaps.metadata))\
-                       .filter_by(id=id)\
-                       .filter_by(vm_security_group_snap_id=vm_security_group_snap_id)
+        query = session.query(
+            models.VMSecurityGroupRuleSnaps) .options(
+            sa_orm.joinedload(
+                models.VMSecurityGroupRuleSnaps.metadata)) .filter_by(
+                id=id) .filter_by(
+                    vm_security_group_snap_id=vm_security_group_snap_id)
 
         # TODO(gbasava): filter out deleted resource snapshots if context
         # disallows it
@@ -2635,8 +2740,12 @@ def _restore_update(context, values, restore_id, purge_metadata, session):
         metadata = values.pop('metadata', {})
 
         if restore_id:
-            restore_ref = model_query(context, models.Restores, session=session, read_deleted="yes").\
-                filter_by(id=restore_id).first()
+            restore_ref = model_query(
+                context,
+                models.Restores,
+                session=session,
+                read_deleted="yes"). filter_by(
+                id=restore_id).first()
             if not restore_ref:
                 lock.release()
                 raise exception.RestoreNotFound(restore_id=restore_id)
@@ -2964,10 +3073,11 @@ def restored_vm_update(context, vm_id, restore_id,
 def restored_vms_get(context, restore_id, **kwargs):
     session = kwargs.get('session') or get_session()
     try:
-        query = session.query(models.RestoredVMs)\
-                       .options(sa_orm.joinedload(models.RestoredVMs.metadata))\
-                       .filter_by(restore_id=restore_id)\
-
+        query = session.query(
+            models.RestoredVMs) .options(
+            sa_orm.joinedload(
+                models.RestoredVMs.metadata)) .filter_by(
+                restore_id=restore_id)
         restored_vms = query.all()
 
     except sa_orm.exc.NoResultFound:
@@ -2979,10 +3089,12 @@ def restored_vms_get(context, restore_id, **kwargs):
 @require_context
 def _restored_vm_get(context, vm_id, restore_id, session):
     try:
-        query = session.query(models.RestoredVMs)\
-                       .options(sa_orm.joinedload(models.RestoredVMs.metadata))\
-                       .filter_by(vm_id=vm_id)\
-                       .filter_by(restore_id=restore_id)
+        query = session.query(
+            models.RestoredVMs) .options(
+            sa_orm.joinedload(
+                models.RestoredVMs.metadata)) .filter_by(
+                vm_id=vm_id) .filter_by(
+                    restore_id=restore_id)
 
         # TODO(gbasava): filter out deleted restored_vm if context disallows it
         restored_vm = query.first()
@@ -3015,8 +3127,12 @@ def restored_vm_delete(context, vm_id, restore_id):
 """ restore vm resource functions """
 
 
-def _set_metadata_for_restored_vm_resource(context, restored_vm_resource_ref, metadata,
-                                           purge_metadata, session):
+def _set_metadata_for_restored_vm_resource(
+        context,
+        restored_vm_resource_ref,
+        metadata,
+        purge_metadata,
+        session):
     """
     Create or update a set of restored_vm_resource_metadata for a given restored resource
 
@@ -3030,9 +3146,10 @@ def _set_metadata_for_restored_vm_resource(context, restored_vm_resource_ref, me
         orig_metadata[metadata_ref.key] = metadata_ref
 
     for key, value in metadata.iteritems():
-        metadata_values = {'restored_vm_resource_id': restored_vm_resource_ref.id,
-                           'key': key,
-                           'value': value}
+        metadata_values = {
+            'restored_vm_resource_id': restored_vm_resource_ref.id,
+            'key': key,
+            'value': value}
         if key in orig_metadata:
             metadata_ref = orig_metadata[key]
             _restored_vm_resource_metadata_update(
@@ -3129,10 +3246,12 @@ def restored_vm_resource_update(
 def restored_vm_resources_get(context, vm_id, restore_id):
     session = get_session()
     try:
-        query = session.query(models.RestoredVMResources)\
-                       .options(sa_orm.joinedload(models.RestoredVMResources.metadata))\
-                       .filter_by(vm_id=vm_id)\
-                       .filter_by(restore_id=restore_id)
+        query = session.query(
+            models.RestoredVMResources) .options(
+            sa_orm.joinedload(
+                models.RestoredVMResources.metadata)) .filter_by(
+                vm_id=vm_id) .filter_by(
+                    restore_id=restore_id)
 
         # TODO(gbasava): filter out deleted restores if context disallows it
         restored_vm_resources = query.all()
@@ -3149,19 +3268,20 @@ def restored_vm_resource_get_by_resource_name(
         context, vm_id, restore_id, resource_name):
     session = get_session()
     try:
-        query = session.query(models.RestoredVMResources)\
-                       .options(sa_orm.joinedload(models.RestoredVMResources.metadata))\
-                       .filter_by(vm_id=vm_id)\
-                       .filter_by(restore_id=restore_id)\
-                       .filter_by(resource_name=resource_name)
+        query = session.query(
+            models.RestoredVMResources) .options(
+            sa_orm.joinedload(
+                models.RestoredVMResources.metadata)) .filter_by(
+                vm_id=vm_id) .filter_by(
+                    restore_id=restore_id) .filter_by(
+                        resource_name=resource_name)
 
         # TODO(gbasava): filter out deleted restores if context disallows it
         restored_vm_resources = query.first()
 
     except sa_orm.exc.NoResultFound:
-        raise exception.RestoredVMResourceWithNameNotFound(resource_name=resource_name,
-                                                           restore_vm_id=vm_id,
-                                                           restore_id=restore_id)
+        raise exception.RestoredVMResourceWithNameNotFound(
+            resource_name=resource_name, restore_vm_id=vm_id, restore_id=restore_id)
 
     return restored_vm_resources
 
@@ -3170,9 +3290,11 @@ def restored_vm_resource_get_by_resource_name(
 def restored_vm_resource_get(context, id):
     session = get_session()
     try:
-        query = session.query(models.RestoredVMResources)\
-                       .options(sa_orm.joinedload(models.RestoredVMResources.metadata))\
-                       .filter_by(id=id)
+        query = session.query(
+            models.RestoredVMResources) .options(
+            sa_orm.joinedload(
+                models.RestoredVMResources.metadata)) .filter_by(
+                id=id)
 
         # TODO(gbasava): filter out deleted restored if context disallows it
         restored_vm_resources = query.first()
@@ -3260,8 +3382,12 @@ def _task_update(context, values, task_id, session):
         status_messages = values.pop('status_messages', {})
 
         if task_id:
-            task_ref = model_query(context, models.Tasks, session=session, read_deleted="yes").\
-                filter_by(id=task_id).first()
+            task_ref = model_query(
+                context,
+                models.Tasks,
+                session=session,
+                read_deleted="yes"). filter_by(
+                id=task_id).first()
             if not task_ref:
                 lock.release()
                 raise exception.TasksNotFound(task_id=task_id)
@@ -3468,10 +3594,13 @@ def _setting_update(context, values, setting_name, purge_metadata, session):
         metadata = values.pop('metadata', {})
 
         if setting_name:
-            setting_ref = model_query(context, models.Settings, session=session, read_deleted="yes").\
-                filter_by(name=setting_name).\
-                filter_by(project_id=context.project_id).\
-                first()
+            setting_ref = model_query(
+                context,
+                models.Settings,
+                session=session,
+                read_deleted="yes"). filter_by(
+                name=setting_name). filter_by(
+                project_id=context.project_id). first()
             if not setting_ref:
                 lock.release()
                 raise exception.SettingNotFound(setting_name=setting_name)
@@ -3672,8 +3801,12 @@ def _vault_storage_update(
         metadata = values.pop('metadata', {})
 
         if vault_storage_id:
-            vault_storage_ref = model_query(context, models.VaultStorages, session=session, read_deleted="yes").\
-                filter_by(id=vault_storage_id).first()
+            vault_storage_ref = model_query(
+                context,
+                models.VaultStorages,
+                session=session,
+                read_deleted="yes"). filter_by(
+                id=vault_storage_id).first()
             if not vault_storage_ref:
                 lock.release()
                 raise exception.VaultStorageNotFound(
@@ -3989,9 +4122,14 @@ def _config_backup_update(context, backup_id, values, session):
         metadata = values.pop('metadata', {})
 
         if backup_id:
-            backup_ref = model_query(context, models.ConfigBackups, session=session, read_deleted="yes"). \
-                options(sa_orm.joinedload(models.ConfigBackups.metadata)).\
-                filter_by(id=backup_id).first()
+            backup_ref = model_query(
+                context,
+                models.ConfigBackups,
+                session=session,
+                read_deleted="yes"). options(
+                sa_orm.joinedload(
+                    models.ConfigBackups.metadata)). filter_by(
+                id=backup_id).first()
             if not backup_ref:
                 lock.release()
                 raise exception.ConfigBackupNotFound(backup_id=backup_id)
@@ -4047,8 +4185,14 @@ def config_backup_get_all(context, **kwargs):
             date_to = kwargs['date_to']
         else:
             date_to = datetime.now()
-        qs = qs.filter(and_(models.ConfigBackups.created_at >= func.date_format(kwargs['date_from'], '%y-%m-%dT%H:%i:%s'),
-                            models.ConfigBackups.created_at <= func.date_format(date_to, '%y-%m-%dT%H:%i:%s')))
+        qs = qs.filter(
+            and_(
+                models.ConfigBackups.created_at >= func.date_format(
+                    kwargs['date_from'],
+                    '%y-%m-%dT%H:%i:%s'),
+                models.ConfigBackups.created_at <= func.date_format(
+                    date_to,
+                    '%y-%m-%dT%H:%i:%s')))
 
     return qs.order_by(models.ConfigBackups.created_at.desc()).all()
 

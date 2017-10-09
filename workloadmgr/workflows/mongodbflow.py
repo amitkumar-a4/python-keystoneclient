@@ -534,12 +534,12 @@ def secondaryhosts_to_backup(
             # print 'Getting secondary from hosts in ', hosts
             # Get the replica set for each shard
             if username != '':
-                c = pymongo.MongoClient("mongodb://" + username + ":" +
-                                        password + "@" + hosts,
-                                        read_preference=ReadPreference.SECONDARY)
+                c = pymongo.MongoClient(
+                    "mongodb://" + username + ":" + password + "@" + hosts,
+                    read_preference=ReadPreference.SECONDARY)
             else:
-                c = pymongo.MongoClient(hosts,
-                                        read_preference=ReadPreference.SECONDARY)
+                c = pymongo.MongoClient(
+                    hosts, read_preference=ReadPreference.SECONDARY)
 
             status = c.admin.command('replSetGetStatus')
 
@@ -560,7 +560,8 @@ def secondaryhosts_to_backup(
                             hosts_to_backup.append({'replicaSetName': status['set'],
                                                     'secondaryReplica': m['name']})
                         else:
-                            LOG.error(_(preferredreplica + " state is " +
+                            LOG.error(_(preferredreplica +
+                                        " state is " +
                                         m['stateStr'] +
                                         ". Will pick next secondary for backup"))
                             for m in status['members']:
@@ -651,7 +652,7 @@ def get_vms(cntx, dbhost, dbport, mongodbusername,
             hosts = hosts.replace('/', '').strip()
             for h in hosts.split(','):
                 hostname = h.split(':')[0]
-                if not hostname in hostnames:
+                if hostname not in hostnames:
                     hostnames[hostname] = 1
 
         # Add config servers to the mix
@@ -661,10 +662,10 @@ def get_vms(cntx, dbhost, dbport, mongodbusername,
         for cfgsrv in cfgsrvs:
             cfghost = cfgsrv.split(':')[0]
             cfgport = cfgsrv.split(':')[1]
-            if not cfghost in hostnames:
+            if cfghost not in hostnames:
                 hostnames[cfghost] = 1
 
-        if not dbhost in hostnames:
+        if dbhost not in hostnames:
             hostnames[dbhost] = 1
     else:
         # this is a replica set
@@ -679,9 +680,8 @@ def get_vms(cntx, dbhost, dbport, mongodbusername,
     interfaces = {}
     for hostname in hostnames:
         try:
-            mac_addresses = utils.get_mac_addresses(hostname, sshport,
-                                                    username=hostusername,
-                                                    password=hostpassword, timeout=120)
+            mac_addresses = utils.get_mac_addresses(
+                hostname, sshport, username=hostusername, password=hostpassword, timeout=120)
             for mac in mac_addresses:
                 interfaces[mac.lower()] = hostname
 
@@ -720,14 +720,15 @@ def get_vms(cntx, dbhost, dbport, mongodbusername,
                         clustername = clusprop['name']
 
                 hypervisor_hostname = clustername
-                utils.append_unique(vms, {'vm_id': instance.id,
-                                          'vm_name': instance.name,
-                                          'vm_metadata': instance.metadata,
-                                          'vm_flavor_id': instance.flavor['id'],
-                                          'hostname': interfaces[addr['macAddress'].lower()],
-                                          'vm_power_state': instance.__dict__['OS-EXT-STS:power_state'],
-                                          'hypervisor_hostname': hypervisor_hostname,
-                                          'hypervisor_type': hypervisor_type},
+                utils.append_unique(vms,
+                                    {'vm_id': instance.id,
+                                     'vm_name': instance.name,
+                                     'vm_metadata': instance.metadata,
+                                     'vm_flavor_id': instance.flavor['id'],
+                                     'hostname': interfaces[addr['macAddress'].lower()],
+                                        'vm_power_state': instance.__dict__['OS-EXT-STS:power_state'],
+                                        'hypervisor_hostname': hypervisor_hostname,
+                                        'hypervisor_type': hypervisor_type},
                                     "vm_id")
                 break
 
@@ -794,8 +795,11 @@ class MongoDBWorkflow(workflow.Workflow):
     # : usename/password - username and password to authenticate to the database
     #
     def initflow(self, composite=False):
-        connection = connect_server(self._store['DBHost'], self._store['DBPort'],
-                                    self._store['DBUser'], self._store['DBPassword'])
+        connection = connect_server(
+            self._store['DBHost'],
+            self._store['DBPort'],
+            self._store['DBUser'],
+            self._store['DBPassword'])
         isMongos = isShardedCluster(connection)
         self.find_first_alive_node()
         cntx = amqp.RpcContext.from_dict(self._store['context'])
@@ -807,12 +811,13 @@ class MongoDBWorkflow(workflow.Workflow):
                             self._store['HostUsername'],
                             self._store['HostPassword'])
         self._store['topology'] = self.topology()
-        hosts_to_backup = secondaryhosts_to_backup(cntx,
-                                                   self._store['DBHost'],
-                                                   self._store['DBPort'],
-                                                   self._store['DBUser'],
-                                                   self._store['DBPassword'],
-                                                   self._store['preferredgroup'])
+        hosts_to_backup = secondaryhosts_to_backup(
+            cntx,
+            self._store['DBHost'],
+            self._store['DBPort'],
+            self._store['DBUser'],
+            self._store['DBPassword'],
+            self._store['preferredgroup'])
 
         self._store['instances'] = []
 
@@ -917,23 +922,35 @@ class MongoDBWorkflow(workflow.Workflow):
             cntx = amqp.RpcContext.from_dict(self._store['context'])
             db = WorkloadMgrDB().db
             if 'snapshot' in self._store:
-                db.snapshot_update(cntx, self._store['snapshot']['id'],
-                                   {'progress_msg': 'Discovering MongoDB Databases'})
+                db.snapshot_update(
+                    cntx, self._store['snapshot']['id'], {
+                        'progress_msg': 'Discovering MongoDB Databases'})
 
             fh, outfile_path = mkstemp()
             os.close(fh)
             fh, errfile_path = mkstemp()
             os.close(fh)
 
-            cmdspec = ["python", "/opt/stack/workloadmgr/workloadmgr/workflows/mongodbnodes.py",
-                       "--config-file", "/etc/workloadmgr/workloadmgr.conf",
-                       "--defaultnode", self._store['DBHost'],
-                       "--port", self._store['HostSSHPort'],
-                       "--username", self._store['HostUsername'],
-                       "--password", "******",
-                       "--dbport", self._store["DBPort"],
-                       "--dbuser", self._store["DBUser"],
-                       "--dbpassword", self._store["DBPassword"], ]
+            cmdspec = [
+                "python",
+                "/opt/stack/workloadmgr/workloadmgr/workflows/mongodbnodes.py",
+                "--config-file",
+                "/etc/workloadmgr/workloadmgr.conf",
+                "--defaultnode",
+                self._store['DBHost'],
+                "--port",
+                self._store['HostSSHPort'],
+                "--username",
+                self._store['HostUsername'],
+                "--password",
+                "******",
+                "--dbport",
+                self._store["DBPort"],
+                "--dbuser",
+                self._store["DBUser"],
+                "--dbpassword",
+                self._store["DBPassword"],
+            ]
 
             if self._store.get('hostnames', None):
                 hosts = ""
@@ -1027,13 +1044,17 @@ class MongoDBWorkflow(workflow.Workflow):
             LOG.debug(_('Getting secondary from hosts in ' + hosts +
                         " for replica " + replica))
             if self._store['DBUser'] != '':
-                repl = pymongo.MongoClient("mongodb://" + self._store['DBUser'] + ":" +
-                                           self._store['DBPassword'] +
-                                           "@" + hosts,
-                                           read_preference=ReadPreference.SECONDARY)
+                repl = pymongo.MongoClient(
+                    "mongodb://" +
+                    self._store['DBUser'] +
+                    ":" +
+                    self._store['DBPassword'] +
+                    "@" +
+                    hosts,
+                    read_preference=ReadPreference.SECONDARY)
             else:
-                repl = pymongo.MongoClient(hosts,
-                                           read_preference=ReadPreference.SECONDARY)
+                repl = pymongo.MongoClient(
+                    hosts, read_preference=ReadPreference.SECONDARY)
             status = repl.admin.command('replSetGetStatus')
 
             replstatus = {}

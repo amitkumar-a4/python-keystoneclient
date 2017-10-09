@@ -604,8 +604,8 @@ class SwiftRepository(ObjectRepository):
     def object_close(self, object_name, fh):
 
         try:
-            segments_dir = self.manifest[object_name].get('segments-dir',
-                                                          object_name + "-segments")
+            segments_dir = self.manifest[object_name].get(
+                'segments-dir', object_name + "-segments")
             container, prefix = self.split_head_tail(segments_dir)
             object_manifest = []
             segments_list = {}
@@ -620,19 +620,26 @@ class SwiftRepository(ObjectRepository):
                         st = self.object_getattr(
                             self.manifest[object_name][offset]['name'], fh)
                         stat = bunchify(st)
-                        object_manifest.append({"path": self.manifest[object_name][offset]['name'],
-                                                "etag": stat.etag,
-                                                "size_bytes": min(stat.st_size, CONF.vault_segment_size)})
+                        object_manifest.append(
+                            {
+                                "path": self.manifest[object_name][offset]['name'],
+                                "etag": stat.etag,
+                                "size_bytes": min(
+                                    stat.st_size,
+                                    CONF.vault_segment_size)})
                     else:
-                        object_manifest.append({"path": self.manifest[object_name][offset]['name'],
-                                                "etag": self.manifest[object_name][offset]['hash'],
-                                                "size_bytes": self.manifest[object_name][offset]['bytes']})
+                        object_manifest.append(
+                            {
+                                "path": self.manifest[object_name][offset]['name'],
+                                "etag": self.manifest[object_name][offset]['hash'],
+                                "size_bytes": self.manifest[object_name][offset]['bytes']})
 
                     offset += CONF.vault_segment_size
 
                 object_manifest = json.dumps(object_manifest)
-                self._write_object_manifest(object_name, object_manifest,
-                                            metadata={'segments-dir': segments_dir})
+                self._write_object_manifest(
+                    object_name, object_manifest, metadata={
+                        'segments-dir': segments_dir})
 
                 offset = 0
                 while True:
@@ -673,8 +680,8 @@ class SwiftRepository(ObjectRepository):
             seg_fullname = self.manifest[object_name][offset]['name']
         else:
             segname = self.next_segname_from_offset(object_name, offset)
-            segments_dir = self.manifest[object_name].get('segments-dir',
-                                                          object_name + "-segments")
+            segments_dir = self.manifest[object_name].get(
+                'segments-dir', object_name + "-segments")
 
             seg_fullname = os.path.join(segments_dir, segname)
 
@@ -785,8 +792,8 @@ class SwiftRepository(ObjectRepository):
         if len(files) == 0:
             return SEGMENT_FORMAT % (int(offset), int(0))
 
-        return SEGMENT_FORMAT % (int(offset),
-                                 int(sorted(files)[-1].split(segments_dir)[1].split('.')[1], 16) + 1)
+        return SEGMENT_FORMAT % (int(offset), int(
+            sorted(files)[-1].split(segments_dir)[1].split('.')[1], 16) + 1)
         pass
 
     def curr_segname_from_offset(self, path, offset):
@@ -808,8 +815,8 @@ class SwiftRepository(ObjectRepository):
         if len(files) == 0:
             return SEGMENT_FORMAT % (int(offset), int(0))
 
-        return SEGMENT_FORMAT % (int(offset),
-                                 int(sorted(files)[-1].split(segments_dir)[1].split('.')[1], 16))
+        return SEGMENT_FORMAT % (int(offset), int(
+            sorted(files)[-1].split(segments_dir)[1].split('.')[1], 16))
 
     def object_getattr(self, object_name, fh=None):
         full_path = self._full_path(object_name)
@@ -847,8 +854,8 @@ class SwiftRepository(ObjectRepository):
             if prefix is not None and 'authorized_key' in prefix:
                 d['st_mode'] = 33152
             d['st_size'] = int(st['headers']['content-length'])
-            if (d['st_size'] == 0 and container == '') or (d['st_size'] == 0 and prefix is None) or \
-                    (d['st_size'] == 0 and prefix == ''):
+            if (d['st_size'] == 0 and container == '') or (d['st_size'] ==
+                                                           0 and prefix is None) or (d['st_size'] == 0 and prefix == ''):
                 d['st_nlink'] = 3
                 d['st_size'] = 4096
                 d['st_mode'] = 16893
@@ -878,8 +885,20 @@ class SwiftRepository(ObjectRepository):
             if prefix == '4913' or prefix[:-1].endswith('~'):
                 return
             st = os.lstat(full_path)
-            d = dict((key, getattr(st, key)) for key in ('st_atime', 'st_ctime',
-                                                         'st_gid', 'st_mode', 'st_mtime', 'st_nlink', 'st_size', 'st_uid',))
+            d = dict(
+                (key,
+                 getattr(
+                     st,
+                     key)) for key in (
+                    'st_atime',
+                    'st_ctime',
+                    'st_gid',
+                    'st_mode',
+                    'st_mtime',
+                    'st_nlink',
+                    'st_size',
+                    'st_uid',
+                ))
 
         # st_blksize and st_blocks are import for qemu-img info command to
         # display disk size attribute correctly. Without this information
@@ -923,7 +942,7 @@ class SwiftRepository(ObjectRepository):
                 except BaseException:
                     pass
             if component is not None and component != '' and \
-                    not '-segments' in component and not '_segments' in component:
+                    '-segments' in component and not '_segments' not in component:
                 if component not in dirents:
                     dirents.append(component)
         for r in list(dirents):
@@ -1044,8 +1063,9 @@ class SwiftRepository(ObjectRepository):
                                      "etag": man['hash'],
                                      "size_bytes": man['bytes']})
             new_manifest = json.dumps(new_manifest)
-            self._write_object_manifest(new, new_manifest,
-                                        metadata={'segments-dir': segments_dir})
+            self._write_object_manifest(
+                new, new_manifest, metadata={
+                    'segments-dir': segments_dir})
             self.object_unlink(old, leave_segments=True)
         except BaseException:
             self.object_unlink(new, leave_segments=True)
@@ -1159,7 +1179,8 @@ class FileRepository(ObjectRepository):
             stat = os.stat(objects[-1])
             object_manifest.append({"path": objects[-1],
                                     "etag": "etagoftheobjectsegment1",
-                                    "size_bytes": min(stat.st_size, CONF.vault_segment_size)})
+                                    "size_bytes": min(stat.st_size,
+                                                      CONF.vault_segment_size)})
             offset += CONF.vault_segment_size
 
         with open(manifest, "w") as manf:
@@ -1232,8 +1253,19 @@ class FileRepository(ObjectRepository):
     def object_getattr(self, object_name, fh=None):
         full_path = self._full_path(object_name)
         st = os.lstat(full_path)
-        attrs = dict((key, getattr(st, key)) for key in ('st_atime', 'st_ctime',
-                                                         'st_gid', 'st_mode', 'st_mtime', 'st_nlink', 'st_size', 'st_uid'))
+        attrs = dict(
+            (key,
+             getattr(
+                 st,
+                 key)) for key in (
+                'st_atime',
+                'st_ctime',
+                'st_gid',
+                'st_mode',
+                'st_mtime',
+                'st_nlink',
+                'st_size',
+                'st_uid'))
 
         try:
             with open(full_path + ".manifest") as manf:
@@ -1267,9 +1299,21 @@ class FileRepository(ObjectRepository):
     def object_statfs(self, path):
         full_path = self._full_path(path)
         stv = os.statvfs(full_path)
-        return dict((key, getattr(stv, key)) for key in ('f_bavail', 'f_bfree',
-                                                         'f_blocks', 'f_bsize', 'f_favail', 'f_ffree', 'f_files', 'f_flag',
-                                                         'f_frsize', 'f_namemax'))
+        return dict(
+            (key,
+             getattr(
+                 stv,
+                 key)) for key in (
+                'f_bavail',
+                'f_bfree',
+                'f_blocks',
+                'f_bsize',
+                'f_favail',
+                'f_ffree',
+                'f_files',
+                'f_flag',
+                'f_frsize',
+                'f_namemax'))
 
     def destroy(self, path):
         shutil.rmtree(self.root)
@@ -1288,8 +1332,10 @@ class FuseCache(object):
         if self.lrucache.get(fh, None):
             self.lrucache.pop(fh)
 
-        self.lrucache[fh] = {'lrucache': LRUCache(maxsize=CONF.vault_cache_size),
-                             'object_name': object_name}
+        self.lrucache[fh] = {
+            'lrucache': LRUCache(
+                maxsize=CONF.vault_cache_size),
+            'object_name': object_name}
         return fh
 
     def object_flush(self, object_name, fh):
@@ -1299,7 +1345,7 @@ class FuseCache(object):
         try:
             while True:
                 off, item = cache.popitem()
-                if item['modified'] == True:
+                if item['modified']:
                     self.repository.object_upload(
                         object_name, off, item['data'])
         except BaseException:
@@ -1344,7 +1390,7 @@ class FuseCache(object):
                         # cache overflow
                         # kick an item so we can accomodate new one
                         off, item = cache.popitem()
-                        if item['modified'] == True:
+                        if item['modified']:
                             self.repository.object_upload(
                                 object_name, off, item['data'])
 
@@ -1373,7 +1419,7 @@ class FuseCache(object):
                     # cache overflow
                     # kick an item so we can accomodate new one
                     off, item = cache.popitem()
-                    if item['modified'] == True:
+                    if item['modified']:
                         self.repository.object_upload(
                             object_name, off, item['data'])
 

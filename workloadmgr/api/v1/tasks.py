@@ -64,8 +64,12 @@ class TasksController(wsgi.Controller):
             status = get_value(value='status')
             page = get_value(value='page')
             size = get_value(value='size')
-            tasks = self.workload_api.tasks_get(context, status=status, page=page,
-                                                size=size, time_in_minutes=time_in_minutes)
+            tasks = self.workload_api.tasks_get(
+                context,
+                status=status,
+                page=page,
+                size=size,
+                time_in_minutes=time_in_minutes)
             return self._view_builder.detail_list(req, tasks)
         except exception.TaskNotFound as error:
             LOG.exception(error)

@@ -77,8 +77,9 @@ class BaseWorkloadTestCase(test.TestCase):
         super(BaseWorkloadTestCase, self).setUp()
         self.context = context.get_admin_context()
 
-        CONF.set_default('vault_storage_nfs_export',
-                         'server1:nfsshare1, server2:nfsshare2, server3:nfsshare3')
+        CONF.set_default(
+            'vault_storage_nfs_export',
+            'server1:nfsshare1, server2:nfsshare2, server3:nfsshare3')
 
         self.is_online_patch = patch(
             'workloadmgr.vault.vault.NfsTrilioVaultBackupTarget.is_online')
@@ -118,18 +119,21 @@ class BaseWorkloadTestCase(test.TestCase):
 
     def test_get_new_volume_type(self):
         from workloadmgr.virt.libvirt import restore_vm_flow
-        new_type = restore_vm_flow.get_new_volume_type(get_restore_options()['openstack']['instances'][0],
-                                                       u'b07c8751-f475-4f4c-94e7-72733f256b0b',
-                                                       "lvm")
+        new_type = restore_vm_flow.get_new_volume_type(
+            get_restore_options()['openstack']['instances'][0],
+            u'b07c8751-f475-4f4c-94e7-72733f256b0b',
+            "lvm")
         self.assertEqual(new_type, 'ceph')
-        new_type = restore_vm_flow.get_new_volume_type(get_restore_options()['openstack']['instances'][1],
-                                                       u'b07c8751-f475-4f4c-94e7-72733f256b0b',
-                                                       "lvm")
+        new_type = restore_vm_flow.get_new_volume_type(
+            get_restore_options()['openstack']['instances'][1],
+            u'b07c8751-f475-4f4c-94e7-72733f256b0b',
+            "lvm")
         self.assertEqual(new_type, 'lvm')
 
-        new_type = restore_vm_flow.get_new_volume_type(get_restore_options()['openstack']['instances'][1],
-                                                       u'a07c8751-f475-4f4c-94e7-72733f256b0b',
-                                                       "lvm")
+        new_type = restore_vm_flow.get_new_volume_type(
+            get_restore_options()['openstack']['instances'][1],
+            u'a07c8751-f475-4f4c-94e7-72733f256b0b',
+            "lvm")
         self.assertEqual(new_type, 'lvm')
 
     def test_get_availability_zone(self):

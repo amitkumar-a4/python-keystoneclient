@@ -48,8 +48,9 @@ class BaseVaultTestCase(test.TestCase):
     def setUp(self):
         super(BaseVaultTestCase, self).setUp()
 
-        CONF.set_default('vault_storage_nfs_export',
-                         'server1:nfsshare1, server2:nfsshare2, server3:nfsshare3')
+        CONF.set_default(
+            'vault_storage_nfs_export',
+            'server1:nfsshare1, server2:nfsshare2, server3:nfsshare3')
 
         self.context = context.get_admin_context()
         patch('sys.stderr').start()
@@ -86,7 +87,9 @@ class BaseVaultTestCase(test.TestCase):
         super(BaseVaultTestCase, self).tearDown()
 
     @patch('subprocess.check_call')
-    @patch('workloadmgr.db.imports.import_workload_1_0_177.get_context', lambda x: x)
+    @patch(
+        'workloadmgr.db.imports.import_workload_1_0_177.get_context',
+        lambda x: x)
     @patch('workloadmgr.db.imports.import_workload_1_0_177.project_id_exists')
     @patch('workloadmgr.vault.vault.NfsTrilioVaultBackupTarget.is_online')
     def test_import_workloads_all(self, mock_method1,
@@ -150,19 +153,36 @@ class BaseVaultTestCase(test.TestCase):
                 (fulls * workload_backup_media_size * CONF.workload_full_backup_factor +
                  incrs * workload_backup_media_size * CONF.workload_incr_backup_factor) / 100
 
-            workload_metadata = [{'key': 'workload_approx_backup_size', 'value': workload_approx_backup_size,
-                                  'deleted': False, 'created_at': None, 'updated_at': None,
-                                  'version': '2.3.1', 'workload_id': workload['id'], 'deleted_at': None}]
+            workload_metadata = [
+                {
+                    'key': 'workload_approx_backup_size',
+                    'value': workload_approx_backup_size,
+                    'deleted': False,
+                    'created_at': None,
+                    'updated_at': None,
+                    'version': '2.3.1',
+                    'workload_id': workload['id'],
+                    'deleted_at': None}]
             workload['metadata'] = workload_metadata
             backup_endpoint = workloadmgr.vault.vault.get_nfs_share_for_workload_by_free_overcommit(
                 self.context, workload)
-            workload_metadata = [{'key': 'workload_approx_backup_size', 'value': workload_approx_backup_size,
-                                  'deleted': False, 'created_at': None, 'updated_at': None,
-                                  'version': '2.3.1', 'workload_id': workload['id'], 'deleted_at': None,
+            workload_metadata = [{'key': 'workload_approx_backup_size',
+                                  'value': workload_approx_backup_size,
+                                  'deleted': False,
+                                  'created_at': None,
+                                  'updated_at': None,
+                                  'version': '2.3.1',
+                                  'workload_id': workload['id'],
+                                  'deleted_at': None,
                                   'id': str(uuid.uuid4())},
-                                 {'key': 'backup_media_target', 'value': backup_endpoint,
-                                  'deleted': False, 'created_at': None, 'updated_at': None,
-                                  'version': '2.3.1', 'workload_id': workload['id'], 'deleted_at': None,
+                                 {'key': 'backup_media_target',
+                                  'value': backup_endpoint,
+                                  'deleted': False,
+                                  'created_at': None,
+                                  'updated_at': None,
+                                  'version': '2.3.1',
+                                  'workload_id': workload['id'],
+                                  'deleted_at': None,
                                   'id': str(uuid.uuid4())}]
 
             workload['metadata'] = workload_metadata
@@ -230,32 +250,77 @@ class BaseVaultTestCase(test.TestCase):
             else:
                 snapsize = workload['size'] / (10 * random.randint(1, 10))
 
-            snapshot_db = {"finished_at": None, "updated_at": None, "deleted_at": None, "id": snap_id,
-                           "size": snapsize, "user_id": "fake", "restore_size": 0,
-                           "display_description": "this is a test snapshot", "time_taken": 2,
-                           "pinned": False, "version": "2.3.1", "project_id": "fake",
-                           "metadata": [{"deleted": False, "created_at": None, "updated_at": None, "value": "0",
-                                         "version": "2.3.1", "key": "object_store_transfer_time",
-                                         "snapshot_id": snap_id, "deleted_at": None,
+            snapshot_db = {"finished_at": None,
+                           "updated_at": None,
+                           "deleted_at": None,
+                           "id": snap_id,
+                           "size": snapsize,
+                           "user_id": "fake",
+                           "restore_size": 0,
+                           "display_description": "this is a test snapshot",
+                           "time_taken": 2,
+                           "pinned": False,
+                           "version": "2.3.1",
+                           "project_id": "fake",
+                           "metadata": [{"deleted": False,
+                                         "created_at": None,
+                                         "updated_at": None,
+                                         "value": "0",
+                                         "version": "2.3.1",
+                                         "key": "object_store_transfer_time",
+                                         "snapshot_id": snap_id,
+                                         "deleted_at": None,
                                          "id": str(uuid.uuid4())},
-                                        {"deleted": False, "created_at": None, "updated_at": None, "value": "0",
-                                         "version": "2.3.1", "key": "data_transfer_time", "snapshot_id": snap_id,
-                                         "deleted_at": None, "id": str(uuid.uuid4())},
-                                        {"deleted": False, "created_at": None, "updated_at": None, "value": "1188",
-                                         "version": "2.3.1", "key": "workload_approx_backup_size",
-                                         "snapshot_id": snap_id, "deleted_at": None,
+                                        {"deleted": False,
+                                         "created_at": None,
+                                         "updated_at": None,
+                                         "value": "0",
+                                         "version": "2.3.1",
+                                         "key": "data_transfer_time",
+                                         "snapshot_id": snap_id,
+                                         "deleted_at": None,
                                          "id": str(uuid.uuid4())},
-                                        {"deleted": False, "created_at": None, "updated_at": None, "value": "server2:nfsshare2",
-                                         "version": "2.3.1", "key": "backup_media_target", "snapshot_id": snap_id,
-                                         "deleted_at": None, "id": str(uuid.uuid4())},
-                                        {"deleted": False, "created_at": None, "updated_at": None,
-                                         "value": "\"", "version": "2.3.1", "key": "topology",
-                                         "snapshot_id": snap_id, "deleted_at": None, "id": str(uuid.uuid4())}],
-                           "status": "available", "vault_storage_id": None, "deleted": False, "warning_msg": None,
-                           "host": "openstack", "progress_msg": "Initializing Snapshot Workflow",
-                           "display_name": "test_snapshot", "error_msg": None, "uploaded_size": 0,
-                           "created_at": None, "snapshot_type": "full", "progress_percent": 0,
-                           "data_deleted": False, "workload_id": workload['id']}
+                                        {"deleted": False,
+                                         "created_at": None,
+                                         "updated_at": None,
+                                         "value": "1188",
+                                         "version": "2.3.1",
+                                         "key": "workload_approx_backup_size",
+                                         "snapshot_id": snap_id,
+                                         "deleted_at": None,
+                                         "id": str(uuid.uuid4())},
+                                        {"deleted": False,
+                                         "created_at": None,
+                                         "updated_at": None,
+                                         "value": "server2:nfsshare2",
+                                         "version": "2.3.1",
+                                         "key": "backup_media_target",
+                                         "snapshot_id": snap_id,
+                                         "deleted_at": None,
+                                         "id": str(uuid.uuid4())},
+                                        {"deleted": False,
+                                         "created_at": None,
+                                         "updated_at": None,
+                                         "value": "\"",
+                                         "version": "2.3.1",
+                                         "key": "topology",
+                                         "snapshot_id": snap_id,
+                                         "deleted_at": None,
+                                         "id": str(uuid.uuid4())}],
+                           "status": "available",
+                           "vault_storage_id": None,
+                           "deleted": False,
+                           "warning_msg": None,
+                           "host": "openstack",
+                           "progress_msg": "Initializing Snapshot Workflow",
+                           "display_name": "test_snapshot",
+                           "error_msg": None,
+                           "uploaded_size": 0,
+                           "created_at": None,
+                           "snapshot_type": "full",
+                           "progress_percent": 0,
+                           "data_deleted": False,
+                           "workload_id": workload['id']}
 
             with open(os.path.join(snap_path, 'snapshot_db'), "w") as f:
                 f.write(json.dumps(snapshot_db))
@@ -265,7 +330,7 @@ class BaseVaultTestCase(test.TestCase):
             for snap in os.listdir(workload_path):
                 if snapname in snap:
                     continue
-                if not "snapshot_" in snap:
+                if "snapshot_" not in snap:
                     continue
                 snaps.append(snap)
 

@@ -1,5 +1,5 @@
 #!/bin/bash
-set -eu
+set - eu
 
 function usage {
   echo "Usage: $0 [OPTION]..."
@@ -35,8 +35,8 @@ function usage {
 }
 
 function process_options {
-  i=1
-  while [ $i -le $# ]; do
+  i = 1
+  while [$i - le $  # ]; do
     case "${!i}" in
       -h|--help) usage;;
       -V|--virtual-env) always_venv=1; never_venv=0;;
@@ -51,33 +51,29 @@ function process_options {
       -P|--no-pep8) no_pep8=1;;
       -c|--coverage) coverage=1;;
       -d|--debug) debug=1;;
-      --virtual-env-path)
-        (( i++ ))
-        venv_path=${!i}
-        ;;
-      --virtual-env-name)
-        (( i++ ))
-        venv_dir=${!i}
-        ;;
-      --tools-path)
-        (( i++ ))
-        tools_path=${!i}
-        ;;
+      --virtual - env - path)
+        ((i + +))
+        venv_path=${!i}; ;
+      --virtual - env - name)
+        ((i + +))
+        venv_dir=${!i}; ;
+      --tools - path)
+        ((i + +))
+        tools_path=${!i}; ;
       --concurrency)
-        (( i++ ))
-        concurrency=${!i}
-        ;;
+        ((i + +))
+        concurrency=${!i}; ;
       -*) testropts="$testropts ${!i}";;
       *) testrargs="$testrargs ${!i}"
     esac
-    (( i++ ))
+    ((i + +))
   done
 }
 
-tool_path=${tools_path:-$(pwd)}
-venv_path=${venv_path:-$(pwd)}
-venv_dir=${venv_name:-.venv}
-with_venv=tools/with_venv.sh
+tool_path=${tools_path: -$(pwd)}
+venv_path=${venv_path: -$(pwd)}
+venv_dir=${venv_name: -.venv}
+with_venv=tools / with_venv.sh
 always_venv=0
 never_venv=0
 force=0
@@ -95,8 +91,8 @@ recreate_db=1
 update=0
 concurrency=1
 
-LANG=en_US.UTF-8
-LANGUAGE=en_US:en
+LANG=en_US.UTF - 8
+LANGUAGE=en_US: en
 LC_ALL=C
 
 process_options $@
@@ -105,23 +101,22 @@ export venv_path
 export venv_dir
 export venv_name
 export tools_dir
-export venv=${venv_path}/${venv_dir}
+export venv=${venv_path} /${venv_dir}
 
-if [ $no_site_packages -eq 1 ]; then
+if [$no_site_packages - eq 1]; then
   installvenvopts="--no-site-packages"
 fi
 
-function run_tests {
-  # Cleanup *pyc
-  ${wrapper} find . -type f -name "*.pyc" -delete
+function run_tests {  # Cleanup *pyc
+  ${wrapper} find . -type f - name "*.pyc" - delete
 
-  if [ $debug -eq 1 ]; then
-    if [ "$testropts" = "" ] && [ "$testrargs" = "" ]; then
+  if [$debug - eq 1]; then
+    if ["$testropts"=""] & & ["$testrargs"=""]; then
       # Default to running all tests if specific test is not
       # provided.
       testrargs="discover ./workloadmgr/tests/"
     fi
-    ${wrapper} python -m testtools.run $testropts $testrargs
+    ${wrapper} python - m testtools.run $testropts $testrargs
 
     # Short circuit because all of the testr and coverage stuff
     # below does not make sense when running testtools.run for
@@ -129,52 +124,52 @@ function run_tests {
     return $?
   fi
 
-  if [ $coverage -eq 1 ]; then
+  if [$coverage - eq 1]; then
     TESTRTESTS="$TESTRTESTS --coverage"
-    if [ -z "${PYTHONPATH:-}" ]; then
-        export PYTHONPATH=./
+    if [-z "${PYTHONPATH:-}"]; then
+        export PYTHONPATH=. /
     else
-        export PYTHONPATH=$PYTHONPATH:./
+        export PYTHONPATH=$PYTHONPATH: . /
     fi
   else
     TESTRTESTS="$TESTRTESTS"
   fi
 
   # Just run the test suites in current environment
-  set +e
-  testrargs=`echo "$testrargs" | sed -e's/^\s*\(.*\)\s*$/\1/'`
+  set + e
+  testrargs=`echo "$testrargs" | sed - e's/^\s*\(.*\)\s*$/\1/'`
   TESTRTESTS="$TESTRTESTS --testr-args='--subunit --concurrency $concurrency $testropts $testrargs'"
-  #TESTRTESTS="$TESTRTESTS --testr-args='--subunit $testropts $testrargs'"
-  if [ setup.cfg -nt workloadmgr.egg-info/entry_points.txt ]
+  # TESTRTESTS="$TESTRTESTS --testr-args='--subunit $testropts $testrargs'"
+  if [setup.cfg - nt workloadmgr.egg - info / entry_points.txt]
   then
     ${wrapper} python setup.py egg_info
   fi
   echo "Running \`${wrapper} $TESTRTESTS\`"
-  bash -c "${wrapper} $TESTRTESTS | ${wrapper} subunit-trace"
+  bash - c "${wrapper} $TESTRTESTS | ${wrapper} subunit-trace"
   RESULT=$?
-  set -e
+  set - e
 
   copy_subunit_log
 
-  if [ $coverage -eq 1 ]; then
+  if [$coverage - eq 1]; then
     echo "Generating coverage report in covhtml/"
     # Don't compute coverage for common code, which is tested elsewhere
     ${wrapper} coverage combine
-    ${wrapper} coverage html --include='workloadmgr/*' --omit='workloadmgr/openstack/common/*' -d covhtml -i
+    ${wrapper} coverage html - -include='workloadmgr/*' - -omit='workloadmgr/openstack/common/*' - d covhtml - i
   fi
 
   return $RESULT
 }
 
 function copy_subunit_log {
-  LOGNAME=`cat .testrepository/next-stream`
+  LOGNAME=`cat .testrepository / next - stream`
   LOGNAME=$(($LOGNAME - 1))
   LOGNAME=".testrepository/${LOGNAME}"
   cp $LOGNAME subunit.log
 }
 
 function warn_on_flake8_without_venv {
-  if [ $never_venv -eq 1 ]; then
+  if [$never_venv - eq 1]; then
     echo "**WARNING**:"
     echo "Running flake8 without virtual env may miss OpenStack HACKING detection"
   fi
@@ -183,70 +178,70 @@ function warn_on_flake8_without_venv {
 function run_pep8 {
   echo "Running flake8 ..."
   warn_on_flake8_without_venv
-  bash -c "${wrapper} flake8"
-  ${wrapper} tools/check_exec.py workloadmgr || exit 1
+  bash - c "${wrapper} flake8"
+  ${wrapper} tools / check_exec.py workloadmgr | | exit 1
 }
 
 
 TESTRTESTS="python setup.py testr"
 
-if [ $never_venv -eq 0 ]
+if [$never_venv - eq 0]
 then
   # Remove the virtual environment if --force used
-  if [ $force -eq 1 ]; then
+  if [$force - eq 1]; then
     echo "Cleaning virtualenv..."
-    rm -rf ${venv}
+    rm - rf ${venv}
   fi
-  if [ $update -eq 1 ]; then
+  if [$update - eq 1]; then
       echo "Updating virtualenv..."
-      python tools/install_venv.py $installvenvopts
+      python tools / install_venv.py $installvenvopts
   fi
-  if [ -e ${venv} ]; then
+  if [-e ${venv}]; then
     wrapper="${with_venv}"
   else
-    if [ $always_venv -eq 1 ]; then
+    if [$always_venv - eq 1]; then
       # Automatically install the virtualenv
-      python tools/install_venv.py $installvenvopts
+      python tools / install_venv.py $installvenvopts
       wrapper="${with_venv}"
     else
-      echo -e "No virtual environment found...create one? (Y/n) \c"
+      echo - e "No virtual environment found...create one? (Y/n) \c"
       read use_ve
-      if [ "x$use_ve" = "xY" -o "x$use_ve" = "x" -o "x$use_ve" = "xy" ]; then
+      if ["x$use_ve"="xY" - o "x$use_ve"="x" - o "x$use_ve"="xy"]; then
         # Install the virtualenv and run the test suite in it
-        python tools/install_venv.py $installvenvopts
+        python tools / install_venv.py $installvenvopts
         wrapper=${with_venv}
       fi
     fi
-    cp /usr/lib/python2.7/dist-packages/libvirt.py .venv/lib/python2.7/site-packages/
-    cp /usr/lib/python2.7/dist-packages/libvirtmod.so .venv/lib/python2.7/site-packages/
+    cp / usr / lib / python2.7 / dist - packages / libvirt.py .venv / lib / python2.7 / site - packages /
+    cp / usr / lib / python2.7 / dist - packages / libvirtmod.so .venv / lib / python2.7 / site - packages /
   fi
 fi
 
 # Delete old coverage data from previous runs
-if [ $coverage -eq 1 ]; then
+if [$coverage - eq 1]; then
     ${wrapper} coverage erase
 fi
 
-if [ $just_pep8 -eq 1 ]; then
+if [$just_pep8 - eq 1]; then
     run_pep8
     exit
 fi
 
-if [ $recreate_db -eq 1 ]; then
-    rm -f tests.sqlite
+if [$recreate_db - eq 1]; then
+    rm - f tests.sqlite
 fi
 
-if [ $just_pep8_changed -eq 1 ]; then
+if [$just_pep8_changed - eq 1]; then
     # NOTE(gilliard) We want to use flake8 to check the
     # entirety of every file that has a change in it.
     # Unfortunately the --filenames argument to flake8 only accepts
     # file *names* and there are no files named (eg) "nova/compute/manager.py". The
     # --diff argument behaves surprisingly as well, because although you feed it a
     # diff, it actually checks the file on disk anyway.
-    files=$(git diff --name-only HEAD~1 | tr '\n' ' ')
+    files=$(git diff - -name - only HEAD~1 | tr '\n' ' ')
     echo "Running flake8 on ${files}"
     warn_on_flake8_without_venv
-    bash -c "diff -u --from-file /dev/null ${files} | ${wrapper} flake8 --diff"
+    bash - c "diff -u --from-file /dev/null ${files} | ${wrapper} flake8 --diff"
     exit
 fi
 
@@ -256,8 +251,8 @@ run_tests
 # not when we're running tests individually. To handle this, we need to
 # distinguish between options (testropts), which begin with a '-', and
 # arguments (testrargs).
-#if [ -z "$testrargs" ]; then
+# if [ -z "$testrargs" ]; then
 #  if [ $no_pep8 -eq 0 ]; then
 #    run_pep8
 #  fi
-#fi
+# fi

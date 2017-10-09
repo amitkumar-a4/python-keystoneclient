@@ -48,8 +48,9 @@ class BaseWorkloadUtilTestCase(test.TestCase):
     def setUp(self):
         super(BaseWorkloadUtilTestCase, self).setUp()
 
-        CONF.set_default('vault_storage_nfs_export',
-                         'server1:nfsshare1, server2:nfsshare2, server3:nfsshare3')
+        CONF.set_default(
+            'vault_storage_nfs_export',
+            'server1:nfsshare1, server2:nfsshare2, server3:nfsshare3')
 
         self.context = context.get_admin_context()
         patch('sys.stderr').start()
@@ -72,10 +73,16 @@ class BaseWorkloadUtilTestCase(test.TestCase):
         self.context.tenant_id = self.context.project_id
         self.context.is_admin = False
 
-        self.nfsshares = [{'server1:nfsshare1': [1099511627776, 10737418240], }.values()[0],
-                          {'server2:nfsshare2': [
-                              1099511627776, 5 * 10737418240], }.values()[0],
-                          {'server3:nfsshare3': [1099511627776, 7 * 10737418240], }.values()[0], ]
+        self.nfsshares = [{'server1:nfsshare1': [1099511627776,
+                                                 10737418240],
+                           }.values()[0],
+                          {'server2:nfsshare2': [1099511627776,
+                                                 5 * 10737418240],
+                           }.values()[0],
+                          {'server3:nfsshare3': [1099511627776,
+                                                 7 * 10737418240],
+                           }.values()[0],
+                          ]
 
     def tearDown(self):
         self.is_online_patch.stop()
@@ -174,10 +181,16 @@ class BaseWorkloadUtilTestCase(test.TestCase):
                               'get_total_capacity', return_value=None) as mock_method2:
                 with patch.object(workloadmgr.workloads.manager.WorkloadMgrManager,
                                   'workload_reset', return_value=None) as mock_method3:
-                    values = [{'server1:nfsshare1': [1099511627776, 10737418240], }.values()[0],
-                              {'server2:nfsshare2': [
-                                  1099511627776, 5 * 10737418240], }.values()[0],
-                              {'server3:nfsshare3': [1099511627776, 7 * 10737418240], }.values()[0], ]
+                    values = [{'server1:nfsshare1': [1099511627776,
+                                                     10737418240],
+                               }.values()[0],
+                              {'server2:nfsshare2': [1099511627776,
+                                                     5 * 10737418240],
+                               }.values()[0],
+                              {'server3:nfsshare3': [1099511627776,
+                                                     7 * 10737418240],
+                               }.values()[0],
+                              ]
 
                     mock_method2.side_effect = values
 
@@ -201,12 +214,13 @@ class BaseWorkloadUtilTestCase(test.TestCase):
                             return context
 
                         mock_method4.side_effect = _get_tenant_context
-                        workload_type = tests_utils.create_workload_type(self.context,
-                                                                         display_name='Serial',
-                                                                         display_description='this is a test workload_type',
-                                                                         status='available',
-                                                                         is_public=True,
-                                                                         metadata=None)
+                        workload_type = tests_utils.create_workload_type(
+                            self.context,
+                            display_name='Serial',
+                            display_description='this is a test workload_type',
+                            status='available',
+                            is_public=True,
+                            metadata=None)
                     workload = tests_utils.create_workload(
                         self.context,
                         workload_type_id=workload_type.id,
@@ -225,14 +239,14 @@ class BaseWorkloadUtilTestCase(test.TestCase):
                         'workload_type': None,
                         'user_id': 'fake',
                         'launched_at': 'DONTCARE',
-                        'jobschedule': {'start_date': '06/05/2014',
-                                        'end_date': '07/05/2015',
-                                        'interval': '1 hr',
-                                        'start_time': '2:30 PM',
-                                        'fullbackup_interval': '-1',
-                                        'retention_policy_type': 'Number of Snapshots to Keep',
-                                        'retention_policy_value': '30'}
-                    }
+                        'jobschedule': {
+                            'start_date': '06/05/2014',
+                            'end_date': '07/05/2015',
+                            'interval': '1 hr',
+                            'start_time': '2:30 PM',
+                            'fullbackup_interval': '-1',
+                            'retention_policy_type': 'Number of Snapshots to Keep',
+                            'retention_policy_value': '30'}}
                     expected['status'] = 'available'
                     self.assertEqual(
                         workload_id, self.db.workload_get(
@@ -305,10 +319,14 @@ class BaseWorkloadUtilTestCase(test.TestCase):
                                   'workload_reset', return_value=None) as mock_method3:
                     with patch.object(workloadmgr.compute.nova,
                                       '_get_tenant_context', return_value=None) as mock_method4:
-                        values = [{'server1:nfsshare1': [1099511627776, 1099511627776], }.values()[0],
-                                  {'server2:nfsshare2': [1099511627776, 1099511627776], }.values()[
-                            0],
-                            {'server3:nfsshare3': [1099511627776, 7 * 10737418240], }.values()[0], ]
+                        values = [
+                            {
+                                'server1:nfsshare1': [
+                                    1099511627776, 1099511627776], }.values()[0], {
+                                'server2:nfsshare2': [
+                                    1099511627776, 1099511627776], }.values()[0], {
+                                'server3:nfsshare3': [
+                                    1099511627776, 7 * 10737418240], }.values()[0], ]
 
                         mock_method2.side_effect = values
 
@@ -318,12 +336,13 @@ class BaseWorkloadUtilTestCase(test.TestCase):
                                 return context
 
                             mock_method4.side_effect = _get_tenant_context
-                            workload_type = tests_utils.create_workload_type(self.context,
-                                                                             display_name='Serial',
-                                                                             display_description='this is a test workload_type',
-                                                                             status='available',
-                                                                             is_public=True,
-                                                                             metadata=None)
+                            workload_type = tests_utils.create_workload_type(
+                                self.context,
+                                display_name='Serial',
+                                display_description='this is a test workload_type',
+                                status='available',
+                                is_public=True,
+                                metadata=None)
 
                             self.workload_params['instances'] = tests_utils.get_instances(
                             )
@@ -336,12 +355,13 @@ class BaseWorkloadUtilTestCase(test.TestCase):
                             self.workload.workload_create(
                                 self.context, workload_id)
 
-                            snapshot = tests_utils.create_snapshot(self.context,
-                                                                   workload_id,
-                                                                   display_name='test_snapshot',
-                                                                   display_description='this is a test snapshot',
-                                                                   snapshot_type='full',
-                                                                   status='creating')
+                            snapshot = tests_utils.create_snapshot(
+                                self.context,
+                                workload_id,
+                                display_name='test_snapshot',
+                                display_description='this is a test snapshot',
+                                snapshot_type='full',
+                                status='creating')
                             self.workload.workload_snapshot(
                                 self.context, snapshot['id'])
                             snapshot = self.db.snapshot_get(
@@ -352,8 +372,8 @@ class BaseWorkloadUtilTestCase(test.TestCase):
                                 snapshot.display_name, 'test_snapshot')
                             self.assertEqual(snapshot.status, 'available')
 
-                            workload_utils.upload_snapshot_db_entry(self.context, snapshot.id,
-                                                                    snapshot_status=None)
+                            workload_utils.upload_snapshot_db_entry(
+                                self.context, snapshot.id, snapshot_status=None)
 
                             backup_target = None
                             for meta in workload.metadata:
@@ -362,8 +382,8 @@ class BaseWorkloadUtilTestCase(test.TestCase):
                                         meta.value)
                             self.assertNotEqual(backup_target, None)
 
-                            workload_path = os.path.join(backup_target.mount_path,
-                                                         "workload_" + workload_id)
+                            workload_path = os.path.join(
+                                backup_target.mount_path, "workload_" + workload_id)
                             workload_db = backup_target.get_object(
                                 os.path.join(workload_path, "workload_db"))
                             snapshot_path = os.path.join(
@@ -423,10 +443,14 @@ class BaseWorkloadUtilTestCase(test.TestCase):
                                   'workload_reset', return_value=None) as mock_method3:
                     with patch.object(workloadmgr.compute.nova,
                                       '_get_tenant_context', return_value=None) as mock_method4:
-                        values = [{'server1:nfsshare1': [1099511627776, 1099511627776], }.values()[0],
-                                  {'server2:nfsshare2': [1099511627776, 1099511627776], }.values()[
-                            0],
-                            {'server3:nfsshare3': [1099511627776, 7 * 10737418240], }.values()[0], ]
+                        values = [
+                            {
+                                'server1:nfsshare1': [
+                                    1099511627776, 1099511627776], }.values()[0], {
+                                'server2:nfsshare2': [
+                                    1099511627776, 1099511627776], }.values()[0], {
+                                'server3:nfsshare3': [
+                                    1099511627776, 7 * 10737418240], }.values()[0], ]
 
                         mock_method2.side_effect = values
 
@@ -434,12 +458,13 @@ class BaseWorkloadUtilTestCase(test.TestCase):
                             return context
 
                         mock_method4.side_effect = _get_tenant_context
-                        workload_type = tests_utils.create_workload_type(self.context,
-                                                                         display_name='Serial',
-                                                                         display_description='this is a test workload_type',
-                                                                         status='available',
-                                                                         is_public=True,
-                                                                         metadata=None)
+                        workload_type = tests_utils.create_workload_type(
+                            self.context,
+                            display_name='Serial',
+                            display_description='this is a test workload_type',
+                            status='available',
+                            is_public=True,
+                            metadata=None)
 
                         self.workload_params['instances'] = tests_utils.get_instances(
                         )
@@ -452,12 +477,13 @@ class BaseWorkloadUtilTestCase(test.TestCase):
                         self.workload.workload_create(
                             self.context, workload_id)
 
-                        snapshot = tests_utils.create_snapshot(self.context,
-                                                               workload_id,
-                                                               display_name='test_snapshot',
-                                                               display_description='this is a test snapshot',
-                                                               snapshot_type='full',
-                                                               status='creating')
+                        snapshot = tests_utils.create_snapshot(
+                            self.context,
+                            workload_id,
+                            display_name='test_snapshot',
+                            display_description='this is a test snapshot',
+                            snapshot_type='full',
+                            status='creating')
                         self.workload.workload_snapshot(
                             self.context, snapshot['id'])
                         snapshot = self.db.snapshot_get(
@@ -543,10 +569,14 @@ class BaseWorkloadUtilTestCase(test.TestCase):
                                   'workload_reset', return_value=None) as mock_method3:
                     with patch.object(workloadmgr.compute.nova,
                                       '_get_tenant_context', return_value=None) as mock_method4:
-                        values = [{'server1:nfsshare1': [1099511627776, 1099511627776], }.values()[0],
-                                  {'server2:nfsshare2': [1099511627776, 1099511627776], }.values()[
-                            0],
-                            {'server3:nfsshare3': [1099511627776, 7 * 10737418240], }.values()[0], ]
+                        values = [
+                            {
+                                'server1:nfsshare1': [
+                                    1099511627776, 1099511627776], }.values()[0], {
+                                'server2:nfsshare2': [
+                                    1099511627776, 1099511627776], }.values()[0], {
+                                'server3:nfsshare3': [
+                                    1099511627776, 7 * 10737418240], }.values()[0], ]
 
                         mock_method2.side_effect = values
 
@@ -554,12 +584,13 @@ class BaseWorkloadUtilTestCase(test.TestCase):
                             return context
 
                         mock_method4.side_effect = _get_tenant_context
-                        workload_type = tests_utils.create_workload_type(self.context,
-                                                                         display_name='Serial',
-                                                                         display_description='this is a test workload_type',
-                                                                         status='available',
-                                                                         is_public=True,
-                                                                         metadata=None)
+                        workload_type = tests_utils.create_workload_type(
+                            self.context,
+                            display_name='Serial',
+                            display_description='this is a test workload_type',
+                            status='available',
+                            is_public=True,
+                            metadata=None)
 
                         self.workload_params['instances'] = tests_utils.get_instances(
                         )
@@ -574,12 +605,13 @@ class BaseWorkloadUtilTestCase(test.TestCase):
 
                         snapshots = []
                         for i in range(0, 5):
-                            snapshot = tests_utils.create_snapshot(self.context,
-                                                                   workload_id,
-                                                                   display_name='test_snapshot',
-                                                                   display_description='this is a test snapshot',
-                                                                   snapshot_type='full',
-                                                                   status='creating')
+                            snapshot = tests_utils.create_snapshot(
+                                self.context,
+                                workload_id,
+                                display_name='test_snapshot',
+                                display_description='this is a test snapshot',
+                                snapshot_type='full',
+                                status='creating')
                             self.workload.workload_snapshot(
                                 self.context, snapshot['id'])
                             snapshot = self.db.snapshot_get(
@@ -597,8 +629,8 @@ class BaseWorkloadUtilTestCase(test.TestCase):
                                         meta.value)
                             self.assertNotEqual(backup_target, None)
 
-                            workload_path = os.path.join(backup_target.mount_path,
-                                                         "workload_" + workload_id)
+                            workload_path = os.path.join(
+                                backup_target.mount_path, "workload_" + workload_id)
                             workload_db = backup_target.get_object(
                                 os.path.join(workload_path, "workload_db"))
                             snapshot_path = os.path.join(
@@ -613,15 +645,14 @@ class BaseWorkloadUtilTestCase(test.TestCase):
                         # Call retension policy here
                         self.db.workload_update(self.context,
                                                 workload_id,
-                                                {
-                                                    'jobschedule': pickle.dumps({'start_date': '06/05/2014',
-                                                                                 'end_date': '07/05/2015',
-                                                                                 'interval': '1 hr',
-                                                                                 'start_time': '2:30 PM',
-                                                                                 'fullbackup_interval': '10',
-                                                                                 'retention_policy_type': 'Number of Snapshots to Keep',
-                                                                                 'retention_policy_value': '3'}),
-                                                })
+                                                {'jobschedule': pickle.dumps({'start_date': '06/05/2014',
+                                                                              'end_date': '07/05/2015',
+                                                                              'interval': '1 hr',
+                                                                              'start_time': '2:30 PM',
+                                                                              'fullbackup_interval': '10',
+                                                                              'retention_policy_type': 'Number of Snapshots to Keep',
+                                                                              'retention_policy_value': '3'}),
+                                                 })
                         snapshot_to_commit, snapshots_to_delete, affected_snapshots, \
                             workload_obj, snapshot_obj, dontcare = workload_utils.common_apply_retention_policy(
                                 self.context,
@@ -657,12 +688,15 @@ class BaseWorkloadUtilTestCase(test.TestCase):
     @patch('workloadmgr.compute.nova.API.set_meta_item')
     @patch('workloadmgr.workflows.serialworkflow.SerialWorkflow.execute')
     @patch('workloadmgr.compute.nova.API.get_servers')
-    def test_common_apply_retention_policy_with_incrementals(self, mock_get_servers, m2,
-                                                             set_meta_item_mock,
-                                                             delete_meta_mock,
-                                                             get_server_by_id_mock,
-                                                             get_flavor_by_id_mock,
-                                                             get_volume_mock):
+    def test_common_apply_retention_policy_with_incrementals(
+            self,
+            mock_get_servers,
+            m2,
+            set_meta_item_mock,
+            delete_meta_mock,
+            get_server_by_id_mock,
+            get_flavor_by_id_mock,
+            get_volume_mock):
         """Test workload can be created and deleted."""
         import workloadmgr.vault.vault
         import workloadmgr.compute.nova
@@ -692,10 +726,14 @@ class BaseWorkloadUtilTestCase(test.TestCase):
                                   'workload_reset', return_value=None) as mock_method3:
                     with patch.object(workloadmgr.compute.nova,
                                       '_get_tenant_context', return_value=None) as mock_method4:
-                        values = [{'server1:nfsshare1': [1099511627776, 1099511627776], }.values()[0],
-                                  {'server2:nfsshare2': [1099511627776, 1099511627776], }.values()[
-                            0],
-                            {'server3:nfsshare3': [1099511627776, 7 * 10737418240], }.values()[0], ]
+                        values = [
+                            {
+                                'server1:nfsshare1': [
+                                    1099511627776, 1099511627776], }.values()[0], {
+                                'server2:nfsshare2': [
+                                    1099511627776, 1099511627776], }.values()[0], {
+                                'server3:nfsshare3': [
+                                    1099511627776, 7 * 10737418240], }.values()[0], ]
 
                         mock_method2.side_effect = values
 
@@ -703,12 +741,13 @@ class BaseWorkloadUtilTestCase(test.TestCase):
                             return context
 
                         mock_method4.side_effect = _get_tenant_context
-                        workload_type = tests_utils.create_workload_type(self.context,
-                                                                         display_name='Serial',
-                                                                         display_description='this is a test workload_type',
-                                                                         status='available',
-                                                                         is_public=True,
-                                                                         metadata=None)
+                        workload_type = tests_utils.create_workload_type(
+                            self.context,
+                            display_name='Serial',
+                            display_description='this is a test workload_type',
+                            status='available',
+                            is_public=True,
+                            metadata=None)
 
                         self.workload_params['instances'] = tests_utils.get_instances(
                         )
@@ -723,12 +762,13 @@ class BaseWorkloadUtilTestCase(test.TestCase):
 
                         snapshots = []
                         for i in range(0, 5):
-                            snapshot = tests_utils.create_snapshot(self.context,
-                                                                   workload_id,
-                                                                   display_name='test_snapshot',
-                                                                   display_description='this is a test snapshot',
-                                                                   snapshot_type='incremental',
-                                                                   status='creating')
+                            snapshot = tests_utils.create_snapshot(
+                                self.context,
+                                workload_id,
+                                display_name='test_snapshot',
+                                display_description='this is a test snapshot',
+                                snapshot_type='incremental',
+                                status='creating')
                             self.workload.workload_snapshot(
                                 self.context, snapshot['id'])
                             snapshot = self.db.snapshot_get(
@@ -746,8 +786,8 @@ class BaseWorkloadUtilTestCase(test.TestCase):
                                         meta.value)
                             self.assertNotEqual(backup_target, None)
 
-                            workload_path = os.path.join(backup_target.mount_path,
-                                                         "workload_" + workload_id)
+                            workload_path = os.path.join(
+                                backup_target.mount_path, "workload_" + workload_id)
                             workload_db = backup_target.get_object(
                                 os.path.join(workload_path, "workload_db"))
                             snapshot_path = os.path.join(
@@ -762,15 +802,14 @@ class BaseWorkloadUtilTestCase(test.TestCase):
                         snapshots.reverse()
                         self.db.workload_update(self.context,
                                                 workload_id,
-                                                {
-                                                    'jobschedule': pickle.dumps({'start_date': '06/05/2014',
-                                                                                 'end_date': '07/05/2015',
-                                                                                 'interval': '1 hr',
-                                                                                 'start_time': '2:30 PM',
-                                                                                 'fullbackup_interval': '10',
-                                                                                 'retention_policy_type': 'Number of Snapshots to Keep',
-                                                                                 'retention_policy_value': '3'}),
-                                                })
+                                                {'jobschedule': pickle.dumps({'start_date': '06/05/2014',
+                                                                              'end_date': '07/05/2015',
+                                                                              'interval': '1 hr',
+                                                                              'start_time': '2:30 PM',
+                                                                              'fullbackup_interval': '10',
+                                                                              'retention_policy_type': 'Number of Snapshots to Keep',
+                                                                              'retention_policy_value': '3'}),
+                                                 })
                         snapshot_to_commit, snapshots_to_delete, affected_snapshots, \
                             workload_obj, snapshot_obj, dontcare = workload_utils.common_apply_retention_policy(
                                 self.context,
@@ -806,12 +845,15 @@ class BaseWorkloadUtilTestCase(test.TestCase):
     @patch('workloadmgr.compute.nova.API.set_meta_item')
     @patch('workloadmgr.workflows.serialworkflow.SerialWorkflow.execute')
     @patch('workloadmgr.compute.nova.API.get_servers')
-    def test_common_apply_retention_policy_with_combination(self, mock_get_servers, m2,
-                                                            set_meta_item_mock,
-                                                            delete_meta_mock,
-                                                            get_server_by_id_mock,
-                                                            get_flavor_by_id_mock,
-                                                            get_volume_mock):
+    def test_common_apply_retention_policy_with_combination(
+            self,
+            mock_get_servers,
+            m2,
+            set_meta_item_mock,
+            delete_meta_mock,
+            get_server_by_id_mock,
+            get_flavor_by_id_mock,
+            get_volume_mock):
         """Test workload can be created and deleted."""
         import workloadmgr.vault.vault
         import workloadmgr.compute.nova
@@ -841,10 +883,14 @@ class BaseWorkloadUtilTestCase(test.TestCase):
                                   'workload_reset', return_value=None) as mock_method3:
                     with patch.object(workloadmgr.compute.nova,
                                       '_get_tenant_context', return_value=None) as mock_method4:
-                        values = [{'server1:nfsshare1': [1099511627776, 1099511627776], }.values()[0],
-                                  {'server2:nfsshare2': [1099511627776, 1099511627776], }.values()[
-                            0],
-                            {'server3:nfsshare3': [1099511627776, 7 * 10737418240], }.values()[0], ]
+                        values = [
+                            {
+                                'server1:nfsshare1': [
+                                    1099511627776, 1099511627776], }.values()[0], {
+                                'server2:nfsshare2': [
+                                    1099511627776, 1099511627776], }.values()[0], {
+                                'server3:nfsshare3': [
+                                    1099511627776, 7 * 10737418240], }.values()[0], ]
 
                         mock_method2.side_effect = values
 
@@ -852,12 +898,13 @@ class BaseWorkloadUtilTestCase(test.TestCase):
                             return context
 
                         mock_method4.side_effect = _get_tenant_context
-                        workload_type = tests_utils.create_workload_type(self.context,
-                                                                         display_name='Serial',
-                                                                         display_description='this is a test workload_type',
-                                                                         status='available',
-                                                                         is_public=True,
-                                                                         metadata=None)
+                        workload_type = tests_utils.create_workload_type(
+                            self.context,
+                            display_name='Serial',
+                            display_description='this is a test workload_type',
+                            status='available',
+                            is_public=True,
+                            metadata=None)
 
                         self.workload_params['instances'] = tests_utils.get_instances(
                         )
@@ -876,12 +923,13 @@ class BaseWorkloadUtilTestCase(test.TestCase):
                                 snapshot_type = "full"
                             else:
                                 snapshot_type = "incremental"
-                            snapshot = tests_utils.create_snapshot(self.context,
-                                                                   workload_id,
-                                                                   display_name='test_snapshot',
-                                                                   display_description='this is a test snapshot',
-                                                                   snapshot_type=snapshot_type,
-                                                                   status='creating')
+                            snapshot = tests_utils.create_snapshot(
+                                self.context,
+                                workload_id,
+                                display_name='test_snapshot',
+                                display_description='this is a test snapshot',
+                                snapshot_type=snapshot_type,
+                                status='creating')
                             self.workload.workload_snapshot(
                                 self.context, snapshot['id'])
                             snapshot = self.db.snapshot_get(
@@ -899,8 +947,8 @@ class BaseWorkloadUtilTestCase(test.TestCase):
                                         meta.value)
                             self.assertNotEqual(backup_target, None)
 
-                            workload_path = os.path.join(backup_target.mount_path,
-                                                         "workload_" + workload_id)
+                            workload_path = os.path.join(
+                                backup_target.mount_path, "workload_" + workload_id)
                             workload_db = backup_target.get_object(
                                 os.path.join(workload_path, "workload_db"))
                             snapshot_path = os.path.join(
@@ -925,15 +973,14 @@ class BaseWorkloadUtilTestCase(test.TestCase):
                         snapshots.reverse()
                         self.db.workload_update(self.context,
                                                 workload_id,
-                                                {
-                                                    'jobschedule': pickle.dumps({'start_date': '06/05/2014',
-                                                                                 'end_date': '07/05/2015',
-                                                                                 'interval': '1 hr',
-                                                                                 'start_time': '2:30 PM',
-                                                                                 'fullbackup_interval': '10',
-                                                                                 'retention_policy_type': 'Number of Snapshots to Keep',
-                                                                                 'retention_policy_value': '7'}),
-                                                })
+                                                {'jobschedule': pickle.dumps({'start_date': '06/05/2014',
+                                                                              'end_date': '07/05/2015',
+                                                                              'interval': '1 hr',
+                                                                              'start_time': '2:30 PM',
+                                                                              'fullbackup_interval': '10',
+                                                                              'retention_policy_type': 'Number of Snapshots to Keep',
+                                                                              'retention_policy_value': '7'}),
+                                                 })
                         snapshot_to_commit, snapshots_to_delete, affected_snapshots, \
                             workload_obj, snapshot_obj, dontcare = workload_utils.common_apply_retention_policy(
                                 self.context,
@@ -969,12 +1016,15 @@ class BaseWorkloadUtilTestCase(test.TestCase):
     @patch('workloadmgr.compute.nova.API.set_meta_item')
     @patch('workloadmgr.workflows.serialworkflow.SerialWorkflow.execute')
     @patch('workloadmgr.compute.nova.API.get_servers')
-    def test_common_apply_retention_policy_with_deleted_snaps(self, mock_get_servers, m2,
-                                                              set_meta_item_mock,
-                                                              delete_meta_mock,
-                                                              get_server_by_id_mock,
-                                                              get_flavor_by_id_mock,
-                                                              get_volume_mock):
+    def test_common_apply_retention_policy_with_deleted_snaps(
+            self,
+            mock_get_servers,
+            m2,
+            set_meta_item_mock,
+            delete_meta_mock,
+            get_server_by_id_mock,
+            get_flavor_by_id_mock,
+            get_volume_mock):
         """Test workload can be created and deleted."""
         import workloadmgr.vault.vault
         import workloadmgr.compute.nova
@@ -1004,10 +1054,14 @@ class BaseWorkloadUtilTestCase(test.TestCase):
                                   'workload_reset', return_value=None) as mock_method3:
                     with patch.object(workloadmgr.compute.nova,
                                       '_get_tenant_context', return_value=None) as mock_method4:
-                        values = [{'server1:nfsshare1': [1099511627776, 1099511627776], }.values()[0],
-                                  {'server2:nfsshare2': [1099511627776, 1099511627776], }.values()[
-                            0],
-                            {'server3:nfsshare3': [1099511627776, 7 * 10737418240], }.values()[0], ]
+                        values = [
+                            {
+                                'server1:nfsshare1': [
+                                    1099511627776, 1099511627776], }.values()[0], {
+                                'server2:nfsshare2': [
+                                    1099511627776, 1099511627776], }.values()[0], {
+                                'server3:nfsshare3': [
+                                    1099511627776, 7 * 10737418240], }.values()[0], ]
 
                         mock_method2.side_effect = values
 
@@ -1015,12 +1069,13 @@ class BaseWorkloadUtilTestCase(test.TestCase):
                             return context
 
                         mock_method4.side_effect = _get_tenant_context
-                        workload_type = tests_utils.create_workload_type(self.context,
-                                                                         display_name='Serial',
-                                                                         display_description='this is a test workload_type',
-                                                                         status='available',
-                                                                         is_public=True,
-                                                                         metadata=None)
+                        workload_type = tests_utils.create_workload_type(
+                            self.context,
+                            display_name='Serial',
+                            display_description='this is a test workload_type',
+                            status='available',
+                            is_public=True,
+                            metadata=None)
 
                         self.workload_params['instances'] = tests_utils.get_instances(
                         )
@@ -1035,12 +1090,13 @@ class BaseWorkloadUtilTestCase(test.TestCase):
 
                         snapshots = []
                         for i in range(0, 5):
-                            snapshot = tests_utils.create_snapshot(self.context,
-                                                                   workload_id,
-                                                                   display_name='test_snapshot',
-                                                                   display_description='this is a test snapshot',
-                                                                   snapshot_type='full',
-                                                                   status='creating')
+                            snapshot = tests_utils.create_snapshot(
+                                self.context,
+                                workload_id,
+                                display_name='test_snapshot',
+                                display_description='this is a test snapshot',
+                                snapshot_type='full',
+                                status='creating')
                             self.workload.workload_snapshot(
                                 self.context, snapshot['id'])
                             snapshot = self.db.snapshot_get(
@@ -1058,8 +1114,8 @@ class BaseWorkloadUtilTestCase(test.TestCase):
                                         meta.value)
                             self.assertNotEqual(backup_target, None)
 
-                            workload_path = os.path.join(backup_target.mount_path,
-                                                         "workload_" + workload_id)
+                            workload_path = os.path.join(
+                                backup_target.mount_path, "workload_" + workload_id)
                             workload_db = backup_target.get_object(
                                 os.path.join(workload_path, "workload_db"))
                             snapshot_path = os.path.join(
@@ -1084,15 +1140,14 @@ class BaseWorkloadUtilTestCase(test.TestCase):
                         # Call retension policy here
                         self.db.workload_update(self.context,
                                                 workload_id,
-                                                {
-                                                    'jobschedule': pickle.dumps({'start_date': '06/05/2014',
-                                                                                 'end_date': '07/05/2015',
-                                                                                 'interval': '1 hr',
-                                                                                 'start_time': '2:30 PM',
-                                                                                 'fullbackup_interval': '10',
-                                                                                 'retention_policy_type': 'Number of Snapshots to Keep',
-                                                                                 'retention_policy_value': '3'}),
-                                                })
+                                                {'jobschedule': pickle.dumps({'start_date': '06/05/2014',
+                                                                              'end_date': '07/05/2015',
+                                                                              'interval': '1 hr',
+                                                                              'start_time': '2:30 PM',
+                                                                              'fullbackup_interval': '10',
+                                                                              'retention_policy_type': 'Number of Snapshots to Keep',
+                                                                              'retention_policy_value': '3'}),
+                                                 })
                         snapshot_to_commit, snapshots_to_delete, affected_snapshots, \
                             workload_obj, snapshot_obj, dontcare = workload_utils.common_apply_retention_policy(
                                 self.context,
@@ -1161,10 +1216,14 @@ class BaseWorkloadUtilTestCase(test.TestCase):
                                   'workload_reset', return_value=None) as mock_method3:
                     with patch.object(workloadmgr.compute.nova,
                                       '_get_tenant_context', return_value=None) as mock_method4:
-                        values = [{'server1:nfsshare1': [1099511627776, 1099511627776], }.values()[0],
-                                  {'server2:nfsshare2': [1099511627776, 1099511627776], }.values()[
-                            0],
-                            {'server3:nfsshare3': [1099511627776, 7 * 10737418240], }.values()[0], ]
+                        values = [
+                            {
+                                'server1:nfsshare1': [
+                                    1099511627776, 1099511627776], }.values()[0], {
+                                'server2:nfsshare2': [
+                                    1099511627776, 1099511627776], }.values()[0], {
+                                'server3:nfsshare3': [
+                                    1099511627776, 7 * 10737418240], }.values()[0], ]
 
                         mock_method2.side_effect = values
 
@@ -1172,12 +1231,13 @@ class BaseWorkloadUtilTestCase(test.TestCase):
                             return context
 
                         mock_method4.side_effect = _get_tenant_context
-                        workload_type = tests_utils.create_workload_type(self.context,
-                                                                         display_name='Serial',
-                                                                         display_description='this is a test workload_type',
-                                                                         status='available',
-                                                                         is_public=True,
-                                                                         metadata=None)
+                        workload_type = tests_utils.create_workload_type(
+                            self.context,
+                            display_name='Serial',
+                            display_description='this is a test workload_type',
+                            status='available',
+                            is_public=True,
+                            metadata=None)
 
                         self.workload_params['instances'] = tests_utils.get_instances(
                         )
@@ -1192,12 +1252,13 @@ class BaseWorkloadUtilTestCase(test.TestCase):
 
                         snapshots = []
                         for i in range(0, 3):
-                            snapshot = tests_utils.create_snapshot(self.context,
-                                                                   workload_id,
-                                                                   display_name='test_snapshot',
-                                                                   display_description='this is a test snapshot',
-                                                                   snapshot_type='full',
-                                                                   status='creating')
+                            snapshot = tests_utils.create_snapshot(
+                                self.context,
+                                workload_id,
+                                display_name='test_snapshot',
+                                display_description='this is a test snapshot',
+                                snapshot_type='full',
+                                status='creating')
                             self.workload.workload_snapshot(
                                 self.context, snapshot['id'])
                             snapshot = self.db.snapshot_get(
@@ -1215,8 +1276,8 @@ class BaseWorkloadUtilTestCase(test.TestCase):
                                         meta.value)
                             self.assertNotEqual(backup_target, None)
 
-                            workload_path = os.path.join(backup_target.mount_path,
-                                                         "workload_" + workload_id)
+                            workload_path = os.path.join(
+                                backup_target.mount_path, "workload_" + workload_id)
                             workload_db = backup_target.get_object(
                                 os.path.join(workload_path, "workload_db"))
                             snapshot_path = os.path.join(
@@ -1293,10 +1354,14 @@ class BaseWorkloadUtilTestCase(test.TestCase):
                                   'workload_reset', return_value=None) as mock_method3:
                     with patch.object(workloadmgr.compute.nova,
                                       '_get_tenant_context', return_value=None) as mock_method4:
-                        values = [{'server1:nfsshare1': [1099511627776, 1099511627776], }.values()[0],
-                                  {'server2:nfsshare2': [1099511627776, 1099511627776], }.values()[
-                            0],
-                            {'server3:nfsshare3': [1099511627776, 7 * 10737418240], }.values()[0], ]
+                        values = [
+                            {
+                                'server1:nfsshare1': [
+                                    1099511627776, 1099511627776], }.values()[0], {
+                                'server2:nfsshare2': [
+                                    1099511627776, 1099511627776], }.values()[0], {
+                                'server3:nfsshare3': [
+                                    1099511627776, 7 * 10737418240], }.values()[0], ]
 
                         mock_method2.side_effect = values
 
@@ -1304,12 +1369,13 @@ class BaseWorkloadUtilTestCase(test.TestCase):
                             return context
 
                         mock_method4.side_effect = _get_tenant_context
-                        workload_type = tests_utils.create_workload_type(self.context,
-                                                                         display_name='Serial',
-                                                                         display_description='this is a test workload_type',
-                                                                         status='available',
-                                                                         is_public=True,
-                                                                         metadata=None)
+                        workload_type = tests_utils.create_workload_type(
+                            self.context,
+                            display_name='Serial',
+                            display_description='this is a test workload_type',
+                            status='available',
+                            is_public=True,
+                            metadata=None)
 
                         self.workload_params['instances'] = tests_utils.get_instances(
                         )
@@ -1324,12 +1390,13 @@ class BaseWorkloadUtilTestCase(test.TestCase):
 
                         snapshots = []
                         for i in range(0, 5):
-                            snapshot = tests_utils.create_snapshot(self.context,
-                                                                   workload_id,
-                                                                   display_name='test_snapshot',
-                                                                   display_description='this is a test snapshot',
-                                                                   snapshot_type='full',
-                                                                   status='creating')
+                            snapshot = tests_utils.create_snapshot(
+                                self.context,
+                                workload_id,
+                                display_name='test_snapshot',
+                                display_description='this is a test snapshot',
+                                snapshot_type='full',
+                                status='creating')
                             self.workload.workload_snapshot(
                                 self.context, snapshot['id'])
                             snapshot = self.db.snapshot_get(
@@ -1347,8 +1414,8 @@ class BaseWorkloadUtilTestCase(test.TestCase):
                                         meta.value)
                             self.assertNotEqual(backup_target, None)
 
-                            workload_path = os.path.join(backup_target.mount_path,
-                                                         "workload_" + workload_id)
+                            workload_path = os.path.join(
+                                backup_target.mount_path, "workload_" + workload_id)
                             workload_db = backup_target.get_object(
                                 os.path.join(workload_path, "workload_db"))
                             snapshot_path = os.path.join(
@@ -1363,15 +1430,14 @@ class BaseWorkloadUtilTestCase(test.TestCase):
                         # Call retension policy here
                         self.db.workload_update(self.context,
                                                 workload_id,
-                                                {
-                                                    'jobschedule': pickle.dumps({'start_date': '06/05/2014',
-                                                                                 'end_date': '07/05/2015',
-                                                                                 'interval': '1 hr',
-                                                                                 'start_time': '2:30 PM',
-                                                                                 'fullbackup_interval': '10',
-                                                                                 'retention_policy_type': 'Number of Snapshots to Keep',
-                                                                                 'retention_policy_value': '3'}),
-                                                })
+                                                {'jobschedule': pickle.dumps({'start_date': '06/05/2014',
+                                                                              'end_date': '07/05/2015',
+                                                                              'interval': '1 hr',
+                                                                              'start_time': '2:30 PM',
+                                                                              'fullbackup_interval': '10',
+                                                                              'retention_policy_type': 'Number of Snapshots to Keep',
+                                                                              'retention_policy_value': '3'}),
+                                                 })
 
                         snapshot_to_commit, snapshots_to_delete, affected_snapshots, \
                             workload_obj, snapshot_obj, dontcare = workload_utils.common_apply_retention_policy(

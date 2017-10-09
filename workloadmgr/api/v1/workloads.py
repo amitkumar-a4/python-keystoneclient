@@ -255,8 +255,12 @@ class WorkloadMgrsController(wsgi.Controller):
                 all_workloads = bool(escape(all_workloads))
                 page_number = var.get('page_number', [''])[0]
                 nfs_share = var.get('nfs_share', [''])[0]
-            workloads_all = self.workload_api.workload_get_all(context, search_opts={'page_number': page_number,
-                                                                                     'nfs_share': nfs_share, 'all_workloads': all_workloads})
+            workloads_all = self.workload_api.workload_get_all(
+                context,
+                search_opts={
+                    'page_number': page_number,
+                    'nfs_share': nfs_share,
+                    'all_workloads': all_workloads})
             limited_list = common.limited(workloads_all, req)
             if is_detail:
                 workloads = self._view_builder.detail_list(
@@ -300,38 +304,39 @@ class WorkloadMgrsController(wsgi.Controller):
             source_platform = workload.get(
                 'source_platform', "") or 'openstack'
             source_platform = source_platform.strip() or "openstack"
-            jobdefaults = {'fullbackup_interval': '-1',
-                           'start_time': '09:00 PM',
-                           'interval': u'24hr',
-                           'enabled': u'true',
-                           'start_date': time.strftime("%m/%d/%Y"),
-                           'end_date': "No End",
-                           'retention_policy_type': 'Number of Snapshots to Keep',
-                           'retention_policy_value': '30'}
+            jobdefaults = {
+                'fullbackup_interval': '-1',
+                'start_time': '09:00 PM',
+                'interval': u'24hr',
+                'enabled': u'true',
+                'start_date': time.strftime("%m/%d/%Y"),
+                'end_date': "No End",
+                'retention_policy_type': 'Number of Snapshots to Keep',
+                'retention_policy_value': '30'}
 
             jobschedule = workload.get('jobschedule', jobdefaults)
             if not jobschedule:
                 jobschedule = {}
 
-            if not 'fullbackup_interval' in jobschedule:
+            if 'fullbackup_interval' not in jobschedule:
                 jobschedule['fullbackup_interval'] = jobdefaults['fullbackup_interval']
 
-            if not 'start_time' in jobschedule:
+            if 'start_time' not in jobschedule:
                 jobschedule['start_time'] = jobdefaults['start_time']
 
-            if not 'interval' in jobschedule:
+            if 'interval' not in jobschedule:
                 jobschedule['interval'] = jobdefaults['interval']
 
-            if not 'enabled' in jobschedule:
+            if 'enabled' not in jobschedule:
                 jobschedule['enabled'] = jobdefaults['enabled']
 
-            if not 'start_date' in jobschedule:
+            if 'start_date' not in jobschedule:
                 jobschedule['start_date'] = jobdefaults['start_date']
 
-            if not 'retention_policy_type' in jobschedule:
+            if 'retention_policy_type' not in jobschedule:
                 jobschedule['retention_policy_type'] = jobdefaults['retention_policy_type']
 
-            if not 'retention_policy_value' in jobschedule:
+            if 'retention_policy_value' not in jobschedule:
                 jobschedule['retention_policy_value'] = jobdefaults['retention_policy_value']
 
             instances = workload.get('instances', {})
@@ -342,14 +347,15 @@ class WorkloadMgrsController(wsgi.Controller):
                 metadata = {}
 
             try:
-                new_workload = self.workload_api.workload_create(context,
-                                                                 name,
-                                                                 description,
-                                                                 workload_type_id,
-                                                                 source_platform,
-                                                                 instances,
-                                                                 jobschedule,
-                                                                 metadata)
+                new_workload = self.workload_api.workload_create(
+                    context,
+                    name,
+                    description,
+                    workload_type_id,
+                    source_platform,
+                    instances,
+                    jobschedule,
+                    metadata)
                 new_workload_dict = self.workload_api.workload_show(
                     context, new_workload.id)
             except Exception as error:
@@ -387,14 +393,15 @@ class WorkloadMgrsController(wsgi.Controller):
                     msg = _("Incorrect request body format")
                     raise exc.HTTPBadRequest(explanation=msg)
 
-                jobdefaults = {'fullbackup_interval': '-1',
-                               'start_time': '09:00 PM',
-                               'interval': u'24hr',
-                               'enabled': u'true',
-                               'start_date': time.strftime("%x"),
-                               'end_date': "No End",
-                               'retention_policy_type': 'Number of Snapshots to Keep',
-                               'retention_policy_value': '30'}
+                jobdefaults = {
+                    'fullbackup_interval': '-1',
+                    'start_time': '09:00 PM',
+                    'interval': u'24hr',
+                    'enabled': u'true',
+                    'start_date': time.strftime("%x"),
+                    'end_date': "No End",
+                    'retention_policy_type': 'Number of Snapshots to Keep',
+                    'retention_policy_value': '30'}
 
                 jobschedule = workload.get('jobschedule', jobdefaults)
                 self.workload_api.workload_modify(
@@ -1013,14 +1020,20 @@ class WorkloadMgrsController(wsgi.Controller):
                 new_tenant_id = tenant_map['new_tenant_id']
                 user_id = tenant_map['user_id']
                 if workload_ids and old_tenant_ids:
-                    raise exc.HTTPBadRequest(explanation=unicode("Please provide "
-                                                                 "only one parameter among workload_ids and old_tenant_ids."))
+                    raise exc.HTTPBadRequest(
+                        explanation=unicode(
+                            "Please provide "
+                            "only one parameter among workload_ids and old_tenant_ids."))
                 if new_tenant_id is None:
-                    raise exc.HTTPBadRequest(explanation=unicode("Please provide "
-                                                                 "required parameters: new_tenant_id."))
+                    raise exc.HTTPBadRequest(
+                        explanation=unicode(
+                            "Please provide "
+                            "required parameters: new_tenant_id."))
                 if user_id is None:
-                    raise exc.HTTPBadRequest(explanation=unicode("Please provide "
-                                                                 "required parameters: user_id."))
+                    raise exc.HTTPBadRequest(
+                        explanation=unicode(
+                            "Please provide "
+                            "required parameters: user_id."))
             try:
                 workloads = self.workload_api.workloads_reassign(
                     context, tenant_maps)

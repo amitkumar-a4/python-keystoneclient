@@ -49,8 +49,9 @@ class BaseWorkloadTransferTestCase(test.TestCase):
     def setUp(self):
         super(BaseWorkloadTransferTestCase, self).setUp()
 
-        CONF.set_default('vault_storage_nfs_export',
-                         'server1:nfsshare1, server2:nfsshare2, server3:nfsshare3')
+        CONF.set_default(
+            'vault_storage_nfs_export',
+            'server1:nfsshare1, server2:nfsshare2, server3:nfsshare3')
 
         self.context = context.get_admin_context()
         patch('sys.stderr').start()
@@ -75,10 +76,16 @@ class BaseWorkloadTransferTestCase(test.TestCase):
         self.context.tenant_id = self.context.project_id
         self.context.is_admin = False
 
-        self.nfsshares = [{'server1:nfsshare1': [1099511627776, 10737418240], }.values()[0],
-                          {'server2:nfsshare2': [
-                              1099511627776, 5 * 10737418240], }.values()[0],
-                          {'server3:nfsshare3': [1099511627776, 7 * 10737418240], }.values()[0], ]
+        self.nfsshares = [{'server1:nfsshare1': [1099511627776,
+                                                 10737418240],
+                           }.values()[0],
+                          {'server2:nfsshare2': [1099511627776,
+                                                 5 * 10737418240],
+                           }.values()[0],
+                          {'server3:nfsshare3': [1099511627776,
+                                                 7 * 10737418240],
+                           }.values()[0],
+                          ]
 
     def tearDown(self):
         self.is_online_patch.stop()
@@ -114,10 +121,16 @@ class BaseWorkloadTransferTestCase(test.TestCase):
                               'get_total_capacity', return_value=None) as mock_method2:
                 with patch.object(workloadmgr.workloads.manager.WorkloadMgrManager,
                                   'workload_reset', return_value=None) as mock_method3:
-                    values = [{'server1:nfsshare1': [1099511627776, 10737418240], }.values()[0],
-                              {'server2:nfsshare2': [
-                                  1099511627776, 5 * 10737418240], }.values()[0],
-                              {'server3:nfsshare3': [1099511627776, 7 * 10737418240], }.values()[0], ]
+                    values = [{'server1:nfsshare1': [1099511627776,
+                                                     10737418240],
+                               }.values()[0],
+                              {'server2:nfsshare2': [1099511627776,
+                                                     5 * 10737418240],
+                               }.values()[0],
+                              {'server3:nfsshare3': [1099511627776,
+                                                     7 * 10737418240],
+                               }.values()[0],
+                              ]
 
                     mock_method2.side_effect = values
                     self.workload_params = {
@@ -138,12 +151,13 @@ class BaseWorkloadTransferTestCase(test.TestCase):
                             return context
 
                         mock_method4.side_effect = _get_tenant_context
-                        workload_type = tests_utils.create_workload_type(self.context,
-                                                                         display_name='Serial',
-                                                                         display_description='this is a test workload_type',
-                                                                         status='available',
-                                                                         is_public=True,
-                                                                         metadata=None)
+                        workload_type = tests_utils.create_workload_type(
+                            self.context,
+                            display_name='Serial',
+                            display_description='this is a test workload_type',
+                            status='available',
+                            is_public=True,
+                            metadata=None)
 
                     workload = tests_utils.create_workload(
                         self.context,
@@ -164,14 +178,14 @@ class BaseWorkloadTransferTestCase(test.TestCase):
                         'workload_type': None,
                         'user_id': 'fake',
                         'launched_at': 'DONTCARE',
-                        'jobschedule': {'start_date': '06/05/2014',
-                                        'end_date': '07/05/2015',
-                                        'interval': '1 hr',
-                                        'start_time': '2:30 PM',
-                                        'fullbackup_interval': '-1',
-                                        'retention_policy_type': 'Number of Snapshots to Keep',
-                                        'retention_policy_value': '30'}
-                    }
+                        'jobschedule': {
+                            'start_date': '06/05/2014',
+                            'end_date': '07/05/2015',
+                            'interval': '1 hr',
+                            'start_time': '2:30 PM',
+                            'fullbackup_interval': '-1',
+                            'retention_policy_type': 'Number of Snapshots to Keep',
+                            'retention_policy_value': '30'}}
                     expected['status'] = 'available'
                     self.assertEqual(
                         workload_id, self.db.workload_get(
@@ -207,12 +221,15 @@ class BaseWorkloadTransferTestCase(test.TestCase):
                     self.db.workload_update(self.context, workload['id'],
                                             {'status': 'available'})
 
-                    transfer_rec = self.workload_transfer_api.create(self.context,
-                                                                     workload_id, "test-transfer")
+                    transfer_rec = self.workload_transfer_api.create(
+                        self.context, workload_id, "test-transfer")
 
-                    self.assertEqual(set(['id', 'workload_id',
-                                          'display_name', 'auth_key',
-                                          'created_at']), set(transfer_rec.keys()))
+                    self.assertEqual(set(['id',
+                                          'workload_id',
+                                          'display_name',
+                                          'auth_key',
+                                          'created_at']),
+                                     set(transfer_rec.keys()))
 
                     self.assertEqual(
                         transfer_rec['workload_id'], workload['id'])
@@ -248,10 +265,16 @@ class BaseWorkloadTransferTestCase(test.TestCase):
                               'get_total_capacity', return_value=None) as mock_method2:
                 with patch.object(workloadmgr.workloads.manager.WorkloadMgrManager,
                                   'workload_reset', return_value=None) as mock_method3:
-                    values = [{'server1:nfsshare1': [1099511627776, 10737418240], }.values()[0],
-                              {'server2:nfsshare2': [
-                                  1099511627776, 5 * 10737418240], }.values()[0],
-                              {'server3:nfsshare3': [1099511627776, 7 * 10737418240], }.values()[0], ]
+                    values = [{'server1:nfsshare1': [1099511627776,
+                                                     10737418240],
+                               }.values()[0],
+                              {'server2:nfsshare2': [1099511627776,
+                                                     5 * 10737418240],
+                               }.values()[0],
+                              {'server3:nfsshare3': [1099511627776,
+                                                     7 * 10737418240],
+                               }.values()[0],
+                              ]
 
                     mock_method2.side_effect = values
                     self.workload_params = {
@@ -281,12 +304,13 @@ class BaseWorkloadTransferTestCase(test.TestCase):
                             return context
 
                         mock_method4.side_effect = _get_tenant_context
-                        workload_type = tests_utils.create_workload_type(self.context,
-                                                                         display_name='Serial',
-                                                                         display_description='this is a test workload_type',
-                                                                         status='available',
-                                                                         is_public=True,
-                                                                         metadata=None)
+                        workload_type = tests_utils.create_workload_type(
+                            self.context,
+                            display_name='Serial',
+                            display_description='this is a test workload_type',
+                            status='available',
+                            is_public=True,
+                            metadata=None)
 
                     workload = tests_utils.create_workload(
                         self.context,
@@ -307,14 +331,14 @@ class BaseWorkloadTransferTestCase(test.TestCase):
                         'workload_type': None,
                         'user_id': 'fake',
                         'launched_at': 'DONTCARE',
-                        'jobschedule': {'start_date': '06/05/2014',
-                                        'end_date': '07/05/2015',
-                                        'interval': '1 hr',
-                                        'start_time': '2:30 PM',
-                                        'fullbackup_interval': '-1',
-                                        'retention_policy_type': 'Number of Snapshots to Keep',
-                                        'retention_policy_value': '30'}
-                    }
+                        'jobschedule': {
+                            'start_date': '06/05/2014',
+                            'end_date': '07/05/2015',
+                            'interval': '1 hr',
+                            'start_time': '2:30 PM',
+                            'fullbackup_interval': '-1',
+                            'retention_policy_type': 'Number of Snapshots to Keep',
+                            'retention_policy_value': '30'}}
                     expected['status'] = 'available'
                     self.assertEqual(
                         workload_id, self.db.workload_get(
@@ -350,12 +374,15 @@ class BaseWorkloadTransferTestCase(test.TestCase):
                     self.db.workload_update(self.context, workload['id'],
                                             {'status': 'available'})
 
-                    transfer_rec = self.workload_transfer_api.create(self.context,
-                                                                     workload_id, "test-transfer")
+                    transfer_rec = self.workload_transfer_api.create(
+                        self.context, workload_id, "test-transfer")
 
-                    self.assertEqual(set(['id', 'workload_id',
-                                          'display_name', 'auth_key',
-                                          'created_at']), set(transfer_rec.keys()))
+                    self.assertEqual(set(['id',
+                                          'workload_id',
+                                          'display_name',
+                                          'auth_key',
+                                          'created_at']),
+                                     set(transfer_rec.keys()))
 
                     self.assertEqual(
                         transfer_rec['workload_id'], workload['id'])
@@ -379,8 +406,8 @@ class BaseWorkloadTransferTestCase(test.TestCase):
                             else:
                                 return bunchify(self.stash)
                         workload_get_mock.side_effect = workload_get_stub
-                        trans_rec = self.workload_transfer_api.accept(self.context,
-                                                                      rec['id'], transfer_rec['auth_key'])
+                        trans_rec = self.workload_transfer_api.accept(
+                            self.context, rec['id'], transfer_rec['auth_key'])
 
     @patch('workloadmgr.workloads.api.API.import_workloads')
     def test_workload_transfer_complete(self, import_wl_mock):
@@ -395,10 +422,16 @@ class BaseWorkloadTransferTestCase(test.TestCase):
                               'get_total_capacity', return_value=None) as mock_method2:
                 with patch.object(workloadmgr.workloads.manager.WorkloadMgrManager,
                                   'workload_reset', return_value=None) as mock_method3:
-                    values = [{'server1:nfsshare1': [1099511627776, 10737418240], }.values()[0],
-                              {'server2:nfsshare2': [
-                                  1099511627776, 5 * 10737418240], }.values()[0],
-                              {'server3:nfsshare3': [1099511627776, 7 * 10737418240], }.values()[0], ]
+                    values = [{'server1:nfsshare1': [1099511627776,
+                                                     10737418240],
+                               }.values()[0],
+                              {'server2:nfsshare2': [1099511627776,
+                                                     5 * 10737418240],
+                               }.values()[0],
+                              {'server3:nfsshare3': [1099511627776,
+                                                     7 * 10737418240],
+                               }.values()[0],
+                              ]
 
                     mock_method2.side_effect = values
                     self.workload_params = {
@@ -428,12 +461,13 @@ class BaseWorkloadTransferTestCase(test.TestCase):
                             return context
 
                         mock_method4.side_effect = _get_tenant_context
-                        workload_type = tests_utils.create_workload_type(self.context,
-                                                                         display_name='Serial',
-                                                                         display_description='this is a test workload_type',
-                                                                         status='available',
-                                                                         is_public=True,
-                                                                         metadata=None)
+                        workload_type = tests_utils.create_workload_type(
+                            self.context,
+                            display_name='Serial',
+                            display_description='this is a test workload_type',
+                            status='available',
+                            is_public=True,
+                            metadata=None)
 
                     workload = tests_utils.create_workload(
                         self.context,
@@ -454,14 +488,14 @@ class BaseWorkloadTransferTestCase(test.TestCase):
                         'workload_type': None,
                         'user_id': 'fake',
                         'launched_at': 'DONTCARE',
-                        'jobschedule': {'start_date': '06/05/2014',
-                                        'end_date': '07/05/2015',
-                                        'interval': '1 hr',
-                                        'start_time': '2:30 PM',
-                                        'fullbackup_interval': '-1',
-                                        'retention_policy_type': 'Number of Snapshots to Keep',
-                                        'retention_policy_value': '30'}
-                    }
+                        'jobschedule': {
+                            'start_date': '06/05/2014',
+                            'end_date': '07/05/2015',
+                            'interval': '1 hr',
+                            'start_time': '2:30 PM',
+                            'fullbackup_interval': '-1',
+                            'retention_policy_type': 'Number of Snapshots to Keep',
+                            'retention_policy_value': '30'}}
                     expected['status'] = 'available'
                     self.assertEqual(
                         workload_id, self.db.workload_get(
@@ -497,12 +531,15 @@ class BaseWorkloadTransferTestCase(test.TestCase):
                     self.db.workload_update(self.context, workload['id'],
                                             {'status': 'available'})
 
-                    transfer_rec = self.workload_transfer_api.create(self.context,
-                                                                     workload_id, "test-transfer")
+                    transfer_rec = self.workload_transfer_api.create(
+                        self.context, workload_id, "test-transfer")
 
-                    self.assertEqual(set(['id', 'workload_id',
-                                          'display_name', 'auth_key',
-                                          'created_at']), set(transfer_rec.keys()))
+                    self.assertEqual(set(['id',
+                                          'workload_id',
+                                          'display_name',
+                                          'auth_key',
+                                          'created_at']),
+                                     set(transfer_rec.keys()))
 
                     self.assertEqual(
                         transfer_rec['workload_id'], workload['id'])
@@ -527,8 +564,8 @@ class BaseWorkloadTransferTestCase(test.TestCase):
                         saved_project_id = self.context.project_id
                         new_id = self.context.project_id = str(uuid.uuid4())
                         self.context.tenant_id = self.context.project_id
-                        trans_rec = self.workload_transfer_api.accept(self.context,
-                                                                      rec['id'], transfer_rec['auth_key'])
+                        trans_rec = self.workload_transfer_api.accept(
+                            self.context, rec['id'], transfer_rec['auth_key'])
                         self.context.project_id = saved_project_id
                         self.context.tenant_id = self.context.project_id
 
@@ -547,8 +584,9 @@ class BaseWorkloadTransferTestCase(test.TestCase):
                                           self.workload_transfer_api.complete,
                                           self.context,
                                           rec['id'])
-                        self.db.workload_update(self.context, workload_id,
-                                                {'status': 'transfer-in-progress'})
+                        self.db.workload_update(
+                            self.context, workload_id, {
+                                'status': 'transfer-in-progress'})
 
                         # same project id should throws an exception
                         saved_project_id = self.context.project_id

@@ -119,17 +119,17 @@ def create_controller_spec(client_factory, key, adapter_type="lsiLogic"):
     """
     # Create a controller for the Virtual Hard Disk
     virtual_device_config = client_factory.create(
-                            'ns0:VirtualDeviceConfigSpec')
+        'ns0:VirtualDeviceConfigSpec')
     virtual_device_config.operation = "add"
     if adapter_type == "busLogic":
         virtual_controller = client_factory.create(
-                                'ns0:VirtualBusLogicController')
+            'ns0:VirtualBusLogicController')
     elif adapter_type == "lsiLogicsas":
         virtual_controller = client_factory.create(
-                                'ns0:VirtualLsiLogicSASController')
+            'ns0:VirtualLsiLogicSASController')
     else:
         virtual_controller = client_factory.create(
-                                'ns0:VirtualLsiLogicController')
+            'ns0:VirtualLsiLogicController')
     virtual_controller.key = key
     virtual_controller.busNumber = 0
     virtual_controller.sharedBus = "noSharing"
@@ -171,13 +171,13 @@ def create_network_spec(client_factory, vif_info):
                                 'VirtualPortBackingInfo'])
         backing = client_factory.create(backing_name)
         portgroup = client_factory.create(
-                    'ns0:DistributedVirtualSwitchPortConnection')
+            'ns0:DistributedVirtualSwitchPortConnection')
         portgroup.switchUuid = network_ref['dvsw']
         portgroup.portgroupKey = network_ref['dvpg']
         backing.port = portgroup
     else:
         backing = client_factory.create(
-                  'ns0:VirtualEthernetCardNetworkBackingInfo')
+            'ns0:VirtualEthernetCardNetworkBackingInfo')
         backing.deviceName = network_name
 
     connectable_spec = client_factory.create('ns0:VirtualDeviceConnectInfo')
@@ -226,10 +226,15 @@ def get_vmdk_attach_config_spec(client_factory,
                                                      controller_key,
                                                      adapter_type)
             device_config_spec.append(controller_spec)
-    virtual_device_config_spec = create_virtual_disk_spec(client_factory,
-                                controller_key, disk_type, file_path,
-                                disk_size, linked_clone,
-                                unit_number, device_name)
+    virtual_device_config_spec = create_virtual_disk_spec(
+        client_factory,
+        controller_key,
+        disk_type,
+        file_path,
+        disk_size,
+        linked_clone,
+        unit_number,
+        device_name)
 
     device_config_spec.append(virtual_device_config_spec)
 
@@ -417,7 +422,7 @@ def create_virtual_disk_spec(client_factory, controller_key,
     Virtual Disk to the VM.
     """
     virtual_device_config = client_factory.create(
-                            'ns0:VirtualDeviceConfigSpec')
+        'ns0:VirtualDeviceConfigSpec')
     virtual_device_config.operation = "add"
     if (file_path is None) or linked_clone:
         virtual_device_config.fileOperation = "create"
@@ -426,14 +431,14 @@ def create_virtual_disk_spec(client_factory, controller_key,
 
     if disk_type == "rdm" or disk_type == "rdmp":
         disk_file_backing = client_factory.create(
-                            'ns0:VirtualDiskRawDiskMappingVer1BackingInfo')
+            'ns0:VirtualDiskRawDiskMappingVer1BackingInfo')
         disk_file_backing.compatibilityMode = "virtualMode" \
             if disk_type == "rdm" else "physicalMode"
         disk_file_backing.diskMode = "independent_persistent"
         disk_file_backing.deviceName = device_name or ""
     else:
         disk_file_backing = client_factory.create(
-                            'ns0:VirtualDiskFlatVer2BackingInfo')
+            'ns0:VirtualDiskFlatVer2BackingInfo')
         disk_file_backing.diskMode = "persistent"
         if disk_type == "thin":
             disk_file_backing.thinProvisioned = True
@@ -473,7 +478,7 @@ def detach_virtual_disk_spec(client_factory, device, destroy_disk=False):
     Builds spec for the detach of an already existing Virtual Disk from VM.
     """
     virtual_device_config = client_factory.create(
-                            'ns0:VirtualDeviceConfigSpec')
+        'ns0:VirtualDeviceConfigSpec')
     virtual_device_config.operation = "remove"
     if destroy_disk:
         virtual_device_config.fileOperation = "destroy"
@@ -540,7 +545,7 @@ def get_dummy_vm_create_spec(client_factory, name, data_store_name):
 def get_machine_id_change_spec(client_factory, machine_id_str):
     """Builds the machine id change config spec."""
     virtual_machine_config_spec = client_factory.create(
-                                  'ns0:VirtualMachineConfigSpec')
+        'ns0:VirtualMachineConfigSpec')
 
     opt = client_factory.create('ns0:OptionValue')
     opt.key = "machine.id"
@@ -571,7 +576,7 @@ def get_add_vswitch_port_group_spec(client_factory, vswitch_name,
 def get_vnc_config_spec(client_factory, port, password):
     """Builds the vnc config spec."""
     virtual_machine_config_spec = client_factory.create(
-                                    'ns0:VirtualMachineConfigSpec')
+        'ns0:VirtualMachineConfigSpec')
 
     opt_enabled = client_factory.create('ns0:OptionValue')
     opt_enabled.key = "RemoteDisplay.vnc.enabled"
@@ -644,11 +649,10 @@ def _cancel_retrieve_if_necessary(session, results):
                                        token)
 
 
-
 def get_vm_ref_from_name(session, vm_name):
     """Get reference to the VM with the name specified."""
     vms = session._call_method(vim_util, "get_objects",
-                "VirtualMachine", ["name"])
+                               "VirtualMachine", ["name"])
     return _get_object_from_results(session, vms, vm_name,
                                     _get_object_for_value)
 
@@ -656,7 +660,7 @@ def get_vm_ref_from_name(session, vm_name):
 def get_vm_ref_from_uuid(session, instance_uuid):
     """Get reference to the VM with the uuid specified."""
     vms = session._call_method(vim_util, "get_objects",
-                "VirtualMachine", ["name"])
+                               "VirtualMachine", ["name"])
     return _get_object_from_results(session, vms, instance_uuid,
                                     _get_object_for_value)
 
@@ -664,17 +668,18 @@ def get_vm_ref_from_uuid(session, instance_uuid):
 def get_vm_ref_from_vmware_uuid(session, instance_uuid):
     """Get reference to the VM with the uuid specified."""
     vms = session._call_method(vim_util, "get_objects",
-                "VirtualMachine", ["config.uuid"])
-    
+                               "VirtualMachine", ["config.uuid"])
+
     return _get_object_from_results(session, vms, instance_uuid,
-                                    _get_object_for_value)    
+                                    _get_object_for_value)
 
 
 def get_vm_ref(session, instance):
     """Get reference to the VM through uuid or vm name."""
     vm_ref = None
     if hasattr(instance, 'metadata') and 'vmware_uuid' in instance.metadata:
-        vm_ref = get_vm_ref_from_vmware_uuid(session, instance.metadata['vmware_uuid'])
+        vm_ref = get_vm_ref_from_vmware_uuid(
+            session, instance.metadata['vmware_uuid'])
     if not vm_ref:
         vm_ref = get_vm_ref_from_uuid(session, instance['uuid'])
     if not vm_ref:
@@ -687,9 +692,10 @@ def get_vm_ref(session, instance):
 def get_network_ref_from_id(session, net_name):
     """Get reference to the network with the name specified."""
     networks = session._call_method(vim_util, "get_objects",
-                "Network", ["name"])
+                                    "Network", ["name"])
     return _get_object_from_results(session, networks, net_name,
                                     _get_reference_for_value)
+
 
 def get_host_ref_from_id(session, host_id, property_list=None):
     """Get a host reference object for a host_id string."""
@@ -698,8 +704,8 @@ def get_host_ref_from_id(session, host_id, property_list=None):
         property_list = ['name']
 
     host_refs = session._call_method(
-                    vim_util, "get_objects",
-                    "HostSystem", property_list)
+        vim_util, "get_objects",
+        "HostSystem", property_list)
     return _get_object_from_results(session, host_refs, host_id,
                                     _get_reference_for_value)
 
@@ -725,8 +731,8 @@ def get_network_id_from_vm_ref(session, vm_ref):
     # property_set here, is a local representation of the
     # properties we are querying for.
     property_set = session._call_method(
-            vim_util, "get_object_properties",
-            None, vm_ref, vm_ref._type, [property_name])
+        vim_util, "get_object_properties",
+        None, vm_ref, vm_ref._type, [property_name])
 
     prop = property_from_property_set(
         property_name, property_set)
@@ -738,9 +744,10 @@ def get_network_id_from_vm_ref(session, vm_ref):
         for p in prop.val.ManagedObjectReference:
             networkid.append(p.value)
         #prop = _property_from_propSet(prop.val, name='ArrayOfManagedObjectReference')
-        #for p in prop:
+        # for p in prop:
 
     return networkid
+
 
 def get_host_id_from_vm_ref(session, vm_ref):
     """
@@ -763,8 +770,8 @@ def get_host_id_from_vm_ref(session, vm_ref):
     # property_set here, is a local representation of the
     # properties we are querying for.
     property_set = session._call_method(
-            vim_util, "get_object_properties",
-            None, vm_ref, vm_ref._type, [property_name])
+        vim_util, "get_object_properties",
+        None, vm_ref, vm_ref._type, [property_name])
 
     prop = property_from_property_set(
         property_name, property_set)
@@ -834,61 +841,99 @@ def get_host_name_from_host_ref(host_ref):
 
 def get_vm_state_from_name(session, vm_name):
     vm_ref = get_vm_ref_from_name(session, vm_name)
-    vm_state = session._call_method(vim_util, "get_dynamic_property",
-                vm_ref, "VirtualMachine", "runtime.powerState")
+    vm_state = session._call_method(
+        vim_util,
+        "get_dynamic_property",
+        vm_ref,
+        "VirtualMachine",
+        "runtime.powerState")
     return vm_state
 
+
 def get_vm_vcpus_from_vmref(session, vm_ref):
-    vm_vcpus = session._call_method(vim_util, "get_dynamic_property",
-                vm_ref, "VirtualMachine", "summary.config.numCpu")
+    vm_vcpus = session._call_method(
+        vim_util,
+        "get_dynamic_property",
+        vm_ref,
+        "VirtualMachine",
+        "summary.config.numCpu")
     return vm_vcpus
+
 
 def get_vm_uuid_from_vmref(session, vm_ref):
     uuid = session._call_method(vim_util, "get_dynamic_property",
-                vm_ref, "VirtualMachine", "config.uuid")
+                                vm_ref, "VirtualMachine", "config.uuid")
     return uuid
+
 
 def get_datastore_from_vmref(session, vm_ref):
     datastore = session._call_method(vim_util, "get_dynamic_property",
-                vm_ref, "VirtualMachine", "datastore")
+                                     vm_ref, "VirtualMachine", "datastore")
     return datastore[0][0]
+
 
 def get_datastore_folder_from_datastore(session, datastore):
     datastorefolder = session._call_method(vim_util, "get_dynamic_property",
-                         datastore, "Datastore", "parent")
+                                           datastore, "Datastore", "parent")
     return datastorefolder
+
 
 def get_datacenter_from_datacenterfolder(session, datastorefolder):
     datacenter = session._call_method(vim_util, "get_dynamic_property",
-                datastorefolder, "Folder", "parent")
+                                      datastorefolder, "Folder", "parent")
     return datacenter
+
 
 def get_name_from_datacenter(session, datacenter):
     name = session._call_method(vim_util, "get_dynamic_property",
-                datacenter, "Datacenter", "name")
+                                datacenter, "Datacenter", "name")
     return name
 
+
 def get_vm_memmbs_from_vmref(session, vm_ref):
-    vm_memmbs = session._call_method(vim_util, "get_dynamic_property",
-                vm_ref, "VirtualMachine", "summary.config.memorySizeMB")
+    vm_memmbs = session._call_method(
+        vim_util,
+        "get_dynamic_property",
+        vm_ref,
+        "VirtualMachine",
+        "summary.config.memorySizeMB")
     return vm_memmbs
 
+
 def get_vm_vdisks_from_vmref(session, vm_ref):
-    vm_vdisks = session._call_method(vim_util, "get_dynamic_property",
-                vm_ref, "VirtualMachine", "summary.config.numVirtualDisks")
+    vm_vdisks = session._call_method(
+        vim_util,
+        "get_dynamic_property",
+        vm_ref,
+        "VirtualMachine",
+        "summary.config.numVirtualDisks")
     return vm_vdisks
 
+
 def get_vm_rootgb_from_vmref(session, vm_ref):
-    vm_rootgb = session._call_method(vim_util, "get_dynamic_property",
-                vm_ref, "VirtualMachine", "summary.storage.uncommitted")
-    vm_rootgb += session._call_method(vim_util, "get_dynamic_property",
-                vm_ref, "VirtualMachine", "summary.storage.committed")
+    vm_rootgb = session._call_method(
+        vim_util,
+        "get_dynamic_property",
+        vm_ref,
+        "VirtualMachine",
+        "summary.storage.uncommitted")
+    vm_rootgb += session._call_method(vim_util,
+                                      "get_dynamic_property",
+                                      vm_ref,
+                                      "VirtualMachine",
+                                      "summary.storage.committed")
     return vm_rootgb
 
+
 def get_vm_virtualdevices_from_vmref(session, vm_ref):
-    virtualdevices = session._call_method(vim_util, "get_dynamic_property",
-                           vm_ref, "VirtualMachine", "config.hardware.device")
+    virtualdevices = session._call_method(
+        vim_util,
+        "get_dynamic_property",
+        vm_ref,
+        "VirtualMachine",
+        "config.hardware.device")
     return virtualdevices
+
 
 def get_stats_from_cluster(session, cluster):
     """Get the aggregate resource stats of a cluster."""
@@ -902,9 +947,12 @@ def get_stats_from_cluster(session, cluster):
         host_ret = prop_dict.get('host')
         if host_ret:
             host_mors = host_ret.ManagedObjectReference
-            result = session._call_method(vim_util,
-                         "get_properties_for_a_collection_of_objects",
-                         "HostSystem", host_mors, ["summary.hardware"])
+            result = session._call_method(
+                vim_util,
+                "get_properties_for_a_collection_of_objects",
+                "HostSystem",
+                host_mors,
+                ["summary.hardware"])
             for obj in result.objects:
                 hardware_summary = obj.propSet[0].val
                 # Total vcpus is the sum of all pCPUs of individual hosts
@@ -916,8 +964,12 @@ def get_stats_from_cluster(session, cluster):
 
         res_mor = prop_dict.get('resourcePool')
         if res_mor:
-            res_usage = session._call_method(vim_util, "get_dynamic_property",
-                            res_mor, "ResourcePool", "summary.runtime.memory")
+            res_usage = session._call_method(
+                vim_util,
+                "get_dynamic_property",
+                res_mor,
+                "ResourcePool",
+                "summary.runtime.memory")
             if res_usage:
                 # maxUsage is the memory limit of the cluster available to VM's
                 mem_info['total'] = int(res_usage.maxUsage / (1024 * 1024))
@@ -972,7 +1024,7 @@ def propset_dict(propset):
     if propset is None:
         return {}
 
-    #TODO(hartsocks): once support for Python 2.6 is dropped
+    # TODO(hartsocks): once support for Python 2.6 is dropped
     # change to {[(prop.name, prop.val) for prop in propset]}
     return dict([(prop.name, prop.val) for prop in propset])
 
@@ -1016,43 +1068,47 @@ def _get_datastore_ref_and_name(data_stores, datastore_regex=None):
                 if new_ds.freespace > found_ds.freespace:
                     found_ds = new_ds
 
-    #TODO(hartsocks): refactor driver to use DSRecord namedtuple
+    # TODO(hartsocks): refactor driver to use DSRecord namedtuple
     # using DSRecord through out will help keep related information
     # together and improve readability and organisation of the code.
     if found_ds.datastore is not None:
         return (found_ds.datastore, found_ds.name,
-                    found_ds.capacity, found_ds.freespace)
+                found_ds.capacity, found_ds.freespace)
 
 
 def get_datastore_ref_and_name(session, cluster=None, host=None,
                                datastore_regex=None):
     """Get the datastore list and choose the first local storage."""
     if cluster is None and host is None:
-        data_stores = session._call_method(vim_util, "get_objects",
-                    "Datastore", ["summary.type", "summary.name",
-                                  "summary.capacity", "summary.freeSpace",
-                                  "summary.accessible"])
+        data_stores = session._call_method(vim_util,
+                                           "get_objects",
+                                           "Datastore",
+                                           ["summary.type",
+                                            "summary.name",
+                                            "summary.capacity",
+                                            "summary.freeSpace",
+                                            "summary.accessible"])
     else:
         if cluster is not None:
             datastore_ret = session._call_method(
-                                        vim_util,
-                                        "get_dynamic_property", cluster,
-                                        "ClusterComputeResource", "datastore")
+                vim_util,
+                "get_dynamic_property", cluster,
+                "ClusterComputeResource", "datastore")
         else:
             datastore_ret = session._call_method(
-                                        vim_util,
-                                        "get_dynamic_property", host,
-                                        "HostSystem", "datastore")
+                vim_util,
+                "get_dynamic_property", host,
+                "HostSystem", "datastore")
 
         if not datastore_ret:
             raise exception.DatastoreNotFound()
         data_store_mors = datastore_ret.ManagedObjectReference
         data_stores = session._call_method(vim_util,
-                                "get_properties_for_a_collection_of_objects",
-                                "Datastore", data_store_mors,
-                                ["summary.type", "summary.name",
-                                 "summary.capacity", "summary.freeSpace",
-                                 "summary.accessible"])
+                                           "get_properties_for_a_collection_of_objects",
+                                           "Datastore", data_store_mors,
+                                           ["summary.type", "summary.name",
+                                            "summary.capacity", "summary.freeSpace",
+                                            "summary.accessible"])
     while data_stores:
         token = _get_token(data_stores)
         results = _get_datastore_ref_and_name(data_stores, datastore_regex)
@@ -1069,8 +1125,8 @@ def get_datastore_ref_and_name(session, cluster=None, host=None,
         else:
             if datastore_regex:
                 raise exception.DatastoreNotFound(
-                _("Datastore regex %s did not match any datastores")
-                % datastore_regex.pattern)
+                    _("Datastore regex %s did not match any datastores")
+                    % datastore_regex.pattern)
             else:
                 raise exception.DatastoreNotFound()
     raise exception.DatastoreNotFound()
@@ -1123,10 +1179,10 @@ def get_res_pool_ref(session, cluster, node_mo_id):
         if cluster.value == node_mo_id:
             # Get the root resource pool of the cluster
             res_pool_ref = session._call_method(vim_util,
-                                                  "get_dynamic_property",
-                                                  cluster,
-                                                  "ClusterComputeResource",
-                                                  "resourcePool")
+                                                "get_dynamic_property",
+                                                cluster,
+                                                "ClusterComputeResource",
+                                                "resourcePool")
 
     return res_pool_ref
 
@@ -1135,7 +1191,7 @@ def get_all_cluster_mors(session):
     """Get all the clusters in the vCenter."""
     try:
         results = session._call_method(vim_util, "get_objects",
-                                        "ClusterComputeResource", ["name"])
+                                       "ClusterComputeResource", ["name"])
         _cancel_retrieve_if_necessary(session, results)
         return results.objects
 
@@ -1147,7 +1203,7 @@ def get_all_res_pool_mors(session):
     """Get all the resource pools in the vCenter."""
     try:
         results = session._call_method(vim_util, "get_objects",
-                                             "ResourcePool")
+                                       "ResourcePool")
 
         _cancel_retrieve_if_necessary(session, results)
         return results.objects

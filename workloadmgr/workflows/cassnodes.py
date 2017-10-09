@@ -406,9 +406,8 @@ def get_cassandra_nodes(alivenodes, port, username, password,
                             if m:
                                 mp = m.group(1)
 
-                                lvoutput = pssh_exec_command([host], port,
-                                                             username, password,
-                                                             "lvdisplay " + mp, sudo=True)
+                                lvoutput = pssh_exec_command(
+                                    [host], port, username, password, "lvdisplay " + mp, sudo=True)
                                 LOG.info(
                                     _('lvdisplay: return value %d') %
                                     lvoutput[host]['exit_code'])
@@ -562,10 +561,11 @@ def main(argv):
 
     except getopt.GetoptError as ex:
         LOG.exception(ex)
-        usage = _("Usage: cassnodes.py --config-file /etc/workloadmgr/workloadmgr.conf --defaultnode cassandra1 "
-                  "--port 22 --username ubuntu --password password "
-                  "--addlnodes 'cassandra1;cassandra2;cassandra3' --preferredgroups 'DC1;DC2' "
-                  "--findpartitiontype False --outfile /tmp/cassnodes.txt --outfile /tmp/cassnodes_errors.txt")
+        usage = _(
+            "Usage: cassnodes.py --config-file /etc/workloadmgr/workloadmgr.conf --defaultnode cassandra1 "
+            "--port 22 --username ubuntu --password password "
+            "--addlnodes 'cassandra1;cassandra2;cassandra3' --preferredgroups 'DC1;DC2' "
+            "--findpartitiontype False --outfile /tmp/cassnodes.txt --outfile /tmp/cassnodes_errors.txt")
         LOG.info(usage)
         with open(errfile, 'w') as errfilehandle:
             errfilehandle.write(usage)

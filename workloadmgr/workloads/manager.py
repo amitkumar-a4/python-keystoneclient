@@ -202,8 +202,9 @@ class WorkloadMgrManager(manager.SchedulerDependentManager):
             kwargs = {'host': self.host, 'status': 'completed'}
             list_search = self.db.file_search_get_all(ctxt, **kwargs)
             for search in list_search:
-                self.db.file_search_update(ctxt, search.id, {'status': 'error',
-                                                             'error_msg': 'Search did not finish successfully'})
+                self.db.file_search_update(
+                    ctxt, search.id, {
+                        'status': 'error', 'error_msg': 'Search did not finish successfully'})
         except Exception as ex:
             LOG.exception(ex)
 
@@ -334,8 +335,8 @@ class WorkloadMgrManager(manager.SchedulerDependentManager):
                 vm = self.db.workload_vms_create(context, values)
                 compute_service.set_meta_item(context, vm.vm_id,
                                               "workload_id", workload.id)
-                compute_service.set_meta_item(context, vm.vm_id,
-                                              "workload_name", workload.display_name)
+                compute_service.set_meta_item(
+                    context, vm.vm_id, "workload_name", workload.display_name)
 
         if instances and 'topology' in instances:
             workload_metadata = {'topology': json.dumps(instances['topology'])}
@@ -415,8 +416,8 @@ class WorkloadMgrManager(manager.SchedulerDependentManager):
             for vm in vms:
                 compute_service.set_meta_item(context, vm.vm_id,
                                               "workload_id", workload_id)
-                compute_service.set_meta_item(context, vm.vm_id,
-                                              "workload_name", workload['display_name'])
+                compute_service.set_meta_item(
+                    context, vm.vm_id, "workload_name", workload['display_name'])
 
                 instance = compute_service.get_server_by_id(
                     context, vm.vm_id, admin=False)
@@ -456,8 +457,9 @@ class WorkloadMgrManager(manager.SchedulerDependentManager):
                 vault.get_nfs_share_for_workload_by_free_overcommit(
                     context,
                     workload)
-            workload_metadata = {'workload_approx_backup_size': workload_approx_backup_size,
-                                 'backup_media_target': backup_endpoint}
+            workload_metadata = {
+                'workload_approx_backup_size': workload_approx_backup_size,
+                'backup_media_target': backup_endpoint}
 
             # Create swift container for the workload
             json_wl = jsonutils.dumps(workload)
@@ -484,8 +486,9 @@ class WorkloadMgrManager(manager.SchedulerDependentManager):
         File search
         """
         try:
-            self.db.file_search_update(context, search_id, {'host': self.host,
-                                                            'status': 'searching'})
+            self.db.file_search_update(
+                context, search_id, {
+                    'host': self.host, 'status': 'searching'})
             search = self.db.file_search_get(context, search_id)
             vm_found = self.db.workload_vm_get_by_id(
                 context, search.vm_id, read_deleted='yes', workloads_filter='deleted')
@@ -561,8 +564,10 @@ class WorkloadMgrManager(manager.SchedulerDependentManager):
                         continue
                     vm_disk_resource_snap = self.db.vm_disk_resource_snap_get_top(
                         context, snapshot_vm_resource.id)
-                    resource_snap_path = os.path.join(backup_target.mount_path,
-                                                      vm_disk_resource_snap.vault_url.strip(os.sep))
+                    resource_snap_path = os.path.join(
+                        backup_target.mount_path,
+                        vm_disk_resource_snap.vault_url.strip(
+                            os.sep))
                     guestfs_input_str = guestfs_input_str + ',,' + resource_snap_path
                 guestfs_input.append(guestfs_input_str)
             guestfs_input_str = "|-|".join(guestfs_input)
@@ -601,12 +606,14 @@ class WorkloadMgrManager(manager.SchedulerDependentManager):
                 LOG.exception(ex)
 
             context = nova._get_tenant_context(context)
-            snapshot = self.db.snapshot_update(context,
-                                               snapshot_id,
-                                               {'host': self.host,
-                                                'progress_percent': 0,
-                                                'progress_msg': 'Snapshot of workload is starting',
-                                                'status': 'starting'})
+            snapshot = self.db.snapshot_update(
+                context,
+                snapshot_id,
+                {
+                    'host': self.host,
+                    'progress_percent': 0,
+                    'progress_msg': 'Snapshot of workload is starting',
+                    'status': 'starting'})
             workload = self.db.workload_get(context, snapshot.workload_id)
 
             backup_endpoint = self.db.get_metadata_value(workload.metadata,
@@ -646,8 +653,7 @@ class WorkloadMgrManager(manager.SchedulerDependentManager):
                                     snapshot_id,
                                     {'progress_percent': 0,
                                      'progress_msg': 'Initializing Snapshot Workflow',
-                                     'status': 'executing'
-                                     })
+                                     'status': 'executing'})
             workflow.initflow()
             workflow.execute()
 
@@ -659,14 +665,16 @@ class WorkloadMgrManager(manager.SchedulerDependentManager):
                 for vm in self.db.workload_vms_get(context, workload.id):
                     self.db.workload_vms_delete(context, vm.vm_id, workload.id)
                     try:
-                        compute_service.delete_meta(context, vm.vm_id,
-                                                    ["workload_id", 'workload_name'])
+                        compute_service.delete_meta(
+                            context, vm.vm_id, [
+                                "workload_id", 'workload_name'])
                     except Exception as ex:
                         LOG.exception(ex)
                         try:
                             context = nova._get_tenant_context(context)
-                            compute_service.delete_meta(context, vm.vm_id,
-                                                        ["workload_id", 'workload_name'])
+                            compute_service.delete_meta(
+                                context, vm.vm_id, [
+                                    "workload_id", 'workload_name'])
                         except Exception as ex:
                             LOG.exception(ex)
 
@@ -679,21 +687,29 @@ class WorkloadMgrManager(manager.SchedulerDependentManager):
                     vm = self.db.workload_vms_create(context, values)
                     compute_service.set_meta_item(context, vm.vm_id,
                                                   "workload_id", workload.id)
-                    compute_service.set_meta_item(context, vm.vm_id,
-                                                  "workload_name", workload.display_name)
+                    compute_service.set_meta_item(
+                        context, vm.vm_id, "workload_name", workload.display_name)
 
                 for inst in workflow._store['instances']:
                     hostnames.append(inst['hostname'])
 
-                    if not 'root_partition_type' in inst:
+                    if 'root_partition_type' not in inst:
                         inst['root_partition_type'] = "Linux"
-                    self.db.snapshot_vm_update(context, inst['vm_id'], snapshot.id,
-                                               {'metadata': {'root_partition_type': inst['root_partition_type'],
-                                                             'availability_zone': inst['availability_zone'],
-                                                             'vm_metadata': json.dumps(inst['vm_metadata'])}})
+                    self.db.snapshot_vm_update(
+                        context,
+                        inst['vm_id'],
+                        snapshot.id,
+                        {
+                            'metadata': {
+                                'root_partition_type': inst['root_partition_type'],
+                                'availability_zone': inst['availability_zone'],
+                                'vm_metadata': json.dumps(
+                                    inst['vm_metadata'])}})
 
-            workload_metadata = {'hostnames': json.dumps(hostnames),
-                                 'topology': json.dumps(workflow._store['topology'])}
+            workload_metadata = {
+                'hostnames': json.dumps(hostnames),
+                'topology': json.dumps(
+                    workflow._store['topology'])}
             self.db.workload_update(context,
                                     snapshot.workload_id,
                                     {'metadata': workload_metadata})
@@ -709,10 +725,9 @@ class WorkloadMgrManager(manager.SchedulerDependentManager):
 
             # upload the data to object store... this function will check if
             # the object store is configured
-            backup_target.upload_snapshot_metatdata_to_object_store(context,
-                                                                    {'workload_id': workload.id,
-                                                                     'workload_name': workload.display_name,
-                                                                     'snapshot_id': snapshot.id})
+            backup_target.upload_snapshot_metatdata_to_object_store(
+                context, {
+                    'workload_id': workload.id, 'workload_name': workload.display_name, 'snapshot_id': snapshot.id})
 
             self.db.snapshot_update(context,
                                     snapshot_id,
@@ -771,12 +786,16 @@ class WorkloadMgrManager(manager.SchedulerDependentManager):
             else:
                 if hasattr(ex, 'code') and ex.code == 401:
                     if hasattr(
-                            context, 'tenant') and context.tenant != '' and context.tenant is not None:
+                            context,
+                            'tenant') and context.tenant != '' and context.tenant is not None:
                         tenant = context.tenant
                     else:
                         tenant = context.project_id
-                    msg = _("Failed creating workload snapshot: Make sure trustee role "
-                            + CONF.trustee_role + " assigned to tenant " + tenant)
+                    msg = _(
+                        "Failed creating workload snapshot: Make sure trustee role " +
+                        CONF.trustee_role +
+                        " assigned to tenant " +
+                        tenant)
                 else:
                     msg = _("Failed creating workload snapshot: %(exception)s") % {
                         'exception': ex}
@@ -798,9 +817,8 @@ class WorkloadMgrManager(manager.SchedulerDependentManager):
 
         finally:
             try:
-                backup_target.purge_snapshot_from_staging_area(context,
-                                                               {'workload_id': workload.id,
-                                                                'snapshot_id': snapshot.id})
+                backup_target.purge_snapshot_from_staging_area(
+                    context, {'workload_id': workload.id, 'snapshot_id': snapshot.id})
             except Exception as ex:
                 LOG.exception(ex)
 
@@ -873,9 +891,9 @@ class WorkloadMgrManager(manager.SchedulerDependentManager):
         if backup_endpoint is not None:
             backup_target = vault.get_backup_target(backup_endpoint)
             if backup_target is not None:
-                backup_target.workload_delete(context,
-                                              {'workload_id': workload.id,
-                                               'workload_name': workload.display_name, })
+                backup_target.workload_delete(
+                    context, {
+                        'workload_id': workload.id, 'workload_name': workload.display_name, })
         self.workload_reset(context, workload_id)
 
         compute_service = nova.API(production=True)
@@ -970,8 +988,9 @@ class WorkloadMgrManager(manager.SchedulerDependentManager):
                     raise wlm_exceptions.InvalidRestoreOptions(message=msg)
 
                 try:
-                    vol_obj = volume_service.get(context, vdisk.get('id', None),
-                                                 no_translate=True)
+                    vol_obj = volume_service.get(
+                        context, vdisk.get(
+                            'id', None), no_translate=True)
                     if not vol_obj:
                         raise wlm_exceptions.InvalidRestoreOptions()
                 except Exception as ex:
@@ -997,9 +1016,11 @@ class WorkloadMgrManager(manager.SchedulerDependentManager):
             options['openstack']['instances'] = []
             for inst in snapshotvms:
                 optionsinst = {
-                    'name': inst.vm_name, 'id': inst.vm_id,
-                    'availability_zone': self.db.get_metadata_value(inst.metadata,
-                                                                    'availability_zone'),
+                    'name': inst.vm_name,
+                    'id': inst.vm_id,
+                    'availability_zone': self.db.get_metadata_value(
+                        inst.metadata,
+                        'availability_zone'),
                 }
                 options['openstack']['instances'].append(optionsinst)
             return options
@@ -1016,15 +1037,16 @@ class WorkloadMgrManager(manager.SchedulerDependentManager):
                 """ flavor """
                 if snapshot_vm_resource.resource_type == 'flavor':
                     vm_flavor = snapshot_vm_resource
-                    optionsinst['flavor'] = {'vcpus': self.db.get_metadata_value(vm_flavor.metadata, 'vcpus'),
-                                             'ram': self.db.get_metadata_value(vm_flavor.metadata, 'ram'),
-                                             'disk': self.db.get_metadata_value(vm_flavor.metadata, 'disk'),
-                                             'ephemeral': self.db.get_metadata_value(vm_flavor.metadata, 'ephemeral')
-                                             }
+                    optionsinst['flavor'] = {
+                        'vcpus': self.db.get_metadata_value(
+                            vm_flavor.metadata, 'vcpus'), 'ram': self.db.get_metadata_value(
+                            vm_flavor.metadata, 'ram'), 'disk': self.db.get_metadata_value(
+                            vm_flavor.metadata, 'disk'), 'ephemeral': self.db.get_metadata_value(
+                            vm_flavor.metadata, 'ephemeral')}
 
             instmeta = inst.metadata
             for meta in inst.metadata:
-                if not meta.key in ['cluster', 'parent', 'networks',
+                if meta.key not in ['cluster', 'parent', 'networks',
                                     'resourcepool', 'vdisks', 'datastores',
                                     'vmxpath']:
                     continue
@@ -1039,11 +1061,13 @@ class WorkloadMgrManager(manager.SchedulerDependentManager):
                 elif meta.key == 'networks':
                     optionsinst['networks'] = []
                     for net in metavalue:
-                        optionsinst['networks'].append({'mac_address': net['macAddress'],
-                                                        'network_moid': net['value'],
-                                                        'network_name': net['name'],
-                                                        'new_network_moid': net['value'],
-                                                        'new_network_name': net['name']})
+                        optionsinst['networks'].append(
+                            {
+                                'mac_address': net['macAddress'],
+                                'network_moid': net['value'],
+                                'network_name': net['name'],
+                                'new_network_moid': net['value'],
+                                'new_network_name': net['name']})
                 elif meta.key == 'resourcepool':
                     optionsinst['resourcepool'] = {
                         'moid': metavalue['value'], 'name': metavalue['name']}
@@ -1115,23 +1139,25 @@ class WorkloadMgrManager(manager.SchedulerDependentManager):
 
             restore_type = restore.restore_type
             if restore_type == 'test':
-                restore = self.db.restore_update(context,
-                                                 restore_id,
-                                                 {'host': self.host,
-                                                  'target_platform': target_platform,
-                                                  'progress_percent': 0,
-                                                  'progress_msg': 'Create testbubble from snapshot is starting',
-                                                  'status': 'starting'
-                                                  })
+                restore = self.db.restore_update(
+                    context,
+                    restore_id,
+                    {
+                        'host': self.host,
+                        'target_platform': target_platform,
+                        'progress_percent': 0,
+                        'progress_msg': 'Create testbubble from snapshot is starting',
+                        'status': 'starting'})
             else:
-                restore = self.db.restore_update(context,
-                                                 restore_id,
-                                                 {'host': self.host,
-                                                  'target_platform': target_platform,
-                                                  'progress_percent': 0,
-                                                  'progress_msg': 'Restore from snapshot is starting',
-                                                  'status': 'starting'
-                                                  })
+                restore = self.db.restore_update(
+                    context,
+                    restore_id,
+                    {
+                        'host': self.host,
+                        'target_platform': target_platform,
+                        'progress_percent': 0,
+                        'progress_msg': 'Restore from snapshot is starting',
+                        'status': 'starting'})
 
             values = {'status': 'executing'}
             workflow_class_name = 'workloadmgr.workflows.restoreworkflow.RestoreWorkflow'
@@ -1158,8 +1184,9 @@ class WorkloadMgrManager(manager.SchedulerDependentManager):
                         instance = compute_service.get_server_by_id(
                             context, vm.vm_id, admin=False)
                         if instance:
-                            msg = _('Original instance ' + vm.vm_name + ' is still present. '
-                                    'Please delete this instance and try again.')
+                            msg = _(
+                                'Original instance ' + vm.vm_name + ' is still present. '
+                                'Please delete this instance and try again.')
                             raise wlm_exceptions.InvalidState(reason=msg)
 
             elif rtype == 'inplace':
@@ -1232,7 +1259,7 @@ class WorkloadMgrManager(manager.SchedulerDependentManager):
                         else:
                             production = False
 
-                        if production == True:
+                        if production:
                             workload_metadata = {}
                             if instance_id is not None:
                                 restored_ids, snap_ins = self.get_metadata_value_by_chain(
@@ -1249,20 +1276,19 @@ class WorkloadMgrManager(manager.SchedulerDependentManager):
                                         self.db.workload_vms_delete(
                                             context, restored_id, workload.id)
                                         try:
-                                            result = compute_service.delete_meta(context, restore_id,
-                                                                                 ["workload_id", ["workload_name"]])
+                                            result = compute_service.delete_meta(
+                                                context, restore_id, ["workload_id", ["workload_name"]])
                                         except Exception as ex:
                                             LOG.exception(ex)
                                             pass
 
-                                self.db.workload_update(context,
-                                                        workload.id,
-                                                        {
-                                                            'metadata': workload_metadata,
-                                                        })
+                                self.db.workload_update(
+                                    context, workload.id, {
+                                        'metadata': workload_metadata, })
 
-                            self.db.restored_vm_update(context, restored_vm.vm_id,
-                                                       restore_id, {'metadata': instance.metadata})
+                            self.db.restored_vm_update(
+                                context, restored_vm.vm_id, restore_id, {
+                                    'metadata': instance.metadata})
                             values = {'workload_id': workload.id,
                                       'vm_id': restored_vm.vm_id,
                                       'metadata': instance.metadata,
@@ -1270,40 +1296,44 @@ class WorkloadMgrManager(manager.SchedulerDependentManager):
                                       'status': 'available'}
                             vm = self.db.workload_vms_create(context, values)
                             workload_def_updated = True
-                            compute_service.set_meta_item(context, vm.vm_id,
-                                                          "workload_id", workload.id)
-                            compute_service.set_meta_item(context, vm.vm_id,
-                                                          "workload_name", workload.display_name)
+                            compute_service.set_meta_item(
+                                context, vm.vm_id, "workload_id", workload.id)
+                            compute_service.set_meta_item(
+                                context, vm.vm_id, "workload_name", workload.display_name)
 
                     restore_data_transfer_time += int(
                         self.db.get_metadata_value(
                             restored_vm.metadata, 'data_transfer_time', '0'))
                     restore_object_store_transfer_time += int(self.db.get_metadata_value(
                         restored_vm.metadata, 'object_store_transfer_time', '0'))
-                if workload_def_updated == True:
+                if workload_def_updated:
                     workload_utils.upload_workload_db_entry(
                         context, workload.id)
 
             if restore_type == 'test':
-                self.db.restore_update(context,
-                                       restore_id,
-                                       {'progress_percent': 100,
-                                        'progress_msg': 'Create testbubble from snapshot is complete',
-                                        'status': 'available'
-                                        })
+                self.db.restore_update(
+                    context,
+                    restore_id,
+                    {
+                        'progress_percent': 100,
+                        'progress_msg': 'Create testbubble from snapshot is complete',
+                        'status': 'available'})
             else:
-                self.db.restore_update(context,
-                                       restore_id,
-                                       {'progress_percent': 100,
-                                        'progress_msg': 'Restore from snapshot is complete',
-                                        'finished_at': timeutils.utcnow(),
-                                        'time_taken': int((timeutils.utcnow() - restore.created_at).total_seconds()),
-                                        'metadata': {'data_transfer_time': restore_data_transfer_time,
-                                                     'object_store_transfer_time': restore_object_store_transfer_time,
-                                                     'restore_user_selected_value': restore_user_selected_value,
-                                                     },
-                                        'status': 'available'
-                                        })
+                self.db.restore_update(
+                    context,
+                    restore_id,
+                    {
+                        'progress_percent': 100,
+                        'progress_msg': 'Restore from snapshot is complete',
+                        'finished_at': timeutils.utcnow(),
+                        'time_taken': int(
+                            (timeutils.utcnow() - restore.created_at).total_seconds()),
+                        'metadata': {
+                            'data_transfer_time': restore_data_transfer_time,
+                            'object_store_transfer_time': restore_object_store_transfer_time,
+                            'restore_user_selected_value': restore_user_selected_value,
+                        },
+                        'status': 'available'})
         except WrappedFailure as ex:
 
             flag = self.db.restore_get_metadata_cancel_flag(
@@ -1327,19 +1357,21 @@ class WorkloadMgrManager(manager.SchedulerDependentManager):
                     time_taken = int(
                         (timeutils.utcnow() - restore.created_at).total_seconds())
 
-            self.db.restore_update(context,
-                                   restore_id,
-                                   {'progress_percent': 100,
-                                    'progress_msg': '',
-                                    'error_msg': msg,
-                                    'finished_at': timeutils.utcnow(),
-                                    'time_taken': time_taken,
-                                    'metadata': {'data_transfer_time': 0,
-                                                 'object_store_transfer_time': 0,
-                                                 'restore_user_selected_value': restore_user_selected_value,
-                                                 },
-                                    'status': status
-                                    })
+            self.db.restore_update(
+                context,
+                restore_id,
+                {
+                    'progress_percent': 100,
+                    'progress_msg': '',
+                    'error_msg': msg,
+                    'finished_at': timeutils.utcnow(),
+                    'time_taken': time_taken,
+                    'metadata': {
+                        'data_transfer_time': 0,
+                        'object_store_transfer_time': 0,
+                        'restore_user_selected_value': restore_user_selected_value,
+                    },
+                    'status': status})
         except Exception as ex:
 
             flag = self.db.restore_get_metadata_cancel_flag(
@@ -1364,24 +1396,25 @@ class WorkloadMgrManager(manager.SchedulerDependentManager):
                     time_taken = int(
                         (timeutils.utcnow() - restore.created_at).total_seconds())
 
-            self.db.restore_update(context,
-                                   restore_id,
-                                   {'progress_percent': 100,
-                                    'progress_msg': '',
-                                    'error_msg': msg,
-                                    'finished_at': timeutils.utcnow(),
-                                    'time_taken': time_taken,
-                                    'metadata': {'data_transfer_time': 0,
-                                                 'object_store_transfer_time': 0,
-                                                 'restore_user_selected_value': restore_user_selected_value,
-                                                 },
-                                    'status': status
-                                    })
+            self.db.restore_update(
+                context,
+                restore_id,
+                {
+                    'progress_percent': 100,
+                    'progress_msg': '',
+                    'error_msg': msg,
+                    'finished_at': timeutils.utcnow(),
+                    'time_taken': time_taken,
+                    'metadata': {
+                        'data_transfer_time': 0,
+                        'object_store_transfer_time': 0,
+                        'restore_user_selected_value': restore_user_selected_value,
+                    },
+                    'status': status})
         finally:
             try:
-                backup_target.purge_snapshot_from_staging_area(context,
-                                                               {'workload_id': workload.id,
-                                                                'snapshot_id': snapshot.id})
+                backup_target.purge_snapshot_from_staging_area(
+                    context, {'workload_id': workload.id, 'snapshot_id': snapshot.id})
             except Exception as ex:
                 LOG.exception(ex)
 
@@ -1425,8 +1458,11 @@ class WorkloadMgrManager(manager.SchedulerDependentManager):
 
             status_messages = {
                 'message': 'Snapshot delete operation completed'}
-            self.db.task_update(context, task_id, {'status': 'done', 'finished_at': timeutils.utcnow(),
-                                                   'status_messages': status_messages})
+            self.db.task_update(context,
+                                task_id,
+                                {'status': 'done',
+                                 'finished_at': timeutils.utcnow(),
+                                 'status_messages': status_messages})
 
         self.pool.submit(execute, context, snapshot_id, task_id)
 
@@ -1446,10 +1482,10 @@ class WorkloadMgrManager(manager.SchedulerDependentManager):
                 pervmdisks[vm.vm_id] = {'vm_name': vm.vm_name,
                                         'vault_path': []}
 
-            if not FLAGS.vault_storage_type in ("nfs", "local", "swift-s"):
+            if FLAGS.vault_storage_type not in ("nfs", "local", "swift-s"):
 
-                context_dict = dict([('%s' % key, value)
-                                     for (key, value) in cntx.to_dict().iteritems()])
+                context_dict = dict([('%s' % key, value) for (
+                    key, value) in cntx.to_dict().iteritems()])
                 # RpcContext object looks for this during init
                 context_dict['conf'] = None
 
@@ -1463,8 +1499,8 @@ class WorkloadMgrManager(manager.SchedulerDependentManager):
                     'mount_id': str(uuid.uuid4()),
                 }
                 for instance in snapshotvms:
-                    snapshot_vm_resources = db.snapshot_vm_resources_get(cntx,
-                                                                         instance['vm_id'], snapshot_obj.id)
+                    snapshot_vm_resources = db.snapshot_vm_resources_get(
+                        cntx, instance['vm_id'], snapshot_obj.id)
 
                     for snapshot_vm_resource in snapshot_vm_resources:
                         store[snapshot_vm_resource.id] = snapshot_vm_resource.id
@@ -1477,23 +1513,24 @@ class WorkloadMgrManager(manager.SchedulerDependentManager):
                         _preparevmflow.add(childflow)
 
                 # execute the workflow
-                result = engines.run(_preparevmflow, engine_conf='serial',
-                                     backend={'connection': store['connection']}, store=store)
-                snapshot_vm_resources = db.snapshot_vm_resources_get(cntx,
-                                                                     instance['vm_id'], snapshot_obj.id)
+                result = engines.run(
+                    _preparevmflow, engine_conf='serial', backend={
+                        'connection': store['connection']}, store=store)
+                snapshot_vm_resources = db.snapshot_vm_resources_get(
+                    cntx, instance['vm_id'], snapshot_obj.id)
                 snapshot_vm_resources = self.db.snapshot_resources_get(
                     context, snapshot_id)
                 for snapshot_vm_resource in snapshot_vm_resources:
                     if snapshot_vm_resource.resource_type == 'disk':
-                        if not snapshot_vm_resource.vm_id in pervmdisks:
+                        if snapshot_vm_resource.vm_id not in pervmdisks:
                             pervmdisks[snapshot_vm_resource.vm_id] = []
                         if 'restore_file_path_' + snapshot_vm_resource.id in result:
                             path = result['restore_file_path_' +
                                           snapshot_vm_resource.id]
                             pervmdisks[snapshot_vm_resource.vm_id].append(path)
             else:
-                backup_endpoint = self.db.get_metadata_value(workload_obj.metadata,
-                                                             'backup_media_target')
+                backup_endpoint = self.db.get_metadata_value(
+                    workload_obj.metadata, 'backup_media_target')
                 backup_target = vault.get_backup_target(backup_endpoint)
                 snapshot_vm_resources = self.db.snapshot_resources_get(
                     context, snapshot_id)
@@ -1501,8 +1538,10 @@ class WorkloadMgrManager(manager.SchedulerDependentManager):
                     if snapshot_vm_resource.resource_type == 'disk':
                         vm_disk_resource_snap = self.db.vm_disk_resource_snap_get_top(
                             context, snapshot_vm_resource.id)
-                        vault_path = os.path.join(backup_target.mount_path,
-                                                  vm_disk_resource_snap.vault_url.lstrip(os.sep))
+                        vault_path = os.path.join(
+                            backup_target.mount_path,
+                            vm_disk_resource_snap.vault_url.lstrip(
+                                os.sep))
                         pervmdisks[snapshot_vm_resource.vm_id]['vault_path'].append(
                             vault_path)
             return pervmdisks
@@ -1520,9 +1559,8 @@ class WorkloadMgrManager(manager.SchedulerDependentManager):
             if workload.source_platform == 'openstack':
                 virtdriver = driver.load_compute_driver(
                     None, 'libvirt.LibvirtDriver')
-                fminstance = virtdriver.snapshot_mount(context, self.db, snapshot,
-                                                       pervmdisks,
-                                                       mount_vm_id=mount_vm_id)
+                fminstance = virtdriver.snapshot_mount(
+                    context, self.db, snapshot, pervmdisks, mount_vm_id=mount_vm_id)
                 urls = []
                 for netname, addresses in fminstance.addresses.iteritems():
                     for addr in addresses:
@@ -1540,12 +1578,14 @@ class WorkloadMgrManager(manager.SchedulerDependentManager):
                 # Add metadata to recovery manager vm
                 try:
                     compute_service = nova.API(production=True)
-                    compute_service.set_meta_item(context, mount_vm_id,
-                                                  "mounted_snapshot_id", snapshot['id'])
-                    compute_service.set_meta_item(context, mount_vm_id,
-                                                  "mounted_snapshot__url",
-                                                  "/project/workloads/snapshots/%s/detail" %
-                                                  snapshot['id'])
+                    compute_service.set_meta_item(
+                        context, mount_vm_id, "mounted_snapshot_id", snapshot['id'])
+                    compute_service.set_meta_item(
+                        context,
+                        mount_vm_id,
+                        "mounted_snapshot__url",
+                        "/project/workloads/snapshots/%s/detail" %
+                        snapshot['id'])
                 except BaseException:
                     pass
                 return {"urls": urls}
@@ -1595,8 +1635,9 @@ class WorkloadMgrManager(manager.SchedulerDependentManager):
                         mountutils.start_filemanager_server(FLAGS.mountdir)
                     snapshot_metadata['mounturl'] = "http://" + [ip for ip in socket.gethostbyname_ex(
                         socket.gethostname())[2] if not ip.startswith("127.")][:1][0] + ":8888"
-                    self.db.snapshot_update(context, snapshot['id'],
-                                            {'status': 'mounted', 'metadata': snapshot_metadata})
+                    self.db.snapshot_update(
+                        context, snapshot['id'], {
+                            'status': 'mounted', 'metadata': snapshot_metadata})
                 except Exception as ex:
                     LOG.error(_("Could not start file manager server"))
                     LOG.exception(ex)
@@ -1696,7 +1737,7 @@ class WorkloadMgrManager(manager.SchedulerDependentManager):
                     # always cleanup as much as possible
                     LOG.exception(ex)
                     pass
-            if not FLAGS.vault_storage_type in ("nfs", "local", "swift-s"):
+            if FLAGS.vault_storage_type not in ("nfs", "local", "swift-s"):
                 for vmid, paths in devpaths.iteritems():
                     try:
                         os.remove(paths.keys()[0])
@@ -1712,8 +1753,9 @@ class WorkloadMgrManager(manager.SchedulerDependentManager):
             snapshot_metadata['mounturl'] = ""
             snapshot_metadata['fsmanagerpid'] = -1
 
-            self.db.snapshot_update(context, snapshot_id,
-                                    {'status': 'available', 'metadata': snapshot_metadata})
+            self.db.snapshot_update(
+                context, snapshot_id, {
+                    'status': 'available', 'metadata': snapshot_metadata})
 
     @autolog.log_method(logger=Logger)
     def restore_delete(self, context, restore_id):
@@ -1917,10 +1959,10 @@ class WorkloadMgrManager(manager.SchedulerDependentManager):
             msg['Subject'] = subject
             part2 = MIMEText(html, 'html')
             msg.attach(part2)
-            s = smtplib.SMTP(settings.get_settings(context).get('smtp_server_name'),
-                             int(settings.get_settings(
-                                 context).get('smtp_port')),
-                             timeout=int(settings.get_settings(context).get('smtp_timeout')))
+            s = smtplib.SMTP(
+                settings.get_settings(context).get('smtp_server_name'), int(
+                    settings.get_settings(context).get('smtp_port')), timeout=int(
+                    settings.get_settings(context).get('smtp_timeout')))
             if settings.get_settings(context).get(
                     'smtp_server_name') != 'localhost':
                 s.ehlo()
@@ -2012,11 +2054,16 @@ class WorkloadMgrManager(manager.SchedulerDependentManager):
             vault.create_backup_directory(
                 context, services_to_backup, backup_vault_storage_path)
 
-            params = {'services_to_backup': services_to_backup, 'backup_directory': backup_vault_storage_path,
-                      'backend_endpoint': config_workload['backup_media_target'], 'backup_id': backup_id,
-                      'databases': databases, 'trusted_user': trusted_user, 'compute_hosts': contego_nodes,
-                      'controller_hosts': controller_nodes, 'authorized_key': authorized_key
-                      }
+            params = {
+                'services_to_backup': services_to_backup,
+                'backup_directory': backup_vault_storage_path,
+                'backend_endpoint': config_workload['backup_media_target'],
+                'backup_id': backup_id,
+                'databases': databases,
+                'trusted_user': trusted_user,
+                'compute_hosts': contego_nodes,
+                'controller_hosts': controller_nodes,
+                'authorized_key': authorized_key}
             context_dict = dict([('%s' % key, value)
                                  for (key, value) in context.to_dict().iteritems()])
             # RpcContext object looks for this during init
@@ -2033,12 +2080,11 @@ class WorkloadMgrManager(manager.SchedulerDependentManager):
             workflow_class = get_workflow_class(context, None)
             workflow = workflow_class("config_backup", store)
 
-            self.db.config_backup_update(context, backup_id,
-                                         {
-                                             'progress_msg': 'Initializing backup Workflow',
-                                             'status': 'uploading',
-                                             'vault_storage_path': backup_vault_storage_path
-                                         })
+            self.db.config_backup_update(context,
+                                         backup_id,
+                                         {'progress_msg': 'Initializing backup Workflow',
+                                          'status': 'uploading',
+                                          'vault_storage_path': backup_vault_storage_path})
             workflow.initflow()
             workflow.execute()
 
@@ -2062,15 +2108,16 @@ class WorkloadMgrManager(manager.SchedulerDependentManager):
                 error_msg = "Config backup failed. Please see backup summary."
                 raise wlm_exceptions.ErrorOccurred(reason=error_ms)
 
-            backup = self.db.config_backup_update(context, backup_id,
-                                                  {
-                                                      'progress_msg': 'Configuration backup is complete',
-                                                      'finished_at': timeutils.utcnow(),
-                                                      'status': status,
-                                                      'time_taken': time_taken,
-                                                      'size': size,
-                                                      'warning_msg': warning_msg
-                                                  })
+            backup = self.db.config_backup_update(
+                context,
+                backup_id,
+                {
+                    'progress_msg': 'Configuration backup is complete',
+                    'finished_at': timeutils.utcnow(),
+                    'status': status,
+                    'time_taken': time_taken,
+                    'size': size,
+                    'warning_msg': warning_msg})
 
             workload_utils.upload_config_backup_db_entry(context, backup_id)
             self.db.config_workload_update(context, {'status': 'available'})
@@ -2083,12 +2130,14 @@ class WorkloadMgrManager(manager.SchedulerDependentManager):
             if backup:
                 time_taken = int(
                     (timeutils.utcnow() - backup.created_at).total_seconds())
-            backup = self.db.config_backup_update(context, backup_id,
-                                                  {
-                                                      'progress_msg': 'Configuration backup is complete',
-                                                      'error_msg': msg,
-                                                      'finished_at': timeutils.utcnow(),
-                                                      'status': 'error',
-                                                      'time_taken': time_taken,
-                                                  })
+            backup = self.db.config_backup_update(
+                context,
+                backup_id,
+                {
+                    'progress_msg': 'Configuration backup is complete',
+                    'error_msg': msg,
+                    'finished_at': timeutils.utcnow(),
+                    'status': 'error',
+                    'time_taken': time_taken,
+                })
             workload_utils.upload_config_backup_db_entry(context, backup_id)

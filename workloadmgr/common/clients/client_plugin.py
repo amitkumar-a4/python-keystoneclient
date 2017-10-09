@@ -357,8 +357,10 @@ class ClientPlugin(object):
         # unknown options raise cfg.NoSuchOptError
         try:
             group_name = 'clients_' + client
-            cfg.CONF.import_opt(option, 'workloadmgr.common.clients.client_plugin',
-                                group=group_name)
+            cfg.CONF.import_opt(
+                option,
+                'workloadmgr.common.clients.client_plugin',
+                group=group_name)
             v = getattr(getattr(cfg.CONF, group_name), option)
             if v is not None:
                 return v

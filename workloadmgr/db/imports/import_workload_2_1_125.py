@@ -18,7 +18,7 @@ LOG = logging.getLogger(__name__)
 
 def _adjust_values(cntx, new_version, values, upgrade):
     values['version'] = new_version
-    if upgrade == False:
+    if not upgrade:
         values['user_id'] = cntx.user_id
         values['project_id'] = cntx.project_id
     if 'metadata' in values:

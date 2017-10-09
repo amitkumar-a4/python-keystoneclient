@@ -82,7 +82,7 @@ def set_settings(context, new_settings):
                     db.setting_update(context, name, {'value': value})
                     name_found = True
                     break
-            if name_found == False:
+            if not name_found:
                 db.setting_create(context, {'name': name,
                                             'value': value,
                                             'user_id': context.user_id,

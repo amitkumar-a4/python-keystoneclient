@@ -123,7 +123,8 @@ class AuditLog(object):
                             record_time, "%I:%M:%S.%f %p - %m/%d/%Y")
                         fetch = False
                         if time_in_minutes:
-                            if (now - record_time) < timedelta(minutes=time_in_minutes):
+                            if (now -
+                                    record_time) < timedelta(minutes=time_in_minutes):
                                 fetch = True
                         else:
                             if record_time >= time_from and record_time <= time_to:

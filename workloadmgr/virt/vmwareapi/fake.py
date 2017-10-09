@@ -204,8 +204,8 @@ class ManagedObject(object):
             if elem.name == attr:
                 return elem.val
         msg = _("Property %(attr)s not set for the managed object %(name)s")
-        raise exception.WorkloadMgrException(msg % {'attr': attr,
-                                                    'name': self.__class__.__name__})
+        raise exception.WorkloadMgrException(
+            msg % {'attr': attr, 'name': self.__class__.__name__})
 
     def _generate_moid(self, prefix):
         """Generates a new Managed Object ID."""
@@ -1054,33 +1054,33 @@ class FakeVim(object):
             return lambda *args, **kwargs: self._reconfig_vm(attr_name,
                                                              *args, **kwargs)
         elif attr_name == "CreateVirtualDisk_Task":
-            return lambda *args, **kwargs: self._create_copy_disk(attr_name,
-                                                                  kwargs.get("name"))
+            return lambda *args, **kwargs: self._create_copy_disk(
+                attr_name, kwargs.get("name"))
         elif attr_name == "DeleteDatastoreFile_Task":
             return lambda *args, **kwargs: self._delete_file(attr_name,
                                                              *args, **kwargs)
         elif attr_name == "PowerOnVM_Task":
-            return lambda *args, **kwargs: self._set_power_state(attr_name,
-                                                                 args[0], "poweredOn")
+            return lambda *args, **kwargs: self._set_power_state(
+                attr_name, args[0], "poweredOn")
         elif attr_name == "PowerOffVM_Task":
-            return lambda *args, **kwargs: self._set_power_state(attr_name,
-                                                                 args[0], "poweredOff")
+            return lambda *args, **kwargs: self._set_power_state(
+                attr_name, args[0], "poweredOff")
         elif attr_name == "RebootGuest":
             return lambda *args, **kwargs: self._just_return()
         elif attr_name == "ResetVM_Task":
-            return lambda *args, **kwargs: self._set_power_state(attr_name,
-                                                                 args[0], "poweredOn")
+            return lambda *args, **kwargs: self._set_power_state(
+                attr_name, args[0], "poweredOn")
         elif attr_name == "SuspendVM_Task":
-            return lambda *args, **kwargs: self._set_power_state(attr_name,
-                                                                 args[0], "suspended")
+            return lambda *args, **kwargs: self._set_power_state(
+                attr_name, args[0], "suspended")
         elif attr_name == "CreateSnapshot_Task":
             return lambda *args, **kwargs: self._snapshot_vm(attr_name)
         elif attr_name == "CopyVirtualDisk_Task":
-            return lambda *args, **kwargs: self._create_copy_disk(attr_name,
-                                                                  kwargs.get("destName"))
+            return lambda *args, **kwargs: self._create_copy_disk(
+                attr_name, kwargs.get("destName"))
         elif attr_name == "ExtendVirtualDisk_Task":
-            return lambda *args, **kwargs: self._extend_disk(attr_name,
-                                                             kwargs.get("size"))
+            return lambda *args, **kwargs: self._extend_disk(
+                attr_name, kwargs.get("size"))
         elif attr_name == "DeleteVirtualDisk_Task":
             return lambda *args, **kwargs: self._delete_disk(attr_name,
                                                              *args, **kwargs)
@@ -1108,8 +1108,8 @@ class FakeVim(object):
         elif attr_name == "AcquireCloneTicket":
             return lambda *args, **kwargs: self._just_return()
         elif attr_name == "AddPortGroup":
-            return lambda *args, **kwargs: self._add_port_group(attr_name,
-                                                                *args, **kwargs)
+            return lambda *args, **kwargs: self._add_port_group(
+                attr_name, *args, **kwargs)
         elif attr_name == "RebootHost_Task":
             return lambda *args, **kwargs: self._just_return_task(attr_name)
         elif attr_name == "ShutdownHost_Task":

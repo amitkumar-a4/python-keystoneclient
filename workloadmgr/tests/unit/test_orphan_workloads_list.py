@@ -28,8 +28,9 @@ class BaseReassignAPITestCase(test.TestCase):
     def setUp(self):
         super(BaseReassignAPITestCase, self).setUp()
 
-        CONF.set_default('vault_storage_nfs_export',
-                         'server1:nfsshare1, server2:nfsshare2, server3:nfsshare3')
+        CONF.set_default(
+            'vault_storage_nfs_export',
+            'server1:nfsshare1, server2:nfsshare2, server3:nfsshare3')
 
         self.context = context.get_admin_context()
         self.stderr_patch = patch('sys.stderr')
@@ -123,8 +124,8 @@ class BaseReassignAPITestCase(test.TestCase):
         workload.pop('_sa_instance_state')
         workload.pop('created_at')
         workload['workload_id'] = workload['id']
-        backup_endpoint = vault.get_nfs_share_for_workload_by_free_overcommit(self.context,
-                                                                              workload)
+        backup_endpoint = vault.get_nfs_share_for_workload_by_free_overcommit(
+            self.context, workload)
         # write json here
         backup_target = vault.get_backup_target(backup_endpoint)
         workload['metadata'] = [

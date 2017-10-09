@@ -52,8 +52,8 @@ class ConfigWorkloadController(wsgi.Controller):
                         # Validate existance of required keys and their values
                         for required_key in ['host', 'user', 'password']:
                             if required_key not in database_config:
-                                raise wlm_exceptions.ErrorOccurred(reason="Database"
-                                                                   "credentials should have host, user and password.")
+                                raise wlm_exceptions.ErrorOccurred(
+                                    reason="Database" "credentials should have host, user and password.")
                             if str(
                                     database_config[required_key]).lower() == 'none':
                                 raise wlm_exceptions.ErrorOccurred(
@@ -94,21 +94,21 @@ class ConfigWorkloadController(wsgi.Controller):
                                'enabled': 'False',
                                'retention_policy_value': '30'}
 
-            if not 'start_time' in jobschedule:
+            if 'start_time' not in jobschedule:
                 jobschedule['start_time'] = jobdefaults['start_time']
 
-            if not 'interval' in jobschedule:
+            if 'interval' not in jobschedule:
                 jobschedule['interval'] = jobdefaults['interval']
 
-            if not 'enabled' in jobschedule:
+            if 'enabled' not in jobschedule:
                 jobschedule['enabled'] = jobdefaults['enabled']
 
-            if not 'retention_policy_value' in jobschedule:
+            if 'retention_policy_value' not in jobschedule:
                 jobschedule['retention_policy_value'] = jobdefaults['retention_policy_value']
 
             try:
-                config_workload = self.workload_api.config_workload(context,
-                                                                    jobschedule, config_data)
+                config_workload = self.workload_api.config_workload(
+                    context, jobschedule, config_data)
             except Exception as error:
                 raise exc.HTTPServerError(explanation=unicode(error))
 

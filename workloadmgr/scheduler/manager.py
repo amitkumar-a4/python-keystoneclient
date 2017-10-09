@@ -20,10 +20,11 @@ from workloadmgr.openstack.common.notifier import api as notifier
 
 LOG = logging.getLogger(__name__)
 
-scheduler_driver_opt = cfg.StrOpt('scheduler_driver',
-                                  default='workloadmgr.scheduler.filter_scheduler.'
-                                          'FilterScheduler',
-                                  help='Default scheduler driver to use')
+scheduler_driver_opt = cfg.StrOpt(
+    'scheduler_driver',
+    default='workloadmgr.scheduler.filter_scheduler.'
+    'FilterScheduler',
+    help='Default scheduler driver to use')
 
 FLAGS = flags.FLAGS
 FLAGS.register_opt(scheduler_driver_opt)
@@ -81,9 +82,8 @@ class SchedulerManager(manager.Manager):
         except Exception as ex:
             with excutils.save_and_reraise_exception():
                 file_search_state = {'status': {'status': 'error'}}
-                self._set_file_search_state_and_notify('file_search',
-                                                       file_search_state,
-                                                       context, ex, request_spec)
+                self._set_file_search_state_and_notify(
+                    'file_search', file_search_state, context, ex, request_spec)
 
     def workload_snapshot(self, context, topic, snapshot_id,
                           request_spec=None, filter_properties=None):

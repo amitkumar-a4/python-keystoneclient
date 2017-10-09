@@ -144,8 +144,8 @@ class HostManager(object):
         self.service_states = {}  # { <host>: {<service>: {cap k : v}}}
         self.host_state_map = {}
         self.host_state_running = {}
-        self.filter_handler = filters.HostFilterHandler('workloadmgr.scheduler.'
-                                                        'filters')
+        self.filter_handler = filters.HostFilterHandler(
+            'workloadmgr.scheduler.' 'filters')
         self.filter_classes = self.filter_handler.get_all_classes()
         self.weight_handler = weights.HostWeightHandler(
             'workloadmgr.scheduler.weights')
@@ -274,9 +274,9 @@ class HostManager(object):
                 host_state.update_capabilities(capabilities,
                                                dict(service.iteritems()))
             else:
-                host_state = self.host_state_cls(host,
-                                                 capabilities=capabilities,
-                                                 service=dict(service.iteritems()))
+                host_state = self.host_state_cls(
+                    host, capabilities=capabilities, service=dict(
+                        service.iteritems()))
             # update host_state
             if host in self.host_state_running.keys():
                 host_state.running_snapshots = self.host_state_running[host]

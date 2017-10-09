@@ -40,12 +40,12 @@ class AvailabilityZoneFilter(filters.BaseHostFilter):
         if availability_zone:
             context = filter_properties['context'].elevated()
             metadata = db.aggregate_metadata_get_by_host(
-                         context, host_state.host, key='availability_zone')
+                context, host_state.host, key='availability_zone')
             if 'availability_zone' in metadata:
                 return availability_zone in metadata['availability_zone']
             else:
                 if 'vmware_az' in host_state.host:
-                    return availability_zone == 'vmware_az' 
+                    return availability_zone == 'vmware_az'
                 return availability_zone == CONF.default_availability_zone
 
         return True

@@ -1332,9 +1332,9 @@ class ChunkedFile(object):
         self.uploaded_size_incremental = self.uploaded_size_incremental + size
         if self.update and ((self.uploaded_size_incremental > (
                 5 * 1024 * 1024)) or (self.tell() == os.SEEK_END)):
-            object = self.update['function'](self.update['context'],
-                                             self.update['id'],
-                                             {'uploaded_size_incremental': self.uploaded_size_incremental})
+            object = self.update['function'](
+                self.update['context'], self.update['id'], {
+                    'uploaded_size_incremental': self.uploaded_size_incremental})
             LOG.debug(_("progress_percent: %(progress_percent)s") %
                       {'progress_percent': object.progress_percent, })
             self.uploaded_size_incremental = 0
@@ -1525,9 +1525,12 @@ def get_mac_addresses(hostname, sshport, username=None,
     stdin, stdout, stderr = client.exec_command(ifcfgcmd, timeout=timeout)
     exitcode = stdout.channel.recv_exit_status()
     if exitcode:
-        raise exception.ProcessExecutionError(stdout=None, stderr=stderr.read(),
-                                              exit_code=exitcode, cmd=ifcfgcmd,
-                                              description=None)
+        raise exception.ProcessExecutionError(
+            stdout=None,
+            stderr=stderr.read(),
+            exit_code=exitcode,
+            cmd=ifcfgcmd,
+            description=None)
     else:
         for macline in stdout.read().strip().split('\n'):
             mac_addresses.append(macline)

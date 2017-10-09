@@ -47,8 +47,9 @@ class BaseWorkloadAPITestCase(test.TestCase):
         self.MockMethod.return_value = True
         self.SubProcessMockMethod.return_value = True
 
-        CONF.set_default('vault_storage_nfs_export',
-                         'server1:nfsshare1, server2:nfsshare2, server3:nfsshare3')
+        CONF.set_default(
+            'vault_storage_nfs_export',
+            'server1:nfsshare1, server2:nfsshare2, server3:nfsshare3')
 
         patch('workloadmgr.workloads.api.create_trust', lambda x: x).start()
         patch('sys.stderr').start()
@@ -217,8 +218,8 @@ class BaseWorkloadAPITestCase(test.TestCase):
     @patch('workloadmgr.workloads.api.API.trust_create')
     @patch('workloadmgr.compute.nova.API.get_servers')
     @patch('workloadmgr.autolog.Logger.log')
-    def test_workload_create_invalid_workload_type(self, log_mock, mock_get_servers,
-                                                   trust_create_mock):
+    def test_workload_create_invalid_workload_type(
+            self, log_mock, mock_get_servers, trust_create_mock):
 
         mock_get_servers.side_effect = tests_utils.get_vms
         x = 0
@@ -268,8 +269,8 @@ class BaseWorkloadAPITestCase(test.TestCase):
     @patch('workloadmgr.workloads.api.API.trust_create')
     @patch('workloadmgr.compute.nova.API.get_servers')
     @patch('workloadmgr.autolog.Logger.log')
-    def test_workload_create_with_two_instances(self, log_mock, mock_get_servers,
-                                                trust_create_mock):
+    def test_workload_create_with_two_instances(
+            self, log_mock, mock_get_servers, trust_create_mock):
 
         mock_get_servers.side_effect = tests_utils.get_vms
         x = 0
@@ -327,8 +328,8 @@ class BaseWorkloadAPITestCase(test.TestCase):
     @patch('workloadmgr.workloads.api.API.trust_create')
     @patch('workloadmgr.compute.nova.API.get_servers')
     @patch('workloadmgr.autolog.Logger.log')
-    def test_workload_create_with_two_instances_with_job_scheduler(self, log_mock, mock_get_servers,
-                                                                   trust_create_mock):
+    def test_workload_create_with_two_instances_with_job_scheduler(
+            self, log_mock, mock_get_servers, trust_create_mock):
 
         mock_get_servers.side_effect = tests_utils.get_vms
         x = 0
@@ -397,8 +398,8 @@ class BaseWorkloadAPITestCase(test.TestCase):
     @patch('workloadmgr.workloads.api.API.trust_create')
     @patch('workloadmgr.compute.nova.API.get_servers')
     @patch('workloadmgr.autolog.Logger.log')
-    def test_workload_modify_invalid_instances(self, log_mock, mock_get_servers,
-                                               trust_create_mock):
+    def test_workload_modify_invalid_instances(
+            self, log_mock, mock_get_servers, trust_create_mock):
 
         mock_get_servers.side_effect = tests_utils.get_vms
         x = 0
@@ -464,8 +465,8 @@ class BaseWorkloadAPITestCase(test.TestCase):
     @patch('workloadmgr.workloads.api.API.trust_create')
     @patch('workloadmgr.compute.nova.API.get_servers')
     @patch('workloadmgr.autolog.Logger.log')
-    def test_workload_modify_invalid_instance_id(self, log_mock, mock_get_servers,
-                                                 trust_create_mock):
+    def test_workload_modify_invalid_instance_id(
+            self, log_mock, mock_get_servers, trust_create_mock):
 
         mock_get_servers.side_effect = tests_utils.get_vms
         x = 0
@@ -539,8 +540,8 @@ class BaseWorkloadAPITestCase(test.TestCase):
     @patch('workloadmgr.workloads.api.API.trust_create')
     @patch('workloadmgr.compute.nova.API.get_servers')
     @patch('workloadmgr.autolog.Logger.log')
-    def test_workload_modify_instance_id_of_existing_workload(self, log_mock, mock_get_servers,
-                                                              trust_create_mock):
+    def test_workload_modify_instance_id_of_existing_workload(
+            self, log_mock, mock_get_servers, trust_create_mock):
 
         mock_get_servers.side_effect = tests_utils.get_vms
         x = 0
@@ -635,9 +636,14 @@ class BaseWorkloadAPITestCase(test.TestCase):
     @patch('workloadmgr.workloads.api.API.trust_create')
     @patch('workloadmgr.compute.nova.API.get_servers')
     @patch('workloadmgr.autolog.Logger.log')
-    def test_workload_modify_add_new_instance(self, log_mock, mock_get_servers,
-                                              trust_create_mock, set_meta_item_mock,
-                                              delete_meta_mock, upload_mock):
+    def test_workload_modify_add_new_instance(
+            self,
+            log_mock,
+            mock_get_servers,
+            trust_create_mock,
+            set_meta_item_mock,
+            delete_meta_mock,
+            upload_mock):
 
         mock_get_servers.side_effect = tests_utils.get_vms
         x = 0
@@ -727,9 +733,14 @@ class BaseWorkloadAPITestCase(test.TestCase):
     @patch('workloadmgr.workloads.api.API.trust_create')
     @patch('workloadmgr.compute.nova.API.get_servers')
     @patch('workloadmgr.autolog.Logger.log')
-    def test_workload_modify_remove_instance(self, log_mock, mock_get_servers,
-                                             trust_create_mock, set_meta_item_mock,
-                                             delete_meta_mock, upload_mock):
+    def test_workload_modify_remove_instance(
+            self,
+            log_mock,
+            mock_get_servers,
+            trust_create_mock,
+            set_meta_item_mock,
+            delete_meta_mock,
+            upload_mock):
 
         mock_get_servers.side_effect = tests_utils.get_vms
         x = 0
@@ -814,9 +825,14 @@ class BaseWorkloadAPITestCase(test.TestCase):
     @patch('workloadmgr.workloads.api.API.trust_create')
     @patch('workloadmgr.compute.nova.API.get_servers')
     @patch('workloadmgr.autolog.Logger.log')
-    def test_workload_modify_change_name_desc(self, log_mock, mock_get_servers,
-                                              trust_create_mock, set_meta_item_mock,
-                                              delete_meta_mock, upload_mock):
+    def test_workload_modify_change_name_desc(
+            self,
+            log_mock,
+            mock_get_servers,
+            trust_create_mock,
+            set_meta_item_mock,
+            delete_meta_mock,
+            upload_mock):
 
         mock_get_servers.side_effect = tests_utils.get_vms
         x = 0

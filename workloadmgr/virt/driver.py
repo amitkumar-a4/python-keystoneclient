@@ -20,9 +20,10 @@ from workloadmgr import utils
 from workloadmgr.virt import event as virtevent
 
 driver_opts = [
-    cfg.StrOpt('compute_driver',
-               help='Driver to use for controlling workload snapshots. Options '
-               'include: libvirt.LibvirtDriver for the initial version '),
+    cfg.StrOpt(
+        'compute_driver',
+        help='Driver to use for controlling workload snapshots. Options '
+        'include: libvirt.LibvirtDriver for the initial version '),
 ]
 
 CONF = cfg.CONF

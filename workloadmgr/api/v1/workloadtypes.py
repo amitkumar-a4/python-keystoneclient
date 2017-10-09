@@ -188,12 +188,8 @@ class WorkloadTypesController(wsgi.Controller):
             is_public = workload_type.get('is_public', False)
 
             try:
-                new_workload_type = self.workload_api.workload_type_create(context,
-                                                                           id,
-                                                                           name,
-                                                                           description,
-                                                                           is_public,
-                                                                           metadata)
+                new_workload_type = self.workload_api.workload_type_create(
+                    context, id, name, description, is_public, metadata)
                 new_workload_type_dict = self.workload_api.workload_type_show(
                     context, new_workload_type.id)
             except exception:

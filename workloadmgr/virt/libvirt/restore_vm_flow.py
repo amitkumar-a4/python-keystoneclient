@@ -151,8 +151,10 @@ class PrepareBackupImage(task.Task):
             self.cntx, vm_resource_id)
         vm_disk_resource_snap = db.vm_disk_resource_snap_get_top(
             self.cntx, snapshot_vm_resource.id)
-        resource_snap_path = os.path.join(backup_target.mount_path,
-                                          vm_disk_resource_snap.vault_url.strip(os.sep))
+        resource_snap_path = os.path.join(
+            backup_target.mount_path,
+            vm_disk_resource_snap.vault_url.strip(
+                os.sep))
         """try:
             os.listdir(os.path.join(backup_target.mount_path, 'workload_'+snapshot_obj.workload_id,
                                    'snapshot_'+snapshot_obj.id))
@@ -161,8 +163,8 @@ class PrepareBackupImage(task.Task):
                pass"""
         image_info = qemuimages.qemu_img_info(resource_snap_path)
 
-        if snapshot_vm_resource.resource_name == 'vda' and \
-                db.get_metadata_value(snapshot_vm_resource.metadata, 'image_id') is not None:
+        if snapshot_vm_resource.resource_name == 'vda' and db.get_metadata_value(
+                snapshot_vm_resource.metadata, 'image_id') is not None:
             # upload the bottom of the chain to glance
             while image_info.backing_file:
                 image_info = qemuimages.qemu_img_info(image_info.backing_file)
@@ -359,14 +361,10 @@ class UploadImageToGlance(task.Task):
                 restored_image = self.image_service.update(
                     self.cntx, restored_image['id'], image_metadata, image_file)
         else:
-            restored_image = self.image_service.update(self.cntx,
-                                                       restored_image['id'],
-                                                       image_metadata,
-                                                       utils.ChunkedFile(restore_file_path,
-                                                                         {'function': db.restore_update,
-                                                                          'context': self.cntx,
-                                                                          'id': restore_obj.id})
-                                                       )
+            restored_image = self.image_service.update(
+                self.cntx, restored_image['id'], image_metadata, utils.ChunkedFile(
+                    restore_file_path, {
+                        'function': db.restore_update, 'context': self.cntx, 'id': restore_obj.id}))
         LOG.debug(_("restore_size: %(restore_size)s") %
                   {'restore_size': restore_obj.size, })
         LOG.debug(_("uploaded_size: %(uploaded_size)s") %
@@ -456,11 +454,14 @@ class RestoreVolumeFromImage(task.Task):
                                                   volume_id=volume_id,
                                                   az=az)
 
-        self.restored_volume = restored_volume = volume_service.create(self.cntx, volume_size,
-                                                                       volume_name,
-                                                                       volume_description,
-                                                                       image_id=image_id, volume_type=volume_type,
-                                                                       availability_zone=availability_zone)
+        self.restored_volume = restored_volume = volume_service.create(
+            self.cntx,
+            volume_size,
+            volume_name,
+            volume_description,
+            image_id=image_id,
+            volume_type=volume_type,
+            availability_zone=availability_zone)
 
         if not restored_volume:
             raise Exception("Cannot create volume from image")
@@ -564,12 +565,13 @@ class RestoreNFSVolume(task.Task):
             self.cntx, restore_id, {
                 'progress_msg': progressmsg, 'status': 'uploading'})
 
-        self.restored_volume = volume_service.create(self.cntx,
-                                                     volume_size,
-                                                     volume_name,
-                                                     volume_description,
-                                                     volume_type=volume_type,
-                                                     availability_zone=availability_zone)
+        self.restored_volume = volume_service.create(
+            self.cntx,
+            volume_size,
+            volume_name,
+            volume_description,
+            volume_type=volume_type,
+            availability_zone=availability_zone)
 
         if not self.restored_volume:
             raise Exception("Failed to create volume type " + volume_type)
@@ -642,8 +644,9 @@ class RestoreNFSVolume(task.Task):
                 if totalbytes:
                     uploaded_size_incremental = totalbytes - previous_uploaded_size
                     uploaded_size = totalbytes
-                    restore_obj = db.restore_update(self.cntx, restore_obj.id,
-                                                    {'uploaded_size_incremental': uploaded_size_incremental})
+                    restore_obj = db.restore_update(
+                        self.cntx, restore_obj.id, {
+                            'uploaded_size_incremental': uploaded_size_incremental})
                     previous_uploaded_size = uploaded_size
                 if not convert_thread.isAlive():
                     break
@@ -671,9 +674,9 @@ class RestoreNFSVolume(task.Task):
             raise Exception("Failed to get NFS export details for volume")
 
         statinfo = os.stat(restored_file_path)
-        restore_obj = db.restore_update(self.cntx,
-                                        restore_obj.id,
-                                        {'uploaded_size_incremental': statinfo.st_size})
+        restore_obj = db.restore_update(
+            self.cntx, restore_obj.id, {
+                'uploaded_size_incremental': statinfo.st_size})
 
         return self.restored_volume['id']
 
@@ -701,8 +704,14 @@ class RestoreSANVolume(task.Task):
         return self.revert_with_log(*args, **kwargs)
 
     @autolog.log_method(Logger, 'RestoreSANVolume.execute')
-    def execute_with_log(self, context, restore_id, instance_options, volume_type,
-                         vm_resource_id, restored_file_path):
+    def execute_with_log(
+            self,
+            context,
+            restore_id,
+            instance_options,
+            volume_type,
+            vm_resource_id,
+            restored_file_path):
 
         self.db = db = WorkloadMgrDB().db
         self.cntx = amqp.RpcContext.from_dict(context)
@@ -742,12 +751,13 @@ class RestoreSANVolume(task.Task):
             self.cntx, restore_id, {
                 'progress_msg': progressmsg, 'status': 'uploading'})
 
-        self.restored_volume = volume_service.create(self.cntx,
-                                                     volume_size,
-                                                     volume_name,
-                                                     volume_description,
-                                                     volume_type=volume_type,
-                                                     availability_zone=availability_zone)
+        self.restored_volume = volume_service.create(
+            self.cntx,
+            volume_size,
+            volume_name,
+            volume_description,
+            volume_type=volume_type,
+            availability_zone=availability_zone)
 
         if not self.restored_volume:
             raise Exception("Failed to create volume type " + volume_type)
@@ -815,10 +825,9 @@ class RestoreInstanceFromVolume(task.Task):
             restored_instance_name = instance_options['name']
 
         LOG.debug('Creating Instance ' + restored_instance_name)
-        snapshot_obj = db.snapshot_update(self.cntx, snapshot_obj.id,
-                                          {'progress_msg': 'Creating Instance: ' + restored_instance_name,
-                                           'status': 'restoring'
-                                           })
+        snapshot_obj = db.snapshot_update(
+            self.cntx, snapshot_obj.id, {
+                'progress_msg': 'Creating Instance: ' + restored_instance_name, 'status': 'restoring'})
         availability_zone = get_availability_zone(instance_options)
 
         restored_compute_flavor = compute_service.get_flavor_by_id(
@@ -847,8 +856,9 @@ class RestoreInstanceFromVolume(task.Task):
             raise Exception("Cannot create instance from image")
 
         start_time = timeutils.utcnow()
-        while hasattr(restored_instance,
-                      'status') == False or restored_instance.status != 'ACTIVE':
+        while hasattr(
+                restored_instance,
+                'status') == False or restored_instance.status != 'ACTIVE':
             LOG.debug(
                 'Waiting for the instance ' +
                 restored_instance.id +
@@ -916,27 +926,29 @@ class RestoreInstanceFromImage(task.Task):
 
         restored_compute_image = compute_service.get_image(self.cntx, image_id)
         LOG.debug('Creating Instance ' + restored_instance_name)
-        snapshot_obj = db.snapshot_update(self.cntx, snapshot_obj.id,
-                                          {'progress_msg': 'Creating Instance: ' + restored_instance_name,
-                                           'status': 'restoring'
-                                           })
+        snapshot_obj = db.snapshot_update(
+            self.cntx, snapshot_obj.id, {
+                'progress_msg': 'Creating Instance: ' + restored_instance_name, 'status': 'restoring'})
         availability_zone = get_availability_zone(instance_options)
 
         restored_compute_flavor = compute_service.get_flavor_by_id(
             self.cntx, restored_compute_flavor_id)
-        self.restored_instance = restored_instance = \
-            compute_service.create_server(self.cntx, restored_instance_name,
-                                          restored_compute_image, restored_compute_flavor,
-                                          nics=restored_nics,
-                                          security_groups=[],
-                                          key_name=keyname,
-                                          availability_zone=availability_zone)
+        self.restored_instance = restored_instance = compute_service.create_server(
+            self.cntx,
+            restored_instance_name,
+            restored_compute_image,
+            restored_compute_flavor,
+            nics=restored_nics,
+            security_groups=[],
+            key_name=keyname,
+            availability_zone=availability_zone)
         if not restored_instance:
             raise Exception("Cannot create instance from image")
 
         start_time = timeutils.utcnow()
-        while hasattr(restored_instance,
-                      'status') == False or restored_instance.status != 'ACTIVE':
+        while hasattr(
+                restored_instance,
+                'status') == False or restored_instance.status != 'ACTIVE':
             LOG.debug(
                 'Waiting for the instance ' +
                 restored_instance.id +
@@ -1000,12 +1012,12 @@ class AdjustSG(task.Task):
                 restored_security_groups.values()) - set(sec_group_ids)
             # remove security groups that were not asked for
             for sec in ids_to_remove:
-                compute_service.remove_security_group(self.cntx, restored_instance_id,
-                                                      sec)
+                compute_service.remove_security_group(
+                    self.cntx, restored_instance_id, sec)
 
             for sec in ids_to_add:
-                compute_service.add_security_group(self.cntx, restored_instance_id,
-                                                   sec)
+                compute_service.add_security_group(
+                    self.cntx, restored_instance_id, sec)
         except Exception as ex:
             LOG.exception(ex)
             msg = "Could not update security groups on the " \
@@ -1123,11 +1135,14 @@ class CopyBackupImageToVolume(task.Task):
         # Get a new token, just to be safe
         cntx = amqp.RpcContext.from_dict(context)
         cntx = nova._get_tenant_context(cntx)
-        vast_params = {'volume_id': volume_id, 'volume_type': volume_type,
-                       'image_id': image_id, 'image_type': image_type,
-                       'backup_image_file_path': restored_file_path,
-                       'image_overlay_file_path': image_overlay_file_path,
-                       'progress_tracking_file_path': progress_tracking_file_path}
+        vast_params = {
+            'volume_id': volume_id,
+            'volume_type': volume_type,
+            'image_id': image_id,
+            'image_type': image_type,
+            'backup_image_file_path': restored_file_path,
+            'image_overlay_file_path': image_overlay_file_path,
+            'progress_tracking_file_path': progress_tracking_file_path}
         compute_service.copy_backup_image_to_volume(
             cntx, restored_instance_id, vast_params)
 
@@ -1161,14 +1176,14 @@ class CopyBackupImageToVolume(task.Task):
                         basestat = progstat
                         basetime = time.time()
                     elif time.time() - basetime > CONF.progress_tracking_update_interval:
-                        raise Exception("No update to %s modified time for last %d minutes. "
-                                        "Contego may have errored. Aborting Operation" %
-                                        (progress_tracking_file_path, CONF.progress_tracking_update_interval / 60))
+                        raise Exception(
+                            "No update to %s modified time for last %d minutes. "
+                            "Contego may have errored. Aborting Operation" %
+                            (progress_tracking_file_path, CONF.progress_tracking_update_interval / 60))
                 else:
                     # For swift based backup media
-                    async_task_status = compute_service.vast_async_task_status(cntx,
-                                                                               instance['vm_id'],
-                                                                               {'metadata': progress_tracker_metadata})
+                    async_task_status = compute_service.vast_async_task_status(
+                        cntx, instance['vm_id'], {'metadata': progress_tracker_metadata})
                 data_transfer_completed = False
                 percentage = "0.0"
                 if async_task_status and 'status' in async_task_status and \
@@ -1184,11 +1199,11 @@ class CopyBackupImageToVolume(task.Task):
                             percentage = "100.0"
                             break
 
-                copied_size_incremental = int(float(percentage) *
-                                              snapshot_vm_resource.restore_size / 100)
-                restore_obj = db.restore_update(cntx, restore_id,
-                                                {'uploaded_size_incremental': copied_size_incremental -
-                                                 prev_copied_size_incremental})
+                copied_size_incremental = int(
+                    float(percentage) * snapshot_vm_resource.restore_size / 100)
+                restore_obj = db.restore_update(
+                    cntx, restore_id, {
+                        'uploaded_size_incremental': copied_size_incremental - prev_copied_size_incremental})
                 prev_copied_size_incremental = copied_size_incremental
                 if data_transfer_completed:
                     break
@@ -1200,8 +1215,9 @@ class CopyBackupImageToVolume(task.Task):
                 LOG.exception(ex)
                 raise ex
 
-        restore_obj = db.restore_update(cntx, restore_id,
-                                        {'uploaded_size_incremental': image_info.virtual_size})
+        restore_obj = db.restore_update(
+            cntx, restore_id, {
+                'uploaded_size_incremental': image_info.virtual_size})
 
     @autolog.log_method(Logger, 'CopyBackupImageToVolume.revert')
     def revert_with_log(self, *args, **kwargs):
@@ -1228,24 +1244,25 @@ class PowerOffInstance(task.Task):
 
         compute_service.stop(self.cntx, restored_instance_id)
 
-        restored_instance = compute_service.get_server_by_id(self.cntx,
-                                                             restored_instance_id)
+        restored_instance = compute_service.get_server_by_id(
+            self.cntx, restored_instance_id)
         start_time = timeutils.utcnow()
         while hasattr(restored_instance, 'status') == False or \
                 restored_instance.status != 'SHUTOFF':
             LOG.debug('Waiting for the instance ' + restored_instance_id +
                       ' to shutdown')
             time.sleep(10)
-            restored_instance = compute_service.get_server_by_id(self.cntx,
-                                                                 restored_instance_id)
+            restored_instance = compute_service.get_server_by_id(
+                self.cntx, restored_instance_id)
             if hasattr(restored_instance, 'status'):
                 if restored_instance.status == 'ERROR':
                     raise Exception(_("Error creating instance " +
                                       restored_instance_id))
             now = timeutils.utcnow()
             if (now - start_time) > datetime.timedelta(minutes=4):
-                raise exception.ErrorOccurred(reason='Timeout waiting for '
-                                              'the instance to boot from volume')
+                raise exception.ErrorOccurred(
+                    reason='Timeout waiting for '
+                    'the instance to boot from volume')
 
         self.restored_instance = restored_instance
         return
@@ -1275,24 +1292,25 @@ class PowerOnInstance(task.Task):
 
         compute_service.start(self.cntx, restored_instance_id)
 
-        restored_instance = compute_service.get_server_by_id(self.cntx,
-                                                             restored_instance_id)
+        restored_instance = compute_service.get_server_by_id(
+            self.cntx, restored_instance_id)
         start_time = timeutils.utcnow()
         while hasattr(restored_instance, 'status') == False or \
                 restored_instance.status != 'ACTIVE':
             LOG.debug('Waiting for the instance ' + restored_instance_id +
                       ' to boot')
             time.sleep(10)
-            restored_instance = compute_service.get_server_by_id(self.cntx,
-                                                                 restored_instance_id)
+            restored_instance = compute_service.get_server_by_id(
+                self.cntx, restored_instance_id)
             if hasattr(restored_instance, 'status'):
                 if restored_instance.status == 'ERROR':
                     raise Exception(_("Error creating instance " +
                                       restored_instance_id))
             now = timeutils.utcnow()
             if (now - start_time) > datetime.timedelta(minutes=5):
-                raise exception.ErrorOccurred(reason='Timeout waiting for '
-                                              'the instance to boot from volume')
+                raise exception.ErrorOccurred(
+                    reason='Timeout waiting for '
+                    'the instance to boot from volume')
 
         self.restored_instance = restored_instance
         return
@@ -1345,8 +1363,8 @@ class AssignFloatingIP(task.Task):
                         for fp in floating_ips_list:
                             if fp.ip == floating_ip and (
                                     fp.instance_id == '' or fp.instance_id is None):
-                                compute_service.add_floating_ip(self.cntx, restored_instance_id,
-                                                                floating_ip, fixed_ip)
+                                compute_service.add_floating_ip(
+                                    self.cntx, restored_instance_id, floating_ip, fixed_ip)
 
                 except BaseException:
                     # we will ignore any exceptions during assigning floating
@@ -1363,8 +1381,8 @@ def LinearPrepareBackupImages(
         context, instance, instance_options, snapshotobj, restore_id):
     flow = lf.Flow("processbackupimageslf")
     db = WorkloadMgrDB().db
-    snapshot_vm_resources = db.snapshot_vm_resources_get(context,
-                                                         instance['vm_id'], snapshotobj.id)
+    snapshot_vm_resources = db.snapshot_vm_resources_get(
+        context, instance['vm_id'], snapshotobj.id)
     for snapshot_vm_resource in snapshot_vm_resources:
         if snapshot_vm_resource.resource_type != 'disk':
             continue
@@ -1475,15 +1493,13 @@ def RestoreInstance(context, instance, snapshotobj, restore_id):
         if snapshot_vm_resource.resource_name != 'vda':
             continue
         if db.get_metadata_value(snapshot_vm_resource.metadata, 'image_id'):
-            flow.add(RestoreInstanceFromImage("RestoreInstanceFromImage" + instance['vm_id'],
-                                              rebind=dict(
-                                                  image_id='image_id_' + str(snapshot_vm_resource.id)),
-                                              provides='restored_instance_id'))
+            flow.add(RestoreInstanceFromImage("RestoreInstanceFromImage" +
+                                              instance['vm_id'], rebind=dict(image_id='image_id_' +
+                                                                             str(snapshot_vm_resource.id)), provides='restored_instance_id'))
         else:
-            flow.add(RestoreInstanceFromVolume("RestoreInstanceFromVolume" + instance['vm_id'],
-                                               rebind=dict(
-                                                   volume_id='volume_id_' + str(snapshot_vm_resource.id)),
-                                               provides='restored_instance_id'))
+            flow.add(RestoreInstanceFromVolume("RestoreInstanceFromVolume" +
+                                               instance['vm_id'], rebind=dict(volume_id='volume_id_' +
+                                                                              str(snapshot_vm_resource.id)), provides='restored_instance_id'))
     return flow
 
 
@@ -1499,25 +1515,26 @@ def AdjustInstanceSecurityGroups(context, instance, snapshotobj, restore_id):
 def AttachVolumes(context, instance, snapshotobj, restore_id):
     flow = lf.Flow("attachvolumeslf")
     db = WorkloadMgrDB().db
-    snapshot_vm_resources = db.snapshot_vm_resources_get(context,
-                                                         instance['vm_id'], snapshotobj.id)
+    snapshot_vm_resources = db.snapshot_vm_resources_get(
+        context, instance['vm_id'], snapshotobj.id)
     for snapshot_vm_resource in snapshot_vm_resources:
         if snapshot_vm_resource.resource_type != 'disk':
             continue
         if snapshot_vm_resource.resource_name == 'vda':
             continue
         if db.get_metadata_value(snapshot_vm_resource.metadata, 'volume_id'):
-            flow.add(AttachVolume("AttachVolume" + snapshot_vm_resource.id,
-                                  rebind=dict(volume_id='volume_id_' + str(snapshot_vm_resource.id),
-                                              devname='devname_' + str(snapshot_vm_resource.id),)))
+            flow.add(AttachVolume("AttachVolume" +
+                                  snapshot_vm_resource.id, rebind=dict(volume_id='volume_id_' +
+                                                                       str(snapshot_vm_resource.id), devname='devname_' +
+                                                                       str(snapshot_vm_resource.id),)))
     return flow
 
 
 def CopyBackupImagesToVolumes(context, instance, snapshot_obj, restore_id):
     flow = lf.Flow("copybackupimagestovolumeslf")
     db = WorkloadMgrDB().db
-    snapshot_vm_resources = db.snapshot_vm_resources_get(context,
-                                                         instance['vm_id'], snapshot_obj.id)
+    snapshot_vm_resources = db.snapshot_vm_resources_get(
+        context, instance['vm_id'], snapshot_obj.id)
     for snapshot_vm_resource in snapshot_vm_resources:
         if snapshot_vm_resource.resource_type != 'disk':
             continue
@@ -1577,10 +1594,22 @@ def AssignFloatingIPFlow(context):
 def FreezeNThawFlow(context):
 
     flow = lf.Flow("freezenthawlf")
-    flow.add(FreezeVM("FreezeVM", rebind={'instance': 'restored_instance_id', 'snapshot': 'restored_instance_id',
-                                          'source_platform': 'restored_instance_id', 'restored_instance_id': 'restored_instance_id'}))
-    flow.add(ThawVM("ThawVM", rebind={'instance': 'restored_instance_id', 'snapshot': 'restored_instance_id',
-                                      'source_platform': 'restored_instance_id', 'restored_instance_id': 'restored_instance_id'}))
+    flow.add(
+        FreezeVM(
+            "FreezeVM",
+            rebind={
+                'instance': 'restored_instance_id',
+                'snapshot': 'restored_instance_id',
+                'source_platform': 'restored_instance_id',
+                'restored_instance_id': 'restored_instance_id'}))
+    flow.add(
+        ThawVM(
+            "ThawVM",
+            rebind={
+                'instance': 'restored_instance_id',
+                'snapshot': 'restored_instance_id',
+                'source_platform': 'restored_instance_id',
+                'restored_instance_id': 'restored_instance_id'}))
 
     return flow
 
@@ -1612,8 +1641,8 @@ def restore_vm(cntx, db, instance, restore, restored_net_resources,
                          for (key, value) in cntx.to_dict().iteritems()])
     context_dict['conf'] = None  # RpcContext object looks for this during init
 
-    snapshot_vm_resources = db.snapshot_vm_resources_get(cntx, instance['vm_id'],
-                                                         snapshot_obj.id)
+    snapshot_vm_resources = db.snapshot_vm_resources_get(
+        cntx, instance['vm_id'], snapshot_obj.id)
 
     restored_security_group_ids = {}
     vm_id = instance['vm_id']
@@ -1647,8 +1676,9 @@ def restore_vm(cntx, db, instance, restore, restored_net_resources,
         store['devname_' + snapshot_vm_resource.id] = snapshot_vm_resource.resource_name
         if snapshot_vm_resource.resource_type == 'disk':
 
-            progress_tracker_metadata = {'snapshot_id': snapshot_obj.id,
-                                         'resource_id': snapshot_vm_resource.id}
+            progress_tracker_metadata = {
+                'snapshot_id': snapshot_obj.id,
+                'resource_id': snapshot_vm_resource.id}
 
             progress_tracking_file_path = backup_target.get_progress_tracker_path(
                 progress_tracker_metadata)
@@ -1736,23 +1766,26 @@ def restore_vm(cntx, db, instance, restore, restored_net_resources,
     if childflow:
         _restorevmflow.add(childflow)
 
-    result = engines.run(_restorevmflow, engine_conf='serial',
-                         backend={'connection': store['connection']}, store=store)
+    result = engines.run(_restorevmflow, engine_conf='serial', backend={
+                         'connection': store['connection']}, store=store)
 
     if result and 'restored_instance_id' in result:
         restored_instance_id = result['restored_instance_id']
         compute_service = nova.API(production=(not test))
-        restored_instance = compute_service.get_server_by_id(cntx,
-                                                             restored_instance_id)
+        restored_instance = compute_service.get_server_by_id(
+            cntx, restored_instance_id)
 
-        restored_vm_values = {'vm_id': restored_instance_id,
-                              'vm_name': restored_instance.name,
-                              'restore_id': restore['id'],
-                              'metadata': {'production': restored_net_resources[mac_address]['production'], 'instance_id': instance['vm_id']},
-                              'status': 'available'}
+        restored_vm_values = {
+            'vm_id': restored_instance_id,
+            'vm_name': restored_instance.name,
+            'restore_id': restore['id'],
+            'metadata': {
+                'production': restored_net_resources[mac_address]['production'],
+                'instance_id': instance['vm_id']},
+            'status': 'available'}
         restored_vm = db.restored_vm_create(cntx, restored_vm_values)
 
-        if test == True:
+        if test:
             LOG.debug(_("Test Restore Completed"))
         else:
             LOG.debug(_("Restore Completed"))
@@ -1771,12 +1804,15 @@ def restore_vm(cntx, db, instance, restore, restored_net_resources,
             except OSError as exc:
                 pass
 
-        db.restore_update(cntx, restore_obj.id,
-                          {'progress_msg': 'Created VM ' + instance['vm_id'] + ' from snapshot ' + snapshot_obj.id,
-                           'status': 'executing'
-                           })
-        db.restore_update(cntx, restore_obj.id,
-                          {'progress_msg': 'Created VM:' + restored_vm['vm_id'], 'status': 'executing'})
+        db.restore_update(
+            cntx,
+            restore_obj.id,
+            {
+                'progress_msg': 'Created VM ' + instance['vm_id'] + ' from snapshot ' + snapshot_obj.id,
+                'status': 'executing'})
+        db.restore_update(
+            cntx, restore_obj.id, {
+                'progress_msg': 'Created VM:' + restored_vm['vm_id'], 'status': 'executing'})
         return restored_vm
     else:
         raise Exception("Restoring VM instance failed")

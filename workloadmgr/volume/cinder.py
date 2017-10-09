@@ -154,8 +154,8 @@ def cinderclient(context, refresh_token=False):
                                             insecure=CONF.cinder_api_insecure,
                                             retries=CONF.cinder_http_retries)
         # noauth extracts user_id:project_id from auth_token
-        cinderclient.client.auth_token = context.auth_token or '%s:%s' % (context.user_id,
-                                                                          context.project_id)
+        cinderclient.client.auth_token = context.auth_token or '%s:%s' % (
+            context.user_id, context.project_id)
         cinderclient.client.management_url = url
         if "v1" in url.split('/'):
             cinderclient.volume_api_version = 1

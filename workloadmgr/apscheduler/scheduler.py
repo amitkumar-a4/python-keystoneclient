@@ -100,7 +100,7 @@ class Scheduler(object):
             raise SchedulerAlreadyRunningError
 
         # Create a RAMJobStore as the default if there is no default job store
-        if not 'default' in self._jobstores:
+        if 'default' not in self._jobstores:
             self.add_jobstore(RAMJobStore(), 'default', True)
 
         # Schedule all pending jobs
@@ -324,9 +324,19 @@ class Scheduler(object):
         trigger = SimpleTrigger(date)
         return self.add_job(trigger, func, args, kwargs, **options)
 
-    def add_interval_job(self, func, start_time, weeks=0, days=0, hours=0, minutes=0,
-                         seconds=0, start_date=None, args=None, kwargs=None,
-                         **options):
+    def add_interval_job(
+            self,
+            func,
+            start_time,
+            weeks=0,
+            days=0,
+            hours=0,
+            minutes=0,
+            seconds=0,
+            start_date=None,
+            args=None,
+            kwargs=None,
+            **options):
         """
         Schedules a job to be completed on specified intervals.
         Any extra keyword arguments are passed along to the constructor of the

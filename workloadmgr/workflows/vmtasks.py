@@ -105,11 +105,11 @@ class RestoreVMNetworks(task.Task):
         try:
             if self.restored_net_resources:
                 if self.target_platform == 'openstack':
-                    vmtasks_openstack.delete_vm_networks(self.cntx,
-                                                         self.restored_net_resources)
+                    vmtasks_openstack.delete_vm_networks(
+                        self.cntx, self.restored_net_resources)
                 else:
-                    vmtasks_vcloud.delete_vm_networks(self.cntx,
-                                                      self.restored_net_resources)
+                    vmtasks_vcloud.delete_vm_networks(
+                        self.cntx, self.restored_net_resources)
         except Exception as ex:
             LOG.exception(ex)
         finally:
@@ -149,11 +149,11 @@ class RestoreSecurityGroups(task.Task):
         try:
             if self.security_groups:
                 if self.target_platform == 'openstack':
-                    vmtasks_openstack.delete_vm_security_groups(self.cntx,
-                                                                self.security_groups)
+                    vmtasks_openstack.delete_vm_security_groups(
+                        self.cntx, self.security_groups)
                 else:
-                    vmtasks_vcloud.delete_vm_security_groups(self.cntx,
-                                                             self.security_groups)
+                    vmtasks_vcloud.delete_vm_security_groups(
+                        self.cntx, self.security_groups)
         except Exception as ex:
             LOG.exception(ex)
         finally:
@@ -228,8 +228,13 @@ class RestoreVM(task.Task):
 
     def execute(self, context, target_platform, instance, restore,
                 restored_net_resources, restored_security_groups):
-        return self.execute_with_log(context, target_platform, instance, restore,
-                                     restored_net_resources, restored_security_groups)
+        return self.execute_with_log(
+            context,
+            target_platform,
+            instance,
+            restore,
+            restored_net_resources,
+            restored_security_groups)
 
     def revert(self, *args, **kwargs):
         return self.revert_with_log(*args, **kwargs)
@@ -243,11 +248,16 @@ class RestoreVM(task.Task):
         db.restore_get_metadata_cancel_flag(cntx, restore['id'])
 
         if target_platform == 'openstack':
-            ret_val = vmtasks_openstack.restore_vm(cntx, db, instance, restore,
-                                                   restored_net_resources, restored_security_groups)
+            ret_val = vmtasks_openstack.restore_vm(
+                cntx, db, instance, restore, restored_net_resources, restored_security_groups)
         else:
-            ret_val = vmtasks_vcloud.restore_vm(cntx, db, instance, restore,
-                                                restored_net_resources, restored_security_groups)
+            ret_val = vmtasks_vcloud.restore_vm(
+                cntx,
+                db,
+                instance,
+                restore,
+                restored_net_resources,
+                restored_security_groups)
 
         return {'vm_name': ret_val.vm_name,
                 'vm_id': ret_val.vm_id, 'uuid': ret_val.vm_id}
@@ -491,9 +501,8 @@ class SnapshotVMNetworks(task.Task):
             search_opts = {}
             search_opts['vmref'] = '1'
             for instance in instances:
-                newinst = compute_service.get_server_by_id(cntx,
-                                                           instance['vm_metadata']['vmware_uuid'],
-                                                           search_opts=search_opts)
+                newinst = compute_service.get_server_by_id(
+                    cntx, instance['vm_metadata']['vmware_uuid'], search_opts=search_opts)
 
         return vmtasks_openstack.snapshot_vm_networks(
             cntx, db, instances, snapshot)
@@ -884,19 +893,21 @@ class SnapshotVM(task.Task):
         try:
             cntx = amqp.RpcContext.from_dict(kwargs['context'])
             db = WorkloadMgrDB().db
-            db.snapshot_vm_update(cntx, kwargs['instance']['vm_id'],
-                                  kwargs['snapshot']['id'], {'status': 'error', })
-            db.vm_recent_snapshot_update(cntx, kwargs['instance']['vm_id'],
-                                         {'snapshot_id': kwargs['snapshot']['id']})
+            db.snapshot_vm_update(
+                cntx, kwargs['instance']['vm_id'], kwargs['snapshot']['id'], {
+                    'status': 'error', })
+            db.vm_recent_snapshot_update(
+                cntx, kwargs['instance']['vm_id'], {
+                    'snapshot_id': kwargs['snapshot']['id']})
 
             if 'result' in kwargs:
                 result = kwargs['result']
                 if kwargs['source_platform'] == 'openstack':
-                    vmtasks_openstack.revert_snapshot(cntx, db, kwargs['instance'],
-                                                      kwargs['snapshot'], result)
+                    vmtasks_openstack.revert_snapshot(
+                        cntx, db, kwargs['instance'], kwargs['snapshot'], result)
                 else:
-                    vmtasks_vcloud.revert_snapshot(cntx, db, kwargs['instance'],
-                                                   kwargs['snapshot'], result)
+                    vmtasks_vcloud.revert_snapshot(
+                        cntx, db, kwargs['instance'], kwargs['snapshot'], result)
         except Exception as ex:
             LOG.exception(ex)
         finally:
@@ -1141,15 +1152,14 @@ class PrepareBackupImage(task.Task):
             shutil.copyfile(vault_path, restored_file_path)
 
         while vm_disk_resource_snap.vm_disk_resource_snap_backing_id is not None:
-            vm_disk_resource_snap_backing = db.vm_disk_resource_snap_get(cntx,
-                                                                         vm_disk_resource_snap.vm_disk_resource_snap_backing_id)
+            vm_disk_resource_snap_backing = db.vm_disk_resource_snap_get(
+                cntx, vm_disk_resource_snap.vm_disk_resource_snap_backing_id)
             disk_format = db.get_metadata_value(
                 vm_disk_resource_snap_backing.metadata, 'disk_format')
             snapshot_vm_resource_backing = db.snapshot_vm_resource_get(
                 cntx, vm_disk_resource_snap_backing.snapshot_vm_resource_id)
             restored_file_path_backing = temp_directory + '/' + vm_disk_resource_snap_backing.id + \
-                '_' + snapshot_vm_resource_backing.resource_name + '.' \
-                + disk_filename_extention
+                '_' + snapshot_vm_resource_backing.resource_name + '.' + disk_filename_extention
             restored_file_path_backing = restored_file_path_backing.replace(
                 " ", "")
             vault_path = os.path.join(backup_target.mount_path,
@@ -1249,10 +1259,15 @@ def LinearFreezeVMs(instances):
 
 def UnorderedPauseVMs(instances):
     flow = uf.Flow("pausevmsuf")
-    if instances[0]['pause_at_snapshot'] == True:
+    if instances[0]['pause_at_snapshot']:
         for index, item in enumerate(instances):
-            flow.add(PauseVM("PauseVM_" + item['vm_id'],
-                             rebind=dict(instance="instance_" + item['vm_id'])))
+            flow.add(
+                PauseVM(
+                    "PauseVM_" +
+                    item['vm_id'],
+                    rebind=dict(
+                        instance="instance_" +
+                        item['vm_id'])))
     else:
         flow.add(NoneTask("UnorderedPauseVMs"))
     return flow
@@ -1263,10 +1278,15 @@ def UnorderedPauseVMs(instances):
 
 def LinearPauseVMs(instances):
     flow = lf.Flow("pausevmslf")
-    if instances[0]['pause_at_snapshot'] == True:
+    if instances[0]['pause_at_snapshot']:
         for index, item in enumerate(instances):
-            flow.add(PauseVM("PauseVM_" + item['vm_id'],
-                             rebind=dict(instance="instance_" + item['vm_id'])))
+            flow.add(
+                PauseVM(
+                    "PauseVM_" +
+                    item['vm_id'],
+                    rebind=dict(
+                        instance="instance_" +
+                        item['vm_id'])))
     else:
         flow.add(NoneTask("LinearPauseVMs"))
 
@@ -1279,8 +1299,10 @@ def LinearPauseVMs(instances):
 def UnorderedSnapshotVMs(instances):
     flow = uf.Flow("snapshotvmuf")
     for index, item in enumerate(instances):
-        flow.add(SnapshotVM("SnapshotVM_" + item['vm_id'], rebind=dict(instance="instance_" + item['vm_id']),
-                            provides='snapshot_data_' + str(item['vm_id'])))
+        flow.add(SnapshotVM("SnapshotVM_" +
+                            item['vm_id'], rebind=dict(instance="instance_" +
+                                                       item['vm_id']), provides='snapshot_data_' +
+                            str(item['vm_id'])))
 
     return flow
 
@@ -1291,8 +1313,10 @@ def UnorderedSnapshotVMs(instances):
 def LinearSnapshotVMs(instances):
     flow = lf.Flow("snapshotvmlf")
     for index, item in enumerate(instances):
-        flow.add(SnapshotVM("SnapshotVM_" + item['vm_id'], rebind=dict(instance="instance_" + item['vm_id']),
-                            provides='snapshot_data_' + str(item['vm_id'])))
+        flow.add(SnapshotVM("SnapshotVM_" +
+                            item['vm_id'], rebind=dict(instance="instance_" +
+                                                       item['vm_id']), provides='snapshot_data_' +
+                            str(item['vm_id'])))
 
     return flow
 
@@ -1304,9 +1328,14 @@ def LinearSnapshotVMs(instances):
 def UnorderedUnPauseVMs(instances):
     flow = uf.Flow("unpausevmsuf")
     for index, item in enumerate(instances):
-        if item['pause_at_snapshot'] == True:
-            flow.add(UnPauseVM("UnPauseVM_" + item['vm_id'],
-                               rebind=dict(instance="instance_" + item['vm_id'])))
+        if item['pause_at_snapshot']:
+            flow.add(
+                UnPauseVM(
+                    "UnPauseVM_" +
+                    item['vm_id'],
+                    rebind=dict(
+                        instance="instance_" +
+                        item['vm_id'])))
         else:
             flow.add(NoneTask("UnorderedUnPauseVMs" + item['vm_id']))
 
@@ -1316,9 +1345,14 @@ def UnorderedUnPauseVMs(instances):
 def LinearUnPauseVMs(instances):
     flow = lf.Flow("unpausevmslf")
     for index, item in enumerate(instances):
-        if item['pause_at_snapshot'] == True:
-            flow.add(UnPauseVM("UnPauseVM_" + item['vm_id'],
-                               rebind=dict(instance="instance_" + item['vm_id'])))
+        if item['pause_at_snapshot']:
+            flow.add(
+                UnPauseVM(
+                    "UnPauseVM_" +
+                    item['vm_id'],
+                    rebind=dict(
+                        instance="instance_" +
+                        item['vm_id'])))
         else:
             flow.add(NoneTask("LinearUnPauseVMs" + item['vm_id']))
 
@@ -1358,8 +1392,9 @@ def UnorderedSnapshotDataSize(instances):
         rebind_dict = dict(instance="instance_" +
                            item['vm_id'], snapshot_data="snapshot_data_" +
                            str(item['vm_id']))
-        flow.add(SnapshotDataSize("SnapshotDataSize_" + item['vm_id'], rebind=rebind_dict,
-                                  provides='snapshot_data_ex_' + str(item['vm_id'])))
+        flow.add(SnapshotDataSize("SnapshotDataSize_" +
+                                  item['vm_id'], rebind=rebind_dict, provides='snapshot_data_ex_' +
+                                  str(item['vm_id'])))
 
     return flow
 
@@ -1370,8 +1405,9 @@ def LinearSnapshotDataSize(instances):
         rebind_dict = dict(instance="instance_" +
                            item['vm_id'], snapshot_data="snapshot_data_" +
                            str(item['vm_id']))
-        flow.add(SnapshotDataSize("SnapshotDataSize_" + item['vm_id'], rebind=rebind_dict,
-                                  provides='snapshot_data_ex_' + str(item['vm_id'])))
+        flow.add(SnapshotDataSize("SnapshotDataSize_" +
+                                  item['vm_id'], rebind=rebind_dict, provides='snapshot_data_ex_' +
+                                  str(item['vm_id'])))
 
     return flow
 
@@ -1550,8 +1586,8 @@ def UnorderedPostRestore(instances):
 def LinearPrepareBackupImages(context, instance, snapshotobj):
     flow = lf.Flow("processbackupimageslf")
     db = WorkloadMgrDB().db
-    snapshot_vm_resources = db.snapshot_vm_resources_get(context,
-                                                         instance['vm_id'], snapshotobj.id)
+    snapshot_vm_resources = db.snapshot_vm_resources_get(
+        context, instance['vm_id'], snapshotobj.id)
     for snapshot_vm_resource in snapshot_vm_resources:
         if snapshot_vm_resource.resource_type != 'disk':
             continue

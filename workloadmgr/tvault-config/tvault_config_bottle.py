@@ -440,38 +440,58 @@ def send_keystone_logs(filename):
 
 @bottle.route('/tvault-contego-install.sh')
 def send_tvault_contego_install():
-    return static_file('tvault-contego-install.sh',
-                       root='/opt/stack/contego/install-scripts', mimetype='text/plain', download=True)
+    return static_file(
+        'tvault-contego-install.sh',
+        root='/opt/stack/contego/install-scripts',
+        mimetype='text/plain',
+        download=True)
 
 
 @bottle.route('/tvault-contego-install.answers')
 def send_tvault_contego_install():
-    return static_file('tvault-contego-install.answers',
-                       root='/opt/stack/contego/install-scripts', mimetype='text/plain', download=True)
+    return static_file(
+        'tvault-contego-install.answers',
+        root='/opt/stack/contego/install-scripts',
+        mimetype='text/plain',
+        download=True)
 
 
 @bottle.route('/tvault-ansible-scripts.tar.gz')
 def send_ansible_scripts():
-    return static_file('tvault-ansible-scripts-' + models.DB_VERSION + '.tar.gz',
-                       root='/home/pypi/packages/', mimetype='application/x-gzip', download=True)
+    return static_file(
+        'tvault-ansible-scripts-' +
+        models.DB_VERSION +
+        '.tar.gz',
+        root='/home/pypi/packages/',
+        mimetype='application/x-gzip',
+        download=True)
 
 
 @bottle.route('/tvault-horizon-plugin-install.sh')
 def send_tvault_horizon_plugin_install():
-    return static_file('tvault-horizon-plugin-install.sh',
-                       root='/opt/stack/horizon-tvault-plugin/install-scripts', mimetype='text/plain', download=True)
+    return static_file(
+        'tvault-horizon-plugin-install.sh',
+        root='/opt/stack/horizon-tvault-plugin/install-scripts',
+        mimetype='text/plain',
+        download=True)
 
 
 @bottle.route('/tvault_panel.py')
 def send_tvault_horizon_panel():
-    return static_file('tvault_panel.py', root='/opt/stack/horizon-tvault-plugin/install-scripts',
-                       mimetype='text/plain', download=True)
+    return static_file(
+        'tvault_panel.py',
+        root='/opt/stack/horizon-tvault-plugin/install-scripts',
+        mimetype='text/plain',
+        download=True)
 
 
 @bottle.route('/tvault_panel_group.py')
 def send_tvault_horizon_panel_group():
-    return static_file('tvault_panel_group.py', root='/opt/stack/horizon-tvault-plugin/install-scripts',
-                       mimetype='text/plain', download=True)
+    return static_file(
+        'tvault_panel_group.py',
+        root='/opt/stack/horizon-tvault-plugin/install-scripts',
+        mimetype='text/plain',
+        download=True)
 
 
 @authorize()
@@ -488,8 +508,11 @@ def send_tvault_logs():
         if os.path.exists('/var/log/workloadmgr'):
             logtar.add('/var/log/workloadmgr')
         logtar.close()
-        return static_file(os.path.basename(
-            logtarfilename), root='/tmp/tvaultlogs', mimetype='text/plain', download=True)
+        return static_file(
+            os.path.basename(logtarfilename),
+            root='/tmp/tvaultlogs',
+            mimetype='text/plain',
+            download=True)
     except Exception as exception:
         raise exception
 
@@ -520,8 +543,11 @@ def send_tvaultlogs_all():
             logtar.add('/var/log/upstart')
 
         logtar.close()
-        return static_file(os.path.basename(
-            logtarfilename), root='/tmp/tvaultlogs_all', mimetype='text/plain', download=True)
+        return static_file(
+            os.path.basename(logtarfilename),
+            root='/tmp/tvaultlogs_all',
+            mimetype='text/plain',
+            download=True)
     except Exception as exception:
         raise exception
 
@@ -535,7 +561,7 @@ def replace_line(file_path, pattern, substitute, starts_with=False):
     new_file = open(abs_path, 'w')
     old_file = open(file_path)
     for line in old_file:
-        if starts_with == True:
+        if starts_with:
             if line.startswith(pattern):
                 new_file.write(substitute + '\n')
             else:
@@ -558,8 +584,8 @@ def replace_line(file_path, pattern, substitute, starts_with=False):
 
 def get_interface_ip(ifname):
     s = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
-    return socket.inet_ntoa(fcntl.ioctl(s.fileno(), 0x8915, struct.pack('256s',
-                                                                        ifname[:15]))[20:24])
+    return socket.inet_ntoa(fcntl.ioctl(
+        s.fileno(), 0x8915, struct.pack('256s', ifname[:15]))[20:24])
 
 
 def get_lan_ip():
@@ -616,55 +642,166 @@ def _authenticate_with_swift(config_data):
             _opts = {}
             if config_data['swift_auth_version'] == 'KEYSTONE_V2' or (
                     config_data['keystone_auth_version'] == 2.0 and config_data['swift_auth_version'] == 'KEYSTONE'):
-                _opts = {'verbose': 1, 'os_username': config_data['swift_username'], 'os_user_domain_name': None, 'os_cacert': None,
-                         'os_tenant_name': config_data['swift_tenantname'], 'os_user_domain_id': config_data['swift_domain_id'],
-                         'os_domain_id': config_data['swift_domain_id'], 'prefix': None, 'auth_version': '2.0',
-                         'ssl_compression': True, 'os_password': config_data['swift_password'], 'os_user_id': None, 'os_project_id': None,
-                         'long': False, 'totals': False, 'snet': False, 'os_tenant_id': None, 'os_project_name': None,
-                         'os_service_type': None, 'insecure': SSL_INSECURE, 'os_help': None, 'os_project_domain_id': None,
-                         'os_storage_url': None, 'human': False, 'auth': config_data['swift_auth_url'],
-                         'os_auth_url': config_data['swift_auth_url'], 'user': config_data['swift_username'], 'key': config_data['swift_password'],
-                         'os_region_name': config_data['region_name'], 'info': False, 'retries': 5, 'os_auth_token': None, 'delimiter': None,
-                         'os_options': {'project_name': None, 'region_name': config_data['region_name'], 'tenant_name': config_data['swift_tenantname'],
-                                        'user_domain_name': None,
-                                        'endpoint_type': None, 'object_storage_url': None, 'project_domain_id': None, 'user_id': None,
-                                        'user_domain_id': config_data['swift_domain_id'], 'domain_id': config_data['swift_domain_id'], 'tenant_id': None,
-                                        'service_type': None, 'project_id': None,
-                                        'auth_token': None, 'project_domain_name': None},
-                         'debug': False, 'os_project_domain_name': None, 'os_endpoint_type': None}
+                _opts = {
+                    'verbose': 1,
+                    'os_username': config_data['swift_username'],
+                    'os_user_domain_name': None,
+                    'os_cacert': None,
+                    'os_tenant_name': config_data['swift_tenantname'],
+                    'os_user_domain_id': config_data['swift_domain_id'],
+                    'os_domain_id': config_data['swift_domain_id'],
+                    'prefix': None,
+                    'auth_version': '2.0',
+                    'ssl_compression': True,
+                    'os_password': config_data['swift_password'],
+                    'os_user_id': None,
+                    'os_project_id': None,
+                    'long': False,
+                    'totals': False,
+                    'snet': False,
+                    'os_tenant_id': None,
+                    'os_project_name': None,
+                    'os_service_type': None,
+                    'insecure': SSL_INSECURE,
+                    'os_help': None,
+                    'os_project_domain_id': None,
+                    'os_storage_url': None,
+                    'human': False,
+                    'auth': config_data['swift_auth_url'],
+                    'os_auth_url': config_data['swift_auth_url'],
+                    'user': config_data['swift_username'],
+                    'key': config_data['swift_password'],
+                    'os_region_name': config_data['region_name'],
+                    'info': False,
+                    'retries': 5,
+                    'os_auth_token': None,
+                    'delimiter': None,
+                    'os_options': {
+                        'project_name': None,
+                        'region_name': config_data['region_name'],
+                        'tenant_name': config_data['swift_tenantname'],
+                        'user_domain_name': None,
+                        'endpoint_type': None,
+                        'object_storage_url': None,
+                        'project_domain_id': None,
+                        'user_id': None,
+                        'user_domain_id': config_data['swift_domain_id'],
+                        'domain_id': config_data['swift_domain_id'],
+                        'tenant_id': None,
+                        'service_type': None,
+                        'project_id': None,
+                        'auth_token': None,
+                        'project_domain_name': None},
+                    'debug': False,
+                    'os_project_domain_name': None,
+                    'os_endpoint_type': None}
             elif config_data['swift_auth_version'] == 'KEYSTONE_V3' or (config_data['keystone_auth_version'] == 3 and config_data['swift_auth_version'] == 'KEYSTONE'):
-                _opts = {'verbose': 1, 'os_username': config_data['swift_username'], 'os_user_domain_name': None, 'os_cacert': None,
-                         'os_tenant_name': config_data['swift_tenantname'], 'os_user_domain_id': config_data['swift_domain_id'],
-                         'os_domain_id': config_data['swift_domain_id'], 'prefix': None, 'auth_version': '3',
-                         'ssl_compression': True, 'os_password': config_data['swift_password'], 'os_user_id': None, 'os_project_id': None,
-                         'long': False, 'totals': False, 'snet': False, 'os_tenant_id': None, 'os_project_name': config_data['swift_tenantname'],
-                         'os_service_type': None, 'insecure': SSL_INSECURE, 'os_help': None, 'os_project_domain_id': config_data['swift_domain_id'],
-                         'os_storage_url': None, 'human': False, 'auth': config_data['swift_auth_url'],
-                         'os_auth_url': config_data['swift_auth_url'], 'user': config_data['swift_username'], 'key': config_data['swift_password'],
-                         'os_region_name': config_data['region_name'], 'info': False, 'retries': 5, 'os_auth_token': None, 'delimiter': None,
-                         'os_options': {'project_name': config_data['swift_tenantname'], 'region_name': config_data['region_name'],
-                                        'tenant_name': config_data['swift_tenantname'],
-                                        'user_domain_name': None,
-                                        'endpoint_type': None, 'object_storage_url': None, 'project_domain_id': config_data['swift_domain_id'], 'user_id': None,
-                                        'user_domain_id': config_data['swift_domain_id'], 'domain_id': config_data['swift_domain_id'],
-                                        'tenant_id': None, 'service_type': None, 'project_id': None,
-                                        'auth_token': None, 'project_domain_name': None},
-                         'debug': False, 'os_project_domain_name': None, 'os_endpoint_type': None}
+                _opts = {
+                    'verbose': 1,
+                    'os_username': config_data['swift_username'],
+                    'os_user_domain_name': None,
+                    'os_cacert': None,
+                    'os_tenant_name': config_data['swift_tenantname'],
+                    'os_user_domain_id': config_data['swift_domain_id'],
+                    'os_domain_id': config_data['swift_domain_id'],
+                    'prefix': None,
+                    'auth_version': '3',
+                    'ssl_compression': True,
+                    'os_password': config_data['swift_password'],
+                    'os_user_id': None,
+                    'os_project_id': None,
+                    'long': False,
+                    'totals': False,
+                    'snet': False,
+                    'os_tenant_id': None,
+                    'os_project_name': config_data['swift_tenantname'],
+                    'os_service_type': None,
+                    'insecure': SSL_INSECURE,
+                    'os_help': None,
+                    'os_project_domain_id': config_data['swift_domain_id'],
+                    'os_storage_url': None,
+                    'human': False,
+                    'auth': config_data['swift_auth_url'],
+                    'os_auth_url': config_data['swift_auth_url'],
+                    'user': config_data['swift_username'],
+                    'key': config_data['swift_password'],
+                    'os_region_name': config_data['region_name'],
+                    'info': False,
+                    'retries': 5,
+                    'os_auth_token': None,
+                    'delimiter': None,
+                    'os_options': {
+                        'project_name': config_data['swift_tenantname'],
+                        'region_name': config_data['region_name'],
+                        'tenant_name': config_data['swift_tenantname'],
+                        'user_domain_name': None,
+                        'endpoint_type': None,
+                        'object_storage_url': None,
+                        'project_domain_id': config_data['swift_domain_id'],
+                        'user_id': None,
+                        'user_domain_id': config_data['swift_domain_id'],
+                        'domain_id': config_data['swift_domain_id'],
+                        'tenant_id': None,
+                        'service_type': None,
+                        'project_id': None,
+                        'auth_token': None,
+                        'project_domain_name': None},
+                    'debug': False,
+                    'os_project_domain_name': None,
+                    'os_endpoint_type': None}
 
             elif config_data['swift_auth_version'] == 'TEMPAUTH':
-                _opts = {'verbose': 1, 'os_username': None, 'os_user_domain_name': None, 'os_cacert': None,
-                         'os_tenant_name': None, 'os_user_domain_id': None, 'prefix': None, 'auth_version': '1.0',
-                         'ssl_compression': True, 'os_password': None, 'os_user_id': None, 'os_project_id': None,
-                         'long': False, 'totals': False, 'snet': False, 'os_tenant_id': None, 'os_project_name': None,
-                         'os_service_type': None, 'insecure': SSL_INSECURE, 'os_help': None, 'os_project_domain_id': None,
-                         'os_storage_url': None, 'human': False, 'auth': config_data['swift_auth_url'],
-                         'os_auth_url': None, 'user': config_data['swift_username'], 'key': config_data['swift_password'],
-                         'os_region_name': None, 'info': False, 'retries': 5, 'os_auth_token': None, 'delimiter': None,
-                         'os_options': {'project_name': None, 'region_name': None, 'tenant_name': None, 'user_domain_name': None,
-                                        'endpoint_type': None, 'object_storage_url': None, 'project_domain_id': None, 'user_id': None,
-                                        'user_domain_id': None, 'tenant_id': None, 'service_type': None, 'project_id': None,
-                                        'auth_token': None, 'project_domain_name': None},
-                         'debug': False, 'os_project_domain_name': None, 'os_endpoint_type': None}
+                _opts = {
+                    'verbose': 1,
+                    'os_username': None,
+                    'os_user_domain_name': None,
+                    'os_cacert': None,
+                    'os_tenant_name': None,
+                    'os_user_domain_id': None,
+                    'prefix': None,
+                    'auth_version': '1.0',
+                    'ssl_compression': True,
+                    'os_password': None,
+                    'os_user_id': None,
+                    'os_project_id': None,
+                    'long': False,
+                    'totals': False,
+                    'snet': False,
+                    'os_tenant_id': None,
+                    'os_project_name': None,
+                    'os_service_type': None,
+                    'insecure': SSL_INSECURE,
+                    'os_help': None,
+                    'os_project_domain_id': None,
+                    'os_storage_url': None,
+                    'human': False,
+                    'auth': config_data['swift_auth_url'],
+                    'os_auth_url': None,
+                    'user': config_data['swift_username'],
+                    'key': config_data['swift_password'],
+                    'os_region_name': None,
+                    'info': False,
+                    'retries': 5,
+                    'os_auth_token': None,
+                    'delimiter': None,
+                    'os_options': {
+                        'project_name': None,
+                        'region_name': None,
+                        'tenant_name': None,
+                        'user_domain_name': None,
+                        'endpoint_type': None,
+                        'object_storage_url': None,
+                        'project_domain_id': None,
+                        'user_id': None,
+                        'user_domain_id': None,
+                        'tenant_id': None,
+                        'service_type': None,
+                        'project_id': None,
+                        'auth_token': None,
+                        'project_domain_name': None},
+                    'debug': False,
+                    'os_project_domain_name': None,
+                    'os_endpoint_type': None}
 
             with SwiftService(options=_opts) as swift:
                 try:
@@ -681,7 +818,7 @@ def _authenticate_with_swift(config_data):
 def _validate_keystone_client_and_version(is_admin_url=True, retry=0):
     try:
         auth_url = config_data['keystone_admin_url']
-        if is_admin_url == False:
+        if not is_admin_url:
             auth_url = config_data['keystone_public_url']
 
         if retry == 0:
@@ -693,11 +830,12 @@ def _validate_keystone_client_and_version(is_admin_url=True, retry=0):
                                      domain_id=config_data['domain_name'],
                                      )
         else:
-            auth = password.Password(auth_url=auth_url,
-                                     username=config_data['admin_username'],
-                                     password=config_data['admin_password'],
-                                     project_name=config_data['admin_tenant_name'],
-                                     )
+            auth = password.Password(
+                auth_url=auth_url,
+                username=config_data['admin_username'],
+                password=config_data['admin_password'],
+                project_name=config_data['admin_tenant_name'],
+            )
         sess = session.Session(auth=auth, verify=SSL_VERIFY)
         keystone = client.Client(
             session=sess,
@@ -739,8 +877,10 @@ def _authenticate_with_keystone():
             elif endpoint.interface == 'admin':
                 keystone_admin_url = endpoint.url
     else:
-        endpoint = keystone.endpoints.find(service_id=keystone.services.find(type='identity').id,
-                                           region=config_data['region_name'])
+        endpoint = keystone.endpoints.find(
+            service_id=keystone.services.find(
+                type='identity').id,
+            region=config_data['region_name'])
         keystone_public_url = endpoint.publicurl
         keystone_internal_url = endpoint.internalurl
         keystone_admin_url = endpoint.adminurl
@@ -799,11 +939,15 @@ def _authenticate_with_keystone():
 
     # image
     if keystone.version == 'v3':
-        image_public_url = keystone.endpoints.find(service_id=keystone.services.find(type='image').id,
-                                                   region=config_data['region_name'], interface=v3_str).url
+        image_public_url = keystone.endpoints.find(service_id=keystone.services.find(
+            type='image').id, region=config_data['region_name'], interface=v3_str).url
     else:
-        image_public_url = getattr(keystone.endpoints.find(service_id=keystone.services.find(type='image').id,
-                                                           region=config_data['region_name']), v3_str + "url")
+        image_public_url = getattr(
+            keystone.endpoints.find(
+                service_id=keystone.services.find(
+                    type='image').id,
+                region=config_data['region_name']),
+            v3_str + "url")
 
     parse_result = urlparse(image_public_url)
     config_data['glance_production_api_servers'] = image_public_url
@@ -813,11 +957,15 @@ def _authenticate_with_keystone():
     # network
     try:
         if keystone.version == 'v3':
-            network_public_url = keystone.endpoints.find(service_id=keystone.services.find(type='network').id,
-                                                         region=config_data['region_name'], interface=v3_str).url
+            network_public_url = keystone.endpoints.find(service_id=keystone.services.find(
+                type='network').id, region=config_data['region_name'], interface=v3_str).url
         else:
-            network_public_url = getattr(keystone.endpoints.find(service_id=keystone.services.find(type='network').id,
-                                                                 region=config_data['region_name']), v3_str + "url")
+            network_public_url = getattr(
+                keystone.endpoints.find(
+                    service_id=keystone.services.find(
+                        type='network').id,
+                    region=config_data['region_name']),
+                v3_str + "url")
         config_data['neutron_production_url'] = network_public_url
     except Exception as ex:
         config_data['neutron_production_url'] = "unavailable"
@@ -829,11 +977,15 @@ def _authenticate_with_keystone():
 
     # compute
     if keystone.version == 'v3':
-        compute_public_url = keystone.endpoints.find(service_id=keystone.services.find(type='compute').id,
-                                                     region=config_data['region_name'], interface=v3_str).url
+        compute_public_url = keystone.endpoints.find(service_id=keystone.services.find(
+            type='compute').id, region=config_data['region_name'], interface=v3_str).url
     else:
-        compute_public_url = getattr(keystone.endpoints.find(service_id=keystone.services.find(type='compute').id,
-                                                             region=config_data['region_name']), v3_str + "url")
+        compute_public_url = getattr(
+            keystone.endpoints.find(
+                service_id=keystone.services.find(
+                    type='compute').id,
+                region=config_data['region_name']),
+            v3_str + "url")
 
     def _get_service_endpoint(public_url):
         comps = public_url.split("/")
@@ -849,11 +1001,15 @@ def _authenticate_with_keystone():
     try:
         # volume
         if keystone.version == 'v3':
-            volume_public_url = keystone.endpoints.find(service_id=keystone.services.find(type='volume').id,
-                                                        region=config_data['region_name'], interface=v3_str).url
+            volume_public_url = keystone.endpoints.find(service_id=keystone.services.find(
+                type='volume').id, region=config_data['region_name'], interface=v3_str).url
         else:
-            volume_public_url = getattr(keystone.endpoints.find(service_id=keystone.services.find(type='volume').id,
-                                                                region=config_data['region_name']), v3_str + "url")
+            volume_public_url = getattr(
+                keystone.endpoints.find(
+                    service_id=keystone.services.find(
+                        type='volume').id,
+                    region=config_data['region_name']),
+                v3_str + "url")
 
         config_data['cinder_production_endpoint_template'] = \
             _get_service_endpoint(volume_public_url)
@@ -865,11 +1021,18 @@ def _authenticate_with_keystone():
     try:
         # object
         if keystone.version == 'v3':
-            object_public_url = keystone.endpoints.find(service_id=keystone.services.find(type='object-store').id,
-                                                        region=config_data['region_name'], interface=v3_str).url
+            object_public_url = keystone.endpoints.find(
+                service_id=keystone.services.find(
+                    type='object-store').id,
+                region=config_data['region_name'],
+                interface=v3_str).url
         else:
-            object_public_url = getattr(keystone.endpoints.find(service_id=keystone.services.find(type='object-store').id,
-                                                                region=config_data['region_name']), v3_str + "url")
+            object_public_url = getattr(
+                keystone.endpoints.find(
+                    service_id=keystone.services.find(
+                        type='object-store').id,
+                    region=config_data['region_name']),
+                v3_str + "url")
 
         config_data['vault_swift_url'] = object_public_url.replace(
             object_public_url.split("/")[-1], 'AUTH_')
@@ -887,11 +1050,16 @@ def _authenticate_with_keystone():
         config_data['rabbit_password'] = TVAULT_SERVICE_PASSWORD
     else:
         if keystone.version == 'v3':
-            wlm_public_url = keystone.endpoints.find(service_id=keystone.services.find(type='workloads').id,
-                                                     region=config_data['region_name'], interface='public').url
+            wlm_public_url = keystone.endpoints.find(
+                service_id=keystone.services.find(
+                    type='workloads').id,
+                region=config_data['region_name'],
+                interface='public').url
         else:
-            wlm_public_url = keystone.endpoints.find(service_id=keystone.services.find(type='workloads').id,
-                                                     region=config_data['region_name']).publicurl
+            wlm_public_url = keystone.endpoints.find(
+                service_id=keystone.services.find(
+                    type='workloads').id,
+                region=config_data['region_name']).publicurl
         parse_result = urlparse(wlm_public_url)
 
         config_data['sql_connection'] = 'mysql://root:' + TVAULT_SERVICE_PASSWORD + \
@@ -980,30 +1148,34 @@ def _register_service():
 
             if keystone.version == 'v3':
                 if wlm_user is None:
-                    wlm_user = keystone.users.create(name=config_data['workloadmgr_user'],
-                                                     password=config_data['workloadmgr_user_password'],
-                                                     email='workloadmgr@trilio.io',
-                                                     domain=config_data['triliovault_user_domain_id'],
-                                                     default_project=config_data['service_tenant_id'],
-                                                     enabled=True)
-                    keystone.roles.grant(role=admin_role.id, user=wlm_user.id,
-                                         project=config_data['service_tenant_id'])
+                    wlm_user = keystone.users.create(
+                        name=config_data['workloadmgr_user'],
+                        password=config_data['workloadmgr_user_password'],
+                        email='workloadmgr@trilio.io',
+                        domain=config_data['triliovault_user_domain_id'],
+                        default_project=config_data['service_tenant_id'],
+                        enabled=True)
+                    keystone.roles.grant(
+                        role=admin_role.id,
+                        user=wlm_user.id,
+                        project=config_data['service_tenant_id'])
                 else:
                     keystone.users.update(
                         wlm_user, password=config_data['workloadmgr_user_password'])
 
             else:
                 if wlm_user is None:
-                    wlm_user = keystone.users.create(config_data['workloadmgr_user'],
-                                                     config_data['workloadmgr_user_password'],
-                                                     'workloadmgr@trilio.io',
-                                                     tenant_id=config_data['service_tenant_id'],
-                                                     enabled=True)
+                    wlm_user = keystone.users.create(
+                        config_data['workloadmgr_user'],
+                        config_data['workloadmgr_user_password'],
+                        'workloadmgr@trilio.io',
+                        tenant_id=config_data['service_tenant_id'],
+                        enabled=True)
                     keystone.roles.add_user_role(
                         wlm_user.id, admin_role.id, config_data['service_tenant_id'])
                 else:
-                    keystone.users.update_password(wlm_user,
-                                                   config_data['workloadmgr_user_password'])
+                    keystone.users.update_password(
+                        wlm_user, config_data['workloadmgr_user_password'])
 
             config_data['cloud_unique_id'] = wlm_user.id
 
@@ -1023,13 +1195,14 @@ def _register_service():
                     keystone.services.delete(service.id)
     # create service and endpoint
     if keystone.version == 'v3':
-        wlm_service = keystone.services.create(name='TrilioVaultWLM',
-                                               type='workloads',
-                                               description='Trilio Vault Workload Manager Service',
-                                               enabled=True)
+        wlm_service = keystone.services.create(
+            name='TrilioVaultWLM',
+            type='workloads',
+            description='Trilio Vault Workload Manager Service',
+            enabled=True)
     else:
-        wlm_service = keystone.services.create('TrilioVaultWLM', 'workloads',
-                                               'Trilio Vault Workload Manager Service')
+        wlm_service = keystone.services.create(
+            'TrilioVaultWLM', 'workloads', 'Trilio Vault Workload Manager Service')
 
     appliance_name = socket.gethostname()
     #wlm_url = 'https://' + config_data['tvault_primary_node'] + ':8780' + '/v1/$(tenant_id)s'
@@ -1099,71 +1272,88 @@ def _register_workloadtypes():
                                       name= 'Hadoop', description = 'Hadoop workload',
                                       id = '09f7b42e-75da-4f77-8c34-0aef60b3d62e')
             """
-        if config_data['configuration_type'] == 'openstack' and workload_type_names['MongoDB'] == True:
+        if config_data['configuration_type'] == 'openstack' and workload_type_names['MongoDB']:
             wlm.workload_types.delete('11b71eeb-8b69-42e2-9862-872ae5b2afce')
 
         if config_data['configuration_type'] == 'vmware' and workload_type_names['MongoDB'] == False:
             # MongoDB
             time.sleep(2)
-            metadata = {'HostUsername': '{"default": "", "display_name": "Username", "required": "True", "type": "string", "tooltip":"Enter database host username", "restore_option": "False", "group_name": "Host Settings", "ordinal":10, "index":1}',
-                        'HostPassword': '{"default": "", "display_name": "Password", "required": "True", "type": "password", "tooltip":"Enter database host password", "restore_option": "False", "group_name": "Host Settings", "ordinal":20, "index":2}',
-                        'HostSSHPort': '{"default": "22", "display_name": "SSH Port", "required": "False", "type": "string", "tooltip":"Enter ssh port number", "restore_option": "False", "group_name": "Host Settings", "ordinal":40, "index":4}',
-                        'DBHost': '{"default": "", "display_name": "Database Host", "required": "True", "type": "string", "tooltip": "Enter the hostname/ipaddress of MongoDB node(For Sharded Cluster: mongos node, for Replica Set: mongod node)", "restore_option": "False", "group_name": "Host Settings", "ordinal":30, "index":3}',
-                        'DBPort': '{"default": "27017", "display_name": "Database Port", "required": "False", "type": "string", "tooltip": "Enter the MongoDB database port(For Sharded Cluster: mongos port, for Replica Set: mongod port)", "restore_option": "False", "group_name": "Database Settings", "ordinal":30, "index":3}',
-                        'DBUser': '{"default": "", "display_name": "Database Username", "required": "False", "type": "string", "tooltip": "MongoDB username if authentication is enabled", "restore_option": "False", "group_name": "Database Settings", "ordinal":10, "index":1}',
-                        'DBPassword': '{"default": "", "display_name": "Database Password", "required": "False", "type": "password", "tooltip": "MongoDB password", "restore_option": "False", "group_name": "Database Settings", "ordinal":20, "index":2}',
-                        'RunAsRoot': '{"default": "True", "display_name": "Run As Root", "required": "False", "type": "boolean", "tooltip": "Runs mongo command as root", "restore_option": "False", "group_name": "Database Settings", "ordinal":40, "index":4}',
-                        'capabilities': 'discover:topology',
-                        'group_ordering': '[{"ordinal": 10, "name": "Host Settings"}, {"ordinal": 20, "name": "Database Settings"}]'}
-            wlm.workload_types.create(metadata=metadata, is_public=True,
-                                      name='MongoDB', description='MongoDB workload',
-                                      id='11b71eeb-8b69-42e2-9862-872ae5b2afce')
+            metadata = {
+                'HostUsername': '{"default": "", "display_name": "Username", "required": "True", "type": "string", "tooltip":"Enter database host username", "restore_option": "False", "group_name": "Host Settings", "ordinal":10, "index":1}',
+                'HostPassword': '{"default": "", "display_name": "Password", "required": "True", "type": "password", "tooltip":"Enter database host password", "restore_option": "False", "group_name": "Host Settings", "ordinal":20, "index":2}',
+                'HostSSHPort': '{"default": "22", "display_name": "SSH Port", "required": "False", "type": "string", "tooltip":"Enter ssh port number", "restore_option": "False", "group_name": "Host Settings", "ordinal":40, "index":4}',
+                'DBHost': '{"default": "", "display_name": "Database Host", "required": "True", "type": "string", "tooltip": "Enter the hostname/ipaddress of MongoDB node(For Sharded Cluster: mongos node, for Replica Set: mongod node)", "restore_option": "False", "group_name": "Host Settings", "ordinal":30, "index":3}',
+                'DBPort': '{"default": "27017", "display_name": "Database Port", "required": "False", "type": "string", "tooltip": "Enter the MongoDB database port(For Sharded Cluster: mongos port, for Replica Set: mongod port)", "restore_option": "False", "group_name": "Database Settings", "ordinal":30, "index":3}',
+                'DBUser': '{"default": "", "display_name": "Database Username", "required": "False", "type": "string", "tooltip": "MongoDB username if authentication is enabled", "restore_option": "False", "group_name": "Database Settings", "ordinal":10, "index":1}',
+                'DBPassword': '{"default": "", "display_name": "Database Password", "required": "False", "type": "password", "tooltip": "MongoDB password", "restore_option": "False", "group_name": "Database Settings", "ordinal":20, "index":2}',
+                'RunAsRoot': '{"default": "True", "display_name": "Run As Root", "required": "False", "type": "boolean", "tooltip": "Runs mongo command as root", "restore_option": "False", "group_name": "Database Settings", "ordinal":40, "index":4}',
+                'capabilities': 'discover:topology',
+                'group_ordering': '[{"ordinal": 10, "name": "Host Settings"}, {"ordinal": 20, "name": "Database Settings"}]'}
+            wlm.workload_types.create(
+                metadata=metadata,
+                is_public=True,
+                name='MongoDB',
+                description='MongoDB workload',
+                id='11b71eeb-8b69-42e2-9862-872ae5b2afce')
 
-        if config_data['configuration_type'] == 'openstack' and workload_type_names['Cassandra'] == True:
+        if config_data['configuration_type'] == 'openstack' and workload_type_names['Cassandra']:
             wlm.workload_types.delete('2c1f45ec-e53b-49cd-b554-228404ece244')
 
         if config_data['configuration_type'] == 'vmware' and workload_type_names['Cassandra'] == False:
             # Cassandra
             time.sleep(2)
-            metadata = {'CassandraNode': '{"default": "", "display_name": "Database Host", "required": "True", "type": "string", "tooltip": "Enter the ipaddress of a Cassandra node", "restore_option": "False", "group_name": "Host Settings", "index":3}',
-                        'SSHPort': '{"default": "22", "display_name": "SSH Port", "required": "False", "type": "string", "tooltip":"Enter ssh port number", "restore_option": "False", "group_name": "Host Settings", "index":4}',
-                        'Username': '{"default": "", "display_name": "Username", "required": "True", "type": "string", "tooltip":"Enter database host username", "restore_option": "False", "group_name": "Host Settings", "index":1}',
-                        'Password': '{"default": "", "display_name": "Password", "required": "True", "type": "password", "tooltip":"Enter database host password", "restore_option": "False", "group_name": "Host Settings", "index":2}',
-                        'IPAddress': '{"default": "192.168.1.160", "display_name": "IP Address", "required": "True", "type": "string", "tooltip":"Enter ip address for restored VM", "restore_option": "True", "per_vm": "True", "group_name": "Cassandra Restore Options", "index":2}',
-                        'Nodename': '{"default": "Cassandra1-Restored", "display_name": "Hostname", "required": "True", "type": "string", "tooltip":"Enter separated hostname for restored VM", "restore_option": "True", "per_vm": "True", "group_name": "Cassandra Restore Options", "index":3}',
-                        'Netmask': '{"default": "255.255.255.0", "display_name": "Netmask", "required": "True", "type": "string", "tooltip":"Netmask for IP addresses", "restore_option": "True", "group_name": "Cassandra Restore Options", "index":4}',
-                        'Broadcast': '{"default": "192.168.1.255", "display_name": "Broadcast", "required": "True", "type": "string", "tooltip":"Broadcast address for new IP subnet", "restore_option": "True", "group_name": "Cassandra Restore Options", "index":6}',
-                        'Gateway': '{"default": "192.168.1.1", "display_name": "Gateway", "required": "True", "type": "string", "tooltip":"Gateway address for new IP addresses", "restore_option": "True", "group_name": "Cassandra Restore Options", "index":5}',
-                        'capabilities': 'discover:topology',
-                        'group_ordering': '[{"ordinal": 10, "name": "Host Settings"}, {"ordinal": 20, "Optional": "True", "name": "Cassandra Restore Options"}]'}
-            wlm.workload_types.create(metadata=metadata, is_public=True,
-                                      name='Cassandra', description='Cassandra workload',
-                                      id='2c1f45ec-e53b-49cd-b554-228404ece244')
+            metadata = {
+                'CassandraNode': '{"default": "", "display_name": "Database Host", "required": "True", "type": "string", "tooltip": "Enter the ipaddress of a Cassandra node", "restore_option": "False", "group_name": "Host Settings", "index":3}',
+                'SSHPort': '{"default": "22", "display_name": "SSH Port", "required": "False", "type": "string", "tooltip":"Enter ssh port number", "restore_option": "False", "group_name": "Host Settings", "index":4}',
+                'Username': '{"default": "", "display_name": "Username", "required": "True", "type": "string", "tooltip":"Enter database host username", "restore_option": "False", "group_name": "Host Settings", "index":1}',
+                'Password': '{"default": "", "display_name": "Password", "required": "True", "type": "password", "tooltip":"Enter database host password", "restore_option": "False", "group_name": "Host Settings", "index":2}',
+                'IPAddress': '{"default": "192.168.1.160", "display_name": "IP Address", "required": "True", "type": "string", "tooltip":"Enter ip address for restored VM", "restore_option": "True", "per_vm": "True", "group_name": "Cassandra Restore Options", "index":2}',
+                'Nodename': '{"default": "Cassandra1-Restored", "display_name": "Hostname", "required": "True", "type": "string", "tooltip":"Enter separated hostname for restored VM", "restore_option": "True", "per_vm": "True", "group_name": "Cassandra Restore Options", "index":3}',
+                'Netmask': '{"default": "255.255.255.0", "display_name": "Netmask", "required": "True", "type": "string", "tooltip":"Netmask for IP addresses", "restore_option": "True", "group_name": "Cassandra Restore Options", "index":4}',
+                'Broadcast': '{"default": "192.168.1.255", "display_name": "Broadcast", "required": "True", "type": "string", "tooltip":"Broadcast address for new IP subnet", "restore_option": "True", "group_name": "Cassandra Restore Options", "index":6}',
+                'Gateway': '{"default": "192.168.1.1", "display_name": "Gateway", "required": "True", "type": "string", "tooltip":"Gateway address for new IP addresses", "restore_option": "True", "group_name": "Cassandra Restore Options", "index":5}',
+                'capabilities': 'discover:topology',
+                'group_ordering': '[{"ordinal": 10, "name": "Host Settings"}, {"ordinal": 20, "Optional": "True", "name": "Cassandra Restore Options"}]'}
+            wlm.workload_types.create(
+                metadata=metadata,
+                is_public=True,
+                name='Cassandra',
+                description='Cassandra workload',
+                id='2c1f45ec-e53b-49cd-b554-228404ece244')
 
         if workload_type_names['Serial'] == False:
             # Serial
             time.sleep(2)
-            wlm.workload_types.create(metadata={}, is_public=True,
-                                      name='Serial', description='Serial workload that snapshots VM in the specified order',
-                                      id='f82ce76f-17fe-438b-aa37-7a023058e50d')
+            wlm.workload_types.create(
+                metadata={},
+                is_public=True,
+                name='Serial',
+                description='Serial workload that snapshots VM in the specified order',
+                id='f82ce76f-17fe-438b-aa37-7a023058e50d')
 
         if workload_type_names['Parallel'] == False:
             # Parallel
             time.sleep(2)
-            wlm.workload_types.create(metadata={}, is_public=True,
-                                      name='Parallel', description='Parallel workload that snapshots all VMs in parallel',
-                                      id='2ddd528d-c9b4-4d7e-8722-cc395140255a')
+            wlm.workload_types.create(
+                metadata={},
+                is_public=True,
+                name='Parallel',
+                description='Parallel workload that snapshots all VMs in parallel',
+                id='2ddd528d-c9b4-4d7e-8722-cc395140255a')
 
-        if config_data['configuration_type'] == 'openstack' and workload_type_names['Composite'] == True:
+        if config_data['configuration_type'] == 'openstack' and workload_type_names['Composite']:
             wlm.workload_types.delete('54947065-2a59-494a-ab64-b6501c139a82')
 
         if config_data['configuration_type'] == 'vmware' and workload_type_names['Composite'] == False:
             # Composite
             time.sleep(2)
             metadata = {'capabilities': 'workloads', 'workloadgraph': 'string'}
-            wlm.workload_types.create(metadata=metadata, is_public=True,
-                                      name='Composite', description='A workload that consists of other workloads',
-                                      id='54947065-2a59-494a-ab64-b6501c139a82')
+            wlm.workload_types.create(
+                metadata=metadata,
+                is_public=True,
+                name='Composite',
+                description='A workload that consists of other workloads',
+                id='54947065-2a59-494a-ab64-b6501c139a82')
 
     if config_data['configuration_type'] == 'openstack':
         config_data['config_status'] = 'success'
@@ -1265,12 +1455,27 @@ def configure_keystone():
 
     if config_data['nodetype'] == 'controller' and config_data['configuration_type'] == 'vmware':
         # configure keystone
-        replace_line('/etc/keystone/keystone.conf', 'admin_endpoint = ', 'admin_endpoint = ' +
-                     "http://" + config_data['tvault_primary_node'] + ":%(admin_port)s/")
-        replace_line('/etc/keystone/keystone.conf', 'public_endpoint = ', 'public_endpoint = ' +
-                     "http://" + config_data['tvault_primary_node'] + ":%(public_port)s/")
-        replace_line('/etc/keystone/keystone.conf', 'connection = ', 'connection = ' +
-                     "mysql://root:52T8FVYZJse@" + config_data['tvault_primary_node'] + "/keystone?charset=utf8")
+        replace_line(
+            '/etc/keystone/keystone.conf',
+            'admin_endpoint = ',
+            'admin_endpoint = ' +
+            "http://" +
+            config_data['tvault_primary_node'] +
+            ":%(admin_port)s/")
+        replace_line(
+            '/etc/keystone/keystone.conf',
+            'public_endpoint = ',
+            'public_endpoint = ' +
+            "http://" +
+            config_data['tvault_primary_node'] +
+            ":%(public_port)s/")
+        replace_line(
+            '/etc/keystone/keystone.conf',
+            'connection = ',
+            'connection = ' +
+            "mysql://root:52T8FVYZJse@" +
+            config_data['tvault_primary_node'] +
+            "/keystone?charset=utf8")
         replace_line(
             '/etc/keystone/keystone.conf',
             'log_dir = ',
@@ -1342,9 +1547,10 @@ def configure_keystone():
         subprocess.call(command, shell=False)
         time.sleep(8)
         try:
-            keystone = ksclient.Client(endpoint=config_data['keystone_admin_url'],
-                                       insecure=True,
-                                       token='52T8FVYZJse')
+            keystone = ksclient.Client(
+                endpoint=config_data['keystone_admin_url'],
+                insecure=True,
+                token='52T8FVYZJse')
             # username=config_data['admin_username'],
             # password=config_data['admin_password'],
             # tenant_name=config_data['admin_tenant_name'])
@@ -1384,8 +1590,12 @@ def configure_keystone():
 
             user_id = _get_user_id_from_name(config_data['vcenter_username'])
             if user_id is None:
-                keystone.users.create(config_data['vcenter_username'], config_data['vcenter_password'],
-                                      email=None, tenant_id=admin_tenant_id, enabled=True)
+                keystone.users.create(
+                    config_data['vcenter_username'],
+                    config_data['vcenter_password'],
+                    email=None,
+                    tenant_id=admin_tenant_id,
+                    enabled=True)
                 user_id = _get_user_id_from_name(
                     config_data['vcenter_username'])
 
@@ -1414,15 +1624,24 @@ def configure_keystone():
 def configure_nova():
     if config_data['nodetype'] == 'controller' and config_data['configuration_type'] == 'vmware':
         # configure nova
-        replace_line('/etc/nova/nova.conf', 'neutron_url = ', 'neutron_url = ' +
-                     "http://" + config_data['tvault_primary_node'] + ":9696")
+        replace_line(
+            '/etc/nova/nova.conf',
+            'neutron_url = ',
+            'neutron_url = ' +
+            "http://" +
+            config_data['tvault_primary_node'] +
+            ":9696")
         replace_line(
             '/etc/nova/nova.conf',
             'neutron_admin_auth_url = ',
             'neutron_admin_auth_url = ' +
             config_data['keystone_admin_url'])
-        replace_line('/etc/nova/nova.conf', 'glance_api_servers = ', 'glance_api_servers = ' +
-                     config_data['tvault_primary_node'] + ":9292")
+        replace_line(
+            '/etc/nova/nova.conf',
+            'glance_api_servers = ',
+            'glance_api_servers = ' +
+            config_data['tvault_primary_node'] +
+            ":9292")
         replace_line(
             '/etc/nova/nova.conf',
             'rabbit_host = ',
@@ -1443,12 +1662,27 @@ def configure_nova():
             'vncserver_listen = ',
             'vncserver_listen = ' +
             config_data['tvault_primary_node'])
-        replace_line('/etc/nova/nova.conf', 'xvpvncproxy_base_url = ', 'xvpvncproxy_base_url = ' +
-                     "http://" + config_data['tvault_primary_node'] + ":6081/console")
-        replace_line('/etc/nova/nova.conf', 'novncproxy_base_url = ', 'novncproxy_base_url = ' +
-                     "http://" + config_data['tvault_primary_node'] + ":6080/vnc_auto.html")
-        replace_line('/etc/nova/nova.conf', 'sql_connection = ', 'sql_connection = ' +
-                     "mysql://root:52T8FVYZJse@" + config_data['tvault_primary_node'] + "/nova?charset=utf8")
+        replace_line(
+            '/etc/nova/nova.conf',
+            'xvpvncproxy_base_url = ',
+            'xvpvncproxy_base_url = ' +
+            "http://" +
+            config_data['tvault_primary_node'] +
+            ":6081/console")
+        replace_line(
+            '/etc/nova/nova.conf',
+            'novncproxy_base_url = ',
+            'novncproxy_base_url = ' +
+            "http://" +
+            config_data['tvault_primary_node'] +
+            ":6080/vnc_auto.html")
+        replace_line(
+            '/etc/nova/nova.conf',
+            'sql_connection = ',
+            'sql_connection = ' +
+            "mysql://root:52T8FVYZJse@" +
+            config_data['tvault_primary_node'] +
+            "/nova?charset=utf8")
         replace_line(
             '/etc/nova/nova.conf',
             'my_ip = ',
@@ -1464,8 +1698,13 @@ def configure_nova():
             'auth_host = ',
             'auth_host = ' +
             config_data['tvault_primary_node'])
-        replace_line('/etc/nova/nova.conf', 'html5proxy_base_url = ', 'html5proxy_base_url = ' +
-                     "http://" + config_data['tvault_primary_node'] + ":6082/spice_auto.html")
+        replace_line(
+            '/etc/nova/nova.conf',
+            'html5proxy_base_url = ',
+            'html5proxy_base_url = ' +
+            "http://" +
+            config_data['tvault_primary_node'] +
+            ":6082/spice_auto.html")
         replace_line(
             '/etc/nova/nova.conf',
             'log_dir = ',
@@ -1558,11 +1797,12 @@ def configure_nova():
         subprocess.call(command, shell=False)
 
         try:
-            keystone = ksclient.Client(auth_url=config_data['keystone_admin_url'],
-                                       insecure=True,
-                                       username=config_data['admin_username'],
-                                       password=config_data['admin_password'],
-                                       tenant_name=config_data['admin_tenant_name'])
+            keystone = ksclient.Client(
+                auth_url=config_data['keystone_admin_url'],
+                insecure=True,
+                username=config_data['admin_username'],
+                password=config_data['admin_password'],
+                tenant_name=config_data['admin_tenant_name'])
             # delete orphan nova services
             services = keystone.services.list()
             endpoints = keystone.endpoints.list()
@@ -1699,8 +1939,13 @@ def configure_neutron():
             'auth_url = ' +
             config_data['keystone_public_url'])
 
-        replace_line('/etc/neutron/plugins/ml2/ml2_conf.ini', 'connection = ', 'connection = ' +
-                     "mysql://root:52T8FVYZJse@" + config_data['tvault_primary_node'] + "/neutron_ml2?charset=utf8")
+        replace_line(
+            '/etc/neutron/plugins/ml2/ml2_conf.ini',
+            'connection = ',
+            'connection = ' +
+            "mysql://root:52T8FVYZJse@" +
+            config_data['tvault_primary_node'] +
+            "/neutron_ml2?charset=utf8")
         replace_line(
             '/etc/neutron/plugins/ml2/ml2_conf.ini',
             'local_ip = ',
@@ -1776,11 +2021,12 @@ def configure_neutron():
         subprocess.call(command, shell=False)
 
         try:
-            keystone = ksclient.Client(auth_url=config_data['keystone_admin_url'],
-                                       insecure=True,
-                                       username=config_data['admin_username'],
-                                       password=config_data['admin_password'],
-                                       tenant_name=config_data['admin_tenant_name'])
+            keystone = ksclient.Client(
+                auth_url=config_data['keystone_admin_url'],
+                insecure=True,
+                username=config_data['admin_username'],
+                password=config_data['admin_password'],
+                tenant_name=config_data['admin_tenant_name'])
             # delete orphan neutron services
             services = keystone.services.list()
             endpoints = keystone.endpoints.list()
@@ -1857,15 +2103,25 @@ def configure_neutron():
 def configure_glance():
     if config_data['nodetype'] == 'controller' and config_data['configuration_type'] == 'vmware':
         # configure glance
-        replace_line('/etc/glance/glance-api.conf', 'sql_connection = ', 'sql_connection = ' +
-                     "mysql://root:52T8FVYZJse@" + config_data['tvault_primary_node'] + "/glance?charset=utf8")
+        replace_line(
+            '/etc/glance/glance-api.conf',
+            'sql_connection = ',
+            'sql_connection = ' +
+            "mysql://root:52T8FVYZJse@" +
+            config_data['tvault_primary_node'] +
+            "/glance?charset=utf8")
         replace_line(
             '/etc/glance/glance-api.conf',
             'rabbit_host = ',
             'rabbit_host = ' +
             config_data['tvault_primary_node'])
-        replace_line('/etc/glance/glance-api.conf', 'auth_uri = ', 'auth_uri = ' +
-                     "http://" + config_data['tvault_primary_node'] + ":5000/")
+        replace_line(
+            '/etc/glance/glance-api.conf',
+            'auth_uri = ',
+            'auth_uri = ' +
+            "http://" +
+            config_data['tvault_primary_node'] +
+            ":5000/")
         replace_line(
             '/etc/glance/glance-api.conf',
             'auth_host = ',
@@ -1878,10 +2134,20 @@ def configure_glance():
             'auth_url = ' +
             config_data['keystone_admin_url'])
 
-        replace_line('/etc/glance/glance-registry.conf', 'sql_connection = ', 'sql_connection = ' +
-                     "mysql://root:52T8FVYZJse@" + config_data['tvault_primary_node'] + "/glance?charset=utf8")
-        replace_line('/etc/glance/glance-registry.conf', 'auth_uri = ', 'auth_uri = ' +
-                     "http://" + config_data['tvault_primary_node'] + ":5000/")
+        replace_line(
+            '/etc/glance/glance-registry.conf',
+            'sql_connection = ',
+            'sql_connection = ' +
+            "mysql://root:52T8FVYZJse@" +
+            config_data['tvault_primary_node'] +
+            "/glance?charset=utf8")
+        replace_line(
+            '/etc/glance/glance-registry.conf',
+            'auth_uri = ',
+            'auth_uri = ' +
+            "http://" +
+            config_data['tvault_primary_node'] +
+            ":5000/")
         replace_line(
             '/etc/glance/glance-registry.conf',
             'auth_host = ',
@@ -1935,11 +2201,12 @@ def configure_glance():
         subprocess.call(command, shell=False)
 
         try:
-            keystone = ksclient.Client(auth_url=config_data['keystone_admin_url'],
-                                       insecure=True,
-                                       username=config_data['admin_username'],
-                                       password=config_data['admin_password'],
-                                       tenant_name=config_data['admin_tenant_name'])
+            keystone = ksclient.Client(
+                auth_url=config_data['keystone_admin_url'],
+                insecure=True,
+                username=config_data['admin_username'],
+                password=config_data['admin_password'],
+                tenant_name=config_data['admin_tenant_name'])
             # delete orphan glance services
             services = keystone.services.list()
             endpoints = keystone.endpoints.list()
@@ -1991,16 +2258,30 @@ def configure_horizon():
     if config_data['nodetype'] == 'controller':
         # configure horizon
         if config_data['configuration_type'] == 'vmware':
-            replace_line('/opt/stack/horizon/openstack_dashboard/local/local_settings.py',
-                         'OPENSTACK_HOST = ', 'OPENSTACK_HOST = ' + '"' + config_data['tvault_primary_node'] + '"')
+            replace_line(
+                '/opt/stack/horizon/openstack_dashboard/local/local_settings.py',
+                'OPENSTACK_HOST = ',
+                'OPENSTACK_HOST = ' +
+                '"' +
+                config_data['tvault_primary_node'] +
+                '"')
         elif config_data['configuration_type'] == 'openstack':
-            replace_line('/opt/stack/horizon/openstack_dashboard/local/local_settings.py',
-                         'OPENSTACK_HOST = ', 'OPENSTACK_HOST = ' + '"' + config_data['keystone_host'] + '"')
+            replace_line(
+                '/opt/stack/horizon/openstack_dashboard/local/local_settings.py',
+                'OPENSTACK_HOST = ',
+                'OPENSTACK_HOST = ' +
+                '"' +
+                config_data['keystone_host'] +
+                '"')
             if 'https' in config_data['keystone_public_url']:
-                replace_line('/opt/stack/horizon/openstack_dashboard/local/local_settings.py',
-                             'OPENSTACK_KEYSTONE_URL = ', 'OPENSTACK_KEYSTONE_URL = "https://%s:5000/v2.0" % OPENSTACK_HOST')
-                replace_line('/opt/stack/horizon/openstack_dashboard/local/local_settings.py',
-                             'OPENSTACK_SSL_NO_VERIFY = ', 'OPENSTACK_SSL_NO_VERIFY = True')
+                replace_line(
+                    '/opt/stack/horizon/openstack_dashboard/local/local_settings.py',
+                    'OPENSTACK_KEYSTONE_URL = ',
+                    'OPENSTACK_KEYSTONE_URL = "https://%s:5000/v2.0" % OPENSTACK_HOST')
+                replace_line(
+                    '/opt/stack/horizon/openstack_dashboard/local/local_settings.py',
+                    'OPENSTACK_SSL_NO_VERIFY = ',
+                    'OPENSTACK_SSL_NO_VERIFY = True')
 
         command = ['sudo', 'rm', "/etc/init/apache2.override"]
         subprocess.call(command, shell=False)
@@ -2009,13 +2290,22 @@ def configure_horizon():
         subprocess.call(command, shell=False)
     else:
         if config_data['configuration_type'] == 'openstack':
-            replace_line('/opt/stack/horizon/openstack_dashboard/local/local_settings.py',
-                         'OPENSTACK_HOST = ', 'OPENSTACK_HOST = ' + '"' + config_data['keystone_host'] + '"')
+            replace_line(
+                '/opt/stack/horizon/openstack_dashboard/local/local_settings.py',
+                'OPENSTACK_HOST = ',
+                'OPENSTACK_HOST = ' +
+                '"' +
+                config_data['keystone_host'] +
+                '"')
             if 'https' in config_data['keystone_public_url']:
-                replace_line('/opt/stack/horizon/openstack_dashboard/local/local_settings.py',
-                             'OPENSTACK_KEYSTONE_URL = ', 'OPENSTACK_KEYSTONE_URL = "https://%s:5000/v2.0" % OPENSTACK_HOST')
-                replace_line('/opt/stack/horizon/openstack_dashboard/local/local_settings.py',
-                             'OPENSTACK_SSL_NO_VERIFY = ', 'OPENSTACK_SSL_NO_VERIFY = True')
+                replace_line(
+                    '/opt/stack/horizon/openstack_dashboard/local/local_settings.py',
+                    'OPENSTACK_KEYSTONE_URL = ',
+                    'OPENSTACK_KEYSTONE_URL = "https://%s:5000/v2.0" % OPENSTACK_HOST')
+                replace_line(
+                    '/opt/stack/horizon/openstack_dashboard/local/local_settings.py',
+                    'OPENSTACK_SSL_NO_VERIFY = ',
+                    'OPENSTACK_SSL_NO_VERIFY = True')
 
             command = ['sudo', 'rm', "/etc/init/apache2.override"]
             subprocess.call(command, shell=False)
@@ -2248,10 +2538,11 @@ def troubleshooting_vmware():
                 "VirtualMachine",
                 "rootSnapshot")
             if rootsnapshot:
-                remove_snapshot_task = session._call_method(session._get_vim(),
-                                                            "RemoveSnapshot_Task",
-                                                            rootsnapshot[0][0],
-                                                            removeChildren=True)
+                remove_snapshot_task = session._call_method(
+                    session._get_vim(),
+                    "RemoveSnapshot_Task",
+                    rootsnapshot[0][0],
+                    removeChildren=True)
                 session._wait_for_task("12345", remove_snapshot_task)
                 output = output + '\n' + 'Removed previous snapshots for ' + vm_name
 
@@ -2324,7 +2615,7 @@ def configure_form():
 @bottle.view('configure_form_vmware')
 @authorize()
 def configure_form_vmware():
-    if not 'error_message' in bottle.request.environ['beaker.session']:
+    if 'error_message' not in bottle.request.environ['beaker.session']:
         bottle.request.environ['beaker.session']['error_message'] = ''
     Config = ConfigParser.RawConfigParser()
     Config.read('/etc/tvault-config/tvault-config.conf')
@@ -2354,7 +2645,7 @@ def configure_form_vmware():
 @bottle.view('configure_form_openstack')
 @authorize()
 def configure_form_openstack():
-    if not 'error_message' in bottle.request.environ['beaker.session']:
+    if 'error_message' not in bottle.request.environ['beaker.session']:
         bottle.request.environ['beaker.session']['error_message'] = ''
     Config = ConfigParser.RawConfigParser()
     Config.read('/etc/tvault-config/tvault-config.conf')
@@ -2444,8 +2735,8 @@ def configure_host():
             '@' + config_data['floating_ipaddress'] + \
             '/workloadmgr?charset=utf8'
         engine = create_engine(config_data['sql_connection'])
-        update = models.Service.__table__.update().where(models.Service.__table__.columns.host == prev_hostname).\
-            values({'host': socket.gethostname()})
+        update = models.Service.__table__.update().where(models.Service.__table__.columns.host ==
+                                                         prev_hostname). values({'host': socket.gethostname()})
         engine.execute(update)
 
         if len(config_data['name_server']):
@@ -2473,8 +2764,12 @@ def configure_host():
             subprocess.call(command, shell=False)
             try:
                 # dhcp
-                replace_line('/etc/dhcp/dhclient.conf', 'prepend domain-name-servers ',
-                             'prepend domain-name-servers ' + config_data['name_server'] + ';')
+                replace_line(
+                    '/etc/dhcp/dhclient.conf',
+                    'prepend domain-name-servers ',
+                    'prepend domain-name-servers ' +
+                    config_data['name_server'] +
+                    ';')
                 command = ['sudo', 'dhclient']
                 subprocess.call(command, shell=False)
             except BaseException:
@@ -3118,10 +3413,12 @@ def configure_service():
         replace_line('/etc/workloadmgr/workloadmgr.conf', 'auth_uri = ',
                      'auth_uri = ' + config_data['keystone_public_url'],
                      starts_with=True)
-        replace_line('/etc/workloadmgr/workloadmgr.conf', 'admin_tenant_name = ',
-                     'admin_tenant_name = ' +
-                     config_data['service_tenant_name'],
-                     starts_with=True)
+        replace_line(
+            '/etc/workloadmgr/workloadmgr.conf',
+            'admin_tenant_name = ',
+            'admin_tenant_name = ' +
+            config_data['service_tenant_name'],
+            starts_with=True)
         replace_line('/etc/workloadmgr/workloadmgr.conf', 'trustee_role = ',
                      'trustee_role = ' +
                      config_data.get('trustee_role', '_member_'),
@@ -3131,10 +3428,16 @@ def configure_service():
                      starts_with=True)
 
         if config_data.get('enable_tls', 'off') == 'off':
-            replace_line('/etc/workloadmgr/workloadmgr.conf', 'ssl_cert_file = ',
-                         'ssl_cert_file = ', starts_with=True)
-            replace_line('/etc/workloadmgr/workloadmgr.conf', 'ssl_key_file = ',
-                         'ssl_key_file = ', starts_with=True)
+            replace_line(
+                '/etc/workloadmgr/workloadmgr.conf',
+                'ssl_cert_file = ',
+                'ssl_cert_file = ',
+                starts_with=True)
+            replace_line(
+                '/etc/workloadmgr/workloadmgr.conf',
+                'ssl_key_file = ',
+                'ssl_key_file = ',
+                starts_with=True)
         else:
             try:
                 os.mkdir('/opt/stack/data/cert')
@@ -3147,38 +3450,51 @@ def configure_service():
             with open('/opt/stack/data/cert/workloadmgr.key', 'w') as f:
                 f.write(config_data['privatekey'])
 
-            replace_line('/etc/workloadmgr/workloadmgr.conf', 'ssl_cert_file = ',
-                         'ssl_cert_file = /opt/stack/data/cert/workloadmgr.cert',
-                         starts_with=True)
-            replace_line('/etc/workloadmgr/workloadmgr.conf', 'ssl_key_file = ',
-                         'ssl_key_file = /opt/stack/data/cert/workloadmgr.key',
-                         starts_with=True)
+            replace_line(
+                '/etc/workloadmgr/workloadmgr.conf',
+                'ssl_cert_file = ',
+                'ssl_cert_file = /opt/stack/data/cert/workloadmgr.cert',
+                starts_with=True)
+            replace_line(
+                '/etc/workloadmgr/workloadmgr.conf',
+                'ssl_key_file = ',
+                'ssl_key_file = /opt/stack/data/cert/workloadmgr.key',
+                starts_with=True)
 
-        replace_line('/etc/workloadmgr/workloadmgr.conf', 'region_name_for_services = ',
-                     'region_name_for_services = ' +
-                     config_data.get('region_name', 'RegionOne'),
-                     starts_with=True)
+        replace_line(
+            '/etc/workloadmgr/workloadmgr.conf',
+            'region_name_for_services = ',
+            'region_name_for_services = ' +
+            config_data.get(
+                'region_name',
+                'RegionOne'),
+            starts_with=True)
         replace_line('/etc/workloadmgr/workloadmgr.conf', 'domain_name = ',
                      'domain_name = ' + config_data.get('domain_name'),
                      starts_with=True)
-        replace_line('/etc/workloadmgr/workloadmgr.conf', 'triliovault_user_domain_id = ',
-                     'triliovault_user_domain_id = ' +
-                     config_data['triliovault_user_domain_id'],
-                     starts_with=True)
+        replace_line(
+            '/etc/workloadmgr/workloadmgr.conf',
+            'triliovault_user_domain_id = ',
+            'triliovault_user_domain_id = ' +
+            config_data['triliovault_user_domain_id'],
+            starts_with=True)
         replace_line('/etc/workloadmgr/workloadmgr.conf', 'user_domain_id = ',
                      'user_domain_id = ' +
                      config_data['triliovault_user_domain_id'],
                      starts_with=True)
-        replace_line('/etc/workloadmgr/workloadmgr.conf', 'project_domain_id = ',
-                     'project_domain_id = ' +
-                     config_data['service_tenant_domain_id'],
-                     starts_with=True)
+        replace_line(
+            '/etc/workloadmgr/workloadmgr.conf',
+            'project_domain_id = ',
+            'project_domain_id = ' +
+            config_data['service_tenant_domain_id'],
+            starts_with=True)
 
         replace_line('/etc/workloadmgr/workloadmgr.conf', 'endpoint_type = ',
                      'endpoint_type = ' + config_data['endpoint_type'],
                      starts_with=True)
 
-        replace_line('/etc/workloadmgr/workloadmgr.conf', 'keystone_auth_version = ',
+        replace_line('/etc/workloadmgr/workloadmgr.conf',
+                     'keystone_auth_version = ',
                      'keystone_auth_version = ' +
                      str(config_data['keystone_auth_version']),
                      starts_with=True)
@@ -3401,11 +3717,12 @@ def discover_vcenter():
     try:
         if config_data['nodetype'] == 'controller':
             time.sleep(5)
-            client = nova.novaclient2(config_data['keystone_public_url'],
-                                      config_data['admin_username'],
-                                      config_data['admin_password'],
-                                      config_data['admin_tenant_name'],
-                                      config_data['nova_production_endpoint_template'])
+            client = nova.novaclient2(
+                config_data['keystone_public_url'],
+                config_data['admin_username'],
+                config_data['admin_password'],
+                config_data['admin_tenant_name'],
+                config_data['nova_production_endpoint_template'])
             search_opts = {}
             search_opts['deep_discover'] = '1'
             client.servers.list(True, search_opts)
@@ -3437,18 +3754,21 @@ def persist_config():
                     row_dict = dict(persisted_setting.items())
                     k1 = row_dict.get("name", None)
                     if k1 == key:
-                        update = models.Settings.__table__.update().where(models.Settings.__table__.columns.name == key).\
-                            values({'value': value})
+                        update = models.Settings.__table__.update().where(
+                            models.Settings.__table__.columns.name == key). values({'value': value})
                         engine.execute(update)
                         name_found = True
                         break
-                if name_found == False:
-                    result = engine.execute(models.Settings.__table__.insert().values({'name': key,
-                                                                                       'value': value,
-                                                                                       'user_id': 'Configurator',
-                                                                                       'project_id': 'Configurator',
-                                                                                       'status': 'available',
-                                                                                       'hidden': True}))
+                if not name_found:
+                    result = engine.execute(
+                        models.Settings.__table__.insert().values(
+                            {
+                                'name': key,
+                                'value': value,
+                                'user_id': 'Configurator',
+                                'project_id': 'Configurator',
+                                'status': 'available',
+                                'hidden': True}))
 
         if not os.path.exists('/etc/tvault-config/'):
             os.makedirs('/etc/tvault-config/')
@@ -3808,9 +4128,9 @@ def configure():
 @bottle.view('home')
 @authorize()
 def home():
-    if not 'error_message' in bottle.request.environ['beaker.session']:
+    if 'error_message' not in bottle.request.environ['beaker.session']:
         bottle.request.environ['beaker.session']['error_message'] = ''
-    if not 'success_message' in bottle.request.environ['beaker.session']:
+    if 'success_message' not in bottle.request.environ['beaker.session']:
         bottle.request.environ['beaker.session']['success_message'] = ''
 
     msgs = dict(
@@ -3997,11 +4317,15 @@ def validate_nfs_share():
                 mounts = utils.execute(
                     "showmount", "-e", "--no-headers", nfsserver)
                 if sharepath not in mounts[0]:
-                    return bottle.HTTPResponse(status=500,
-                                               body=str("'%s' is not found in %s export list" % (nfsshare, nfsserver)))
+                    return bottle.HTTPResponse(
+                        status=500, body=str(
+                            "'%s' is not found in %s export list" %
+                            (nfsshare, nfsserver)))
                 return {'status': 'Success'}
-        return bottle.HTTPResponse(status=500,
-                                   body=str("NFS Daemon is not running on the server '%s'" % nfsserver))
+        return bottle.HTTPResponse(
+            status=500, body=str(
+                "NFS Daemon is not running on the server '%s'" %
+                nfsserver))
 
     except Exception as exception:
         body = str("NFS Daemon is not running on the server '%s'" % nfsserver)

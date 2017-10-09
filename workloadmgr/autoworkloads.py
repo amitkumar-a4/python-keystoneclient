@@ -61,10 +61,11 @@ def get_instances(tenant_name):
         NOVA_SECTION,
         'nova_production_endpoint_template',
         project_ids)
-    cs = nova.novaclient2(get_config_value(NOVA_SECTION, 'nova_admin_auth_url'),
-                          get_config_value(
-        NOVA_SECTION, 'nova_admin_username'),
-        get_config_value(NOVA_SECTION, 'nova_admin_password'), tenant_name, url)
+    cs = nova.novaclient2(
+        get_config_value(
+            NOVA_SECTION, 'nova_admin_auth_url'), get_config_value(
+            NOVA_SECTION, 'nova_admin_username'), get_config_value(
+                NOVA_SECTION, 'nova_admin_password'), tenant_name, url)
     return cs.servers.list()
 
 
@@ -95,12 +96,26 @@ def get_token(tenant_name=None):
     try:
         url = get_config_value(NOVA_SECTION, 'nova_admin_auth_url') + '/tokens'
         if tenant_name is None:
-            values = {"auth": {"passwordCredentials": {"username": get_config_value(NOVA_SECTION,
-                                                                                    'nova_admin_username'), "password": get_config_value(NOVA_SECTION, 'nova_admin_password')}}}
+            values = {
+                "auth": {
+                    "passwordCredentials": {
+                        "username": get_config_value(
+                            NOVA_SECTION,
+                            'nova_admin_username'),
+                        "password": get_config_value(
+                            NOVA_SECTION,
+                            'nova_admin_password')}}}
         else:
-            values = {"auth": {"tenantName": tenant_name, "passwordCredentials":
-                               {"username": get_config_value(NOVA_SECTION, 'nova_admin_username'),
-                                "password": get_config_value(NOVA_SECTION, 'nova_admin_password')}}}
+            values = {
+                "auth": {
+                    "tenantName": tenant_name,
+                    "passwordCredentials": {
+                        "username": get_config_value(
+                            NOVA_SECTION,
+                            'nova_admin_username'),
+                        "password": get_config_value(
+                            NOVA_SECTION,
+                            'nova_admin_password')}}}
         headers = {'Content-Type': 'application/json'}
         data = json.loads(execute_post(url, values, headers))
 
@@ -123,20 +138,22 @@ def create_workload(inst, instance_name, tenant_name):
     stime = dobj.strftime(time_format)
     sdate = dobj.strftime(date_format)
     try:
-        workload_payload = {'name': instance_name,
-                            'workload_type_id': 'f82ce76f-17fe-438b-aa37-7a023058e50d',
-                            'description': 'New Workload from automated workload script',
-                            'source_platform': 'openstack',
-                            'instances': inst,
-                            'jobschedule': {'end_date': 'No End',
-                                            'start_time': stime,
-                                            'interval': '24hr',
-                                            'enabled': True,
-                                            'retain_value': 30,
-                                            'retain_type': '0',
-                                            'fullbackup_interval': 0,
-                                            'start_date': sdate},
-                            'metadata': {}}
+        workload_payload = {
+            'name': instance_name,
+            'workload_type_id': 'f82ce76f-17fe-438b-aa37-7a023058e50d',
+            'description': 'New Workload from automated workload script',
+            'source_platform': 'openstack',
+            'instances': inst,
+            'jobschedule': {
+                'end_date': 'No End',
+                'start_time': stime,
+                'interval': '24hr',
+                'enabled': True,
+                'retain_value': 30,
+                'retain_type': '0',
+                'fullbackup_interval': 0,
+                'start_date': sdate},
+            'metadata': {}}
 
         token, project_id = get_token(tenant_name)
         url = 'http://' + get_config_value(DEFAULT_SECTION,
@@ -199,16 +216,16 @@ def main():
                         if metadata[key] == 'True':
                             auto_workload_found = True
 
-                if instance.status == 'ACTIVE' and auto_workload_found == True:
+                if instance.status == 'ACTIVE' and auto_workload_found:
                     d_inst = {}
-                    for row in engine.execute(select([models.WorkloadVMs.__table__]).
-                                              where(models.WorkloadVMs.__table__.columns.vm_id == instance.id)):
+                    for row in engine.execute(select([models.WorkloadVMs.__table__]). where(
+                            models.WorkloadVMs.__table__.columns.vm_id == instance.id)):
                         items = dict(row.items())
                         if items['vm_id'] == instance.id and items['status'] == 'available':
                             auto_workload_found = False
                             break
 
-                    if auto_workload_found == True:
+                    if auto_workload_found:
                         d_inst['instance-id'] = instance.id
                         inst.append(d_inst)
 

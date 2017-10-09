@@ -126,8 +126,9 @@ def check_tenant(cntx, workload_path, upgrade):
                 return True
             else:
                 raise exception.InvalidRequest(
-                    reason=("Workload %s tenant %s does not belong to this cloud" %
-                            (workload_values['id'], tenant_id)))
+                    reason=(
+                        "Workload %s tenant %s does not belong to this cloud" %
+                        (workload_values['id'], tenant_id)))
     except Exception as ex:
         LOG.exception(ex)
 
@@ -147,7 +148,7 @@ def get_context(values):
 
 def _adjust_values(cntx, new_version, values, upgrade):
     values['version'] = new_version
-    if upgrade == False:
+    if not upgrade:
         values['user_id'] = cntx.user_id
         values['project_id'] = cntx.project_id
     if 'metadata' in values:
@@ -283,8 +284,10 @@ def get_workload_url(context, workload_ids, upgrade):
             # importing config backup only when user has not specified any
             # workload id
             if len(workload_ids) == 0:
-                config_workload_path = os.path.join(backup_target.mount_path,
-                                                    vault.CONF.cloud_unique_id, 'config_workload')
+                config_workload_path = os.path.join(
+                    backup_target.mount_path,
+                    vault.CONF.cloud_unique_id,
+                    'config_workload')
                 if os.path.exists(config_workload_path):
                     add_config_workload(context, config_workload_path)
 
@@ -572,11 +575,11 @@ def import_resources(tenantcontext, resource_map,
                     workload.update(resource)
 
                 # Check if job schedule is enable then add scheduler.
-                if len(resource['jobschedule']) and \
-                        str(pickle.loads(str(resource['jobschedule']))['enabled']).lower() == 'true':
+                if len(resource['jobschedule']) and str(pickle.loads(
+                        str(resource['jobschedule']))['enabled']).lower() == 'true':
                     workload_api = workloadAPI.API()
-                    workload_api.workload_add_scheduler_job(tenantcontext, pickle.loads(str(resource['jobschedule'])), workload,
-                                                            is_config_backup=(file_name == 'config_workload_db'))
+                    workload_api.workload_add_scheduler_job(tenantcontext, pickle.loads(str(
+                        resource['jobschedule'])), workload, is_config_backup=(file_name == 'config_workload_db'))
 
     except Exception as ex:
         LOG.exception(ex)

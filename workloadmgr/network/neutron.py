@@ -99,7 +99,7 @@ def _get_auth_token():
 def _get_client(token=None, production=True, cntx=None):
     if not token and CONF.neutron_auth_strategy:
         token = _get_auth_token()
-    if production == True:
+    if production:
         neutron_url = CONF.neutron_production_url
     else:
         neutron_url = CONF.neutron_tvault_url

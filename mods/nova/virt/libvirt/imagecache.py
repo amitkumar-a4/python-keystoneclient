@@ -74,7 +74,7 @@ imagecache_opts = [
     cfg.IntOpt('checksum_interval_seconds',
                default=3600,
                help='How frequently to checksum base images'),
-    ]
+]
 
 CONF = cfg.CONF
 CONF.register_opts(imagecache_opts)
@@ -99,7 +99,7 @@ def get_cache_fname(images, key):
     assume this.
     """
     image_id = str(images[key])
-    #giri
+    # giri
     return image_id
 
     if not CONF.remove_unused_kernels and key in ['kernel_id', 'ramdisk_id']:

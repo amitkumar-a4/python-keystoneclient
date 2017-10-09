@@ -51,7 +51,7 @@ def get_vms(cntx, restore_id):
             restore_options, snapshot_vm.vm_id, restore_options['type'])
         if not instance_options:
             snapshots_vms_to_be_restored.append(snapshot_vm)
-        elif instance_options.get('include', True) == True:
+        elif instance_options.get('include', True):
             snapshots_vms_to_be_restored.append(snapshot_vm)
 
     snapshot_vms = snapshots_vms_to_be_restored

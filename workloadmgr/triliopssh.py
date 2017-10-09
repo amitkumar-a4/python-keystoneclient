@@ -147,8 +147,12 @@ class SSHClient(object):
         self.proxy_host, self.proxy_port = proxy_host, proxy_port
         self.proxy_client = None
         if self.proxy_host and self.proxy_port:
-            logger.debug("Proxy configured for destination host %s - Proxy host: %s:%s",
-                         self.host, self.proxy_host, self.proxy_port,)
+            logger.debug(
+                "Proxy configured for destination host %s - Proxy host: %s:%s",
+                self.host,
+                self.proxy_host,
+                self.proxy_port,
+            )
             self._connect_tunnel()
         else:
             self._connect(self.client, self.host, self.port)
@@ -342,10 +346,19 @@ class ParallelSSHClient(object):
     therefor any connection and/or authentication exceptions will happen on the
     call to ``run_command`` and need to be caught."""
 
-    def __init__(self, hosts,
-                 user=None, password=None, port=None, pkey=None,
-                 forward_ssh_agent=True, num_retries=DEFAULT_RETRIES, timeout=None,
-                 pool_size=10, proxy_host=None, proxy_port=22):
+    def __init__(
+            self,
+            hosts,
+            user=None,
+            password=None,
+            port=None,
+            pkey=None,
+            forward_ssh_agent=True,
+            num_retries=DEFAULT_RETRIES,
+            timeout=None,
+            pool_size=10,
+            proxy_host=None,
+            proxy_port=22):
         """
         :param hosts: Hosts to connect to
         :type hosts: list(str)
@@ -536,14 +549,17 @@ future releases - use self.run_command instead", DeprecationWarning)
     def _exec_command(self, host, *args, **kwargs):
         """Make SSHClient, run command on host"""
         if not self.host_clients[host]:
-            self.host_clients[host] = SSHClient(host, user=self.user,
-                                                password=self.password,
-                                                port=self.port, pkey=self.pkey,
-                                                forward_ssh_agent=self.forward_ssh_agent,
-                                                num_retries=self.num_retries,
-                                                timeout=self.timeout,
-                                                proxy_host=self.proxy_host,
-                                                proxy_port=self.proxy_port)
+            self.host_clients[host] = SSHClient(
+                host,
+                user=self.user,
+                password=self.password,
+                port=self.port,
+                pkey=self.pkey,
+                forward_ssh_agent=self.forward_ssh_agent,
+                num_retries=self.num_retries,
+                timeout=self.timeout,
+                proxy_host=self.proxy_host,
+                proxy_port=self.proxy_port)
         return self.host_clients[host].exec_command(*args, **kwargs)
 
     def get_output(self, commands=None):
@@ -595,7 +611,7 @@ future releases - use self.run_command instead", DeprecationWarning)
         """Get exit code from host output if available
         :param host_output: Per host output as returned by `self.get_output`
         :rtype: int or None if exit code not ready"""
-        if not 'channel' in host_output:
+        if 'channel' not in host_output:
             logger.error("%s does not look like host output..", host_output,)
             return
         channel = host_output['channel']
@@ -646,10 +662,13 @@ future releases - use self.get_output instead", DeprecationWarning)
                 pass
             return {host: {'exit_code': channel.recv_exit_status(), }}
         gevent.sleep(.2)
-        return {host: {'exit_code': channel.recv_exit_status() if channel.exit_status_ready() else None,
-                       'channel': channel if not channel.closed else None,
-                       'stdout': stdout,
-                       'stderr': stderr, }}
+        return {
+            host: {
+                'exit_code': channel.recv_exit_status() if channel.exit_status_ready() else None,
+                'channel': channel if not channel.closed else None,
+                'stdout': stdout,
+                'stderr': stderr,
+            }}
 
     def copy_file(self, local_file, remote_file):
         """Copy local file to remote file in parallel
@@ -677,8 +696,11 @@ future releases - use self.get_output instead", DeprecationWarning)
     def _copy_file(self, host, local_file, remote_file):
         """Make sftp client, copy file"""
         if not self.host_clients[host]:
-            self.host_clients[host] = SSHClient(host, user=self.user,
-                                                password=self.password,
-                                                port=self.port, pkey=self.pkey,
-                                                forward_ssh_agent=self.forward_ssh_agent)
+            self.host_clients[host] = SSHClient(
+                host,
+                user=self.user,
+                password=self.password,
+                port=self.port,
+                pkey=self.pkey,
+                forward_ssh_agent=self.forward_ssh_agent)
         return self.host_clients[host].copy_file(local_file, remote_file)

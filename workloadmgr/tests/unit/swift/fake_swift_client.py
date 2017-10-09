@@ -80,8 +80,8 @@ class FakeSwiftConnection(object):
             # print path to all subdirectories first.
             for filename in filenames:
                 if dirname.startswith(root):
-                    contents[1].append({"count": 15, "bytes": 103079319237,
-                                        "name": os.path.join(dirname, filename).replace("workloadmgr/tests/swift/", "")})
+                    contents[1].append({"count": 15, "bytes": 103079319237, "name": os.path.join(
+                        dirname, filename).replace("workloadmgr/tests/swift/", "")})
         return contents[0], contents[1]
 
     def head_object(self, container, name):

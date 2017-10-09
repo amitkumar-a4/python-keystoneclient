@@ -72,14 +72,11 @@ class CopyConfigFiles(task.Task):
 
         virtdriver = driver.load_compute_driver(None, 'libvirt.LibvirtDriver')
         LOG.info("vast_config_backup called for backup_id: %s" % backup_id)
-        virtdriver._vast_methods_call_by_function(compute_service.vast_config_backup,
-                                                  cntx, backup_id,
-                                                  params)
+        virtdriver._vast_methods_call_by_function(
+            compute_service.vast_config_backup, cntx, backup_id, params)
         try:
-            upload_status = virtdriver._wait_for_remote_nova_process(cntx, compute_service,
-                                                                     metadata,
-                                                                     backup_id,
-                                                                     backend_endpoint)
+            upload_status = virtdriver._wait_for_remote_nova_process(
+                cntx, compute_service, metadata, backup_id, backend_endpoint)
             if upload_status is True:
                 upload_status = 'Completed'
         except Exception as ex:
@@ -167,12 +164,15 @@ def UnorderedCopyConfigFilesFromRemoteHost(
         LOG.info(
             "Backing controller node: %s from compute node: %s" %
             (controller_host, compute_node))
-        flow.add(CopyConfigFiles(name="CopyConfigFileRemoteHost_" + controller_host,
-                                 rebind={'backup_id': 'backup_id',
-                                         'host': compute_node,
-                                         'target': target,
-                                         'params': 'params'
-                                         }))
+        flow.add(
+            CopyConfigFiles(
+                name="CopyConfigFileRemoteHost_" +
+                controller_host,
+                rebind={
+                    'backup_id': 'backup_id',
+                    'host': compute_node,
+                    'target': target,
+                    'params': 'params'}))
     return flow
 
 

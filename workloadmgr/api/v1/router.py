@@ -341,11 +341,13 @@ class APIRouter(workloadmgr.api.APIRouter):
                        conditions={"method": ['GET']})
 
         # get the detail list of workload snapshots
-        mapper.connect("snapshots_3",
-                       "/{project_id}/workloads/{workload_id}/snapshots/detail",
-                       controller=self.resources['snapshots'],
-                       action='detail',
-                       conditions={"method": ['GET']})
+        mapper.connect(
+            "snapshots_3",
+            "/{project_id}/workloads/{workload_id}/snapshots/detail",
+            controller=self.resources['snapshots'],
+            action='detail',
+            conditions={
+                "method": ['GET']})
 
         # get the specified snapshot
         mapper.connect("snapshot_4",
@@ -383,11 +385,13 @@ class APIRouter(workloadmgr.api.APIRouter):
                        conditions={"method": ['GET']})
 
         # mount a snapshot
-        mapper.connect("mount_snapshot_1",
-                       "/{project_id}/workloads/{workload_id}/snapshots/{id}/mount",
-                       controller=self.resources['snapshots'],
-                       action='mount',
-                       conditions={"method": ['POST']})
+        mapper.connect(
+            "mount_snapshot_1",
+            "/{project_id}/workloads/{workload_id}/snapshots/{id}/mount",
+            controller=self.resources['snapshots'],
+            action='mount',
+            conditions={
+                "method": ['POST']})
 
         mapper.connect("mount_snapshot_2",
                        "/{project_id}/snapshots/{id}/mount",
@@ -396,11 +400,13 @@ class APIRouter(workloadmgr.api.APIRouter):
                        conditions={"method": ['POST']})
 
         # dismount a snapshot
-        mapper.connect("dismount_snapshot1",
-                       "/{project_id}/workloads/{workload_id}/snapshots/{id}/dismount",
-                       controller=self.resources['snapshots'],
-                       action='dismount',
-                       conditions={"method": ['POST']})
+        mapper.connect(
+            "dismount_snapshot1",
+            "/{project_id}/workloads/{workload_id}/snapshots/{id}/dismount",
+            controller=self.resources['snapshots'],
+            action='dismount',
+            conditions={
+                "method": ['POST']})
 
         mapper.connect("dismount_snapshot2",
                        "/{project_id}/snapshots/{id}/dismount",
@@ -409,11 +415,13 @@ class APIRouter(workloadmgr.api.APIRouter):
                        conditions={"method": ['POST']})
 
         # list mounted snapshots
-        mapper.connect("mounted_snapshots_list",
-                       "/{project_id}/workloads/{workload_id}/snapshots/mounted/list",
-                       controller=self.resources['snapshots'],
-                       action='mounted_list',
-                       conditions={"method": ['GET']})
+        mapper.connect(
+            "mounted_snapshots_list",
+            "/{project_id}/workloads/{workload_id}/snapshots/mounted/list",
+            controller=self.resources['snapshots'],
+            action='mounted_list',
+            conditions={
+                "method": ['GET']})
 
         # list mounted snapshots
         mapper.connect("mounted_snapshots_list",
@@ -431,39 +439,49 @@ class APIRouter(workloadmgr.api.APIRouter):
                         member={'action': 'POST'})
 
         # get the list of workload snapshot restores
-        mapper.connect("restores_2",
-                       "/{project_id}/workloads/{workload_id}/snapshots/{snapshot_id}/restores",
-                       controller=self.resources['restores'],
-                       action='index',
-                       conditions={"method": ['GET']})
+        mapper.connect(
+            "restores_2",
+            "/{project_id}/workloads/{workload_id}/snapshots/{snapshot_id}/restores",
+            controller=self.resources['restores'],
+            action='index',
+            conditions={
+                "method": ['GET']})
 
         # get the detail list of workload snapshot restores
-        mapper.connect("restores_3",
-                       "/{project_id}/workloads/{workload_id}/snapshots/{snapshot_id}/restores/detail",
-                       controller=self.resources['restores'],
-                       action='detail',
-                       conditions={"method": ['GET']})
+        mapper.connect(
+            "restores_3",
+            "/{project_id}/workloads/{workload_id}/snapshots/{snapshot_id}/restores/detail",
+            controller=self.resources['restores'],
+            action='detail',
+            conditions={
+                "method": ['GET']})
 
         # get the specified restore
-        mapper.connect("restore_4",
-                       "/{project_id}/workloads/{workload_id}/snapshots/{snapshot_id}/restores/{id}",
-                       controller=self.resources['restores'],
-                       action='show',
-                       conditions={"method": ['GET']})
+        mapper.connect(
+            "restore_4",
+            "/{project_id}/workloads/{workload_id}/snapshots/{snapshot_id}/restores/{id}",
+            controller=self.resources['restores'],
+            action='show',
+            conditions={
+                "method": ['GET']})
 
         # restore a snapshot
-        mapper.connect("restore_5",
-                       "/{project_id}/workloads/{workload_id}/snapshots/{id}/restores",
-                       controller=self.resources['snapshots'],
-                       action='restore',
-                       conditions={"method": ['POST']})
+        mapper.connect(
+            "restore_5",
+            "/{project_id}/workloads/{workload_id}/snapshots/{id}/restores",
+            controller=self.resources['snapshots'],
+            action='restore',
+            conditions={
+                "method": ['POST']})
 
         # delete a restore
-        mapper.connect("delete_restore",
-                       "/{project_id}/workloads/{workload_id}/snapshots/{snapshot_id}/restores/{id}",
-                       controller=self.resources['restores'],
-                       action='delete',
-                       conditions={"method": ['DELETE']})
+        mapper.connect(
+            "delete_restore",
+            "/{project_id}/workloads/{workload_id}/snapshots/{snapshot_id}/restores/{id}",
+            controller=self.resources['restores'],
+            action='delete',
+            conditions={
+                "method": ['DELETE']})
 
         # cancel a restore
         mapper.connect("cancel_restore",
@@ -481,39 +499,49 @@ class APIRouter(workloadmgr.api.APIRouter):
                         member={'action': 'POST'})
 
         # get the list of workload snapshot testbubbles
-        mapper.connect("testbubbles_2",
-                       "/{project_id}/workloads/{workload_id}/snapshots/{snapshot_id}/testbubbles",
-                       controller=self.resources['testbubbles'],
-                       action='index',
-                       conditions={"method": ['GET']})
+        mapper.connect(
+            "testbubbles_2",
+            "/{project_id}/workloads/{workload_id}/snapshots/{snapshot_id}/testbubbles",
+            controller=self.resources['testbubbles'],
+            action='index',
+            conditions={
+                "method": ['GET']})
 
         # get the detail list of workload snapshot testbubbles
-        mapper.connect("testbubbles_3",
-                       "/{project_id}/workloads/{workload_id}/snapshots/{snapshot_id}/testbubbles/detail",
-                       controller=self.resources['testbubbles'],
-                       action='detail',
-                       conditions={"method": ['GET']})
+        mapper.connect(
+            "testbubbles_3",
+            "/{project_id}/workloads/{workload_id}/snapshots/{snapshot_id}/testbubbles/detail",
+            controller=self.resources['testbubbles'],
+            action='detail',
+            conditions={
+                "method": ['GET']})
 
         # get the specified testbubble
-        mapper.connect("testbubble_4",
-                       "/{project_id}/workloads/{workload_id}/snapshots/{snapshot_id}/testbubbles/{id}",
-                       controller=self.resources['testbubbles'],
-                       action='show',
-                       conditions={"method": ['GET']})
+        mapper.connect(
+            "testbubble_4",
+            "/{project_id}/workloads/{workload_id}/snapshots/{snapshot_id}/testbubbles/{id}",
+            controller=self.resources['testbubbles'],
+            action='show',
+            conditions={
+                "method": ['GET']})
 
         # test restore a snapshot
-        mapper.connect("testbubble_5",
-                       "/{project_id}/workloads/{workload_id}/snapshots/{id}/testbubbles",
-                       controller=self.resources['snapshots'],
-                       action='test_restore',
-                       conditions={"method": ['POST']})
+        mapper.connect(
+            "testbubble_5",
+            "/{project_id}/workloads/{workload_id}/snapshots/{id}/testbubbles",
+            controller=self.resources['snapshots'],
+            action='test_restore',
+            conditions={
+                "method": ['POST']})
 
         # delete a testbubble
-        mapper.connect("delete_testbubble",
-                       "/{project_id}/workloads/{workload_id}/snapshots/{snapshot_id}/testbubbles/{id}",
-                       controller=self.resources['testbubbles'],
-                       action='delete',
-                       conditions={"method": ['DELETE']})
+        mapper.connect(
+            "delete_testbubble",
+            "/{project_id}/workloads/{workload_id}/snapshots/{snapshot_id}/testbubbles/{id}",
+            controller=self.resources['testbubbles'],
+            action='delete',
+            conditions={
+                "method": ['DELETE']})
 
         #######################################################################
         self.resources['settings'] = settings.create_resource(ext_mgr)

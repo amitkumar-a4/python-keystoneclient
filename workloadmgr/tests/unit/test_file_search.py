@@ -31,8 +31,9 @@ class BaseFileSearchTestCase(test.TestCase):
     def setUp(self):
         super(BaseFileSearchTestCase, self).setUp()
 
-        CONF.set_default('vault_storage_nfs_export',
-                         'server1:nfsshare1, server2:nfsshare2, server3:nfsshare3')
+        CONF.set_default(
+            'vault_storage_nfs_export',
+            'server1:nfsshare1, server2:nfsshare2, server3:nfsshare3')
 
         self.context = context.get_admin_context()
 
@@ -346,8 +347,9 @@ class BaseFileSearchTestCase(test.TestCase):
             search = self.workloadAPI.search(self.context, data)
             self.assertEqual(1, 2)
         except Exception as ex:
-            self.assertEqual(ex.kwargs['reason'],
-                             "Please provide valid date_from in Format YYYY-MM-DDTHH:MM:SS")
+            self.assertEqual(
+                ex.kwargs['reason'],
+                "Please provide valid date_from in Format YYYY-MM-DDTHH:MM:SS")
 
         date_to = date1.strftime('%Y-%m-%d')
         date_from = date1.strftime('%Y-%m-%dT%H:%M:%S')
@@ -358,5 +360,6 @@ class BaseFileSearchTestCase(test.TestCase):
             search = self.workloadAPI.search(self.context, data)
             self.assertEqual(1, 2)
         except Exception as ex:
-            self.assertEqual(ex.kwargs['reason'],
-                             "Please provide valid date_to in Format YYYY-MM-DDTHH:MM:SS")
+            self.assertEqual(
+                ex.kwargs['reason'],
+                "Please provide valid date_to in Format YYYY-MM-DDTHH:MM:SS")

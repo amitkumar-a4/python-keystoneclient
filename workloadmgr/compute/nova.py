@@ -340,32 +340,34 @@ def novaclient(context, production=True, refresh_token=False, extensions=None):
     else:
         # trusts are not enabled
         if refresh_token:
-            if production == True:
+            if production:
                 url = CONF.nova_production_endpoint_template.replace(
                     '%(project_id)s', context.tenant_id)
                 url = url.replace("/v2.1/", "/v2/")
-                novaclient = nova_client.Client(CONF.nova_admin_username,
-                                                CONF.nova_admin_password,
-                                                project_id=context.tenant_id,
-                                                auth_url=url,
-                                                domain_name=user_domain_id,
-                                                insecure=CONF.nova_api_insecure,
-                                                extensions=extensions,
-                                                timeout=CONF.nova_url_timeout)
+                novaclient = nova_client.Client(
+                    CONF.nova_admin_username,
+                    CONF.nova_admin_password,
+                    project_id=context.tenant_id,
+                    auth_url=url,
+                    domain_name=user_domain_id,
+                    insecure=CONF.nova_api_insecure,
+                    extensions=extensions,
+                    timeout=CONF.nova_url_timeout)
             else:
                 url = CONF.nova_tvault_endpoint_template.replace(
                     '%(project_id)s', context.tenant_id)
-                novaclient = nova_client.Client(CONF.nova_admin_username,
-                                                CONF.nova_admin_password,
-                                                project_id=context.tenant_id,
-                                                auth_url=url,
-                                                domain_name=user_domain_id,
-                                                insecure=CONF.nova_api_insecure,
-                                                extensions=extensions,
-                                                timeout=CONF.nova_url_timeout)
+                novaclient = nova_client.Client(
+                    CONF.nova_admin_username,
+                    CONF.nova_admin_password,
+                    project_id=context.tenant_id,
+                    auth_url=url,
+                    domain_name=user_domain_id,
+                    insecure=CONF.nova_api_insecure,
+                    extensions=extensions,
+                    timeout=CONF.nova_url_timeout)
             LOG.debug(_('Novaclient connection created using URL: %s') % url)
         else:
-            if production == True:
+            if production:
                 url = CONF.nova_production_endpoint_template % context.to_dict()
                 url = url.replace("/v2.1/", "/v2/")
             else:
@@ -480,13 +482,26 @@ class API(base.Base):
 
     @synchronized(novalock)
     @exception_handler(ignore_exception=False)
-    def create_server(self, context, name, image, flavor,
-                      meta=None, files=None,
-                      reservation_id=None, min_count=None,
-                      max_count=None, security_groups=None, userdata=None,
-                      key_name=None, availability_zone=None,
-                      block_device_mapping=None, nics=None, scheduler_hints=None,
-                      config_drive=None, **kwargs):
+    def create_server(
+            self,
+            context,
+            name,
+            image,
+            flavor,
+            meta=None,
+            files=None,
+            reservation_id=None,
+            min_count=None,
+            max_count=None,
+            security_groups=None,
+            userdata=None,
+            key_name=None,
+            availability_zone=None,
+            block_device_mapping=None,
+            nics=None,
+            scheduler_hints=None,
+            config_drive=None,
+            **kwargs):
         """
         Create (boot) a new server.
 
@@ -522,14 +537,24 @@ class API(base.Base):
         """
 
         client = kwargs['client']
-        item = client.servers.create(name, image, flavor,
-                                     meta=meta, files=files,
-                                     reservation_id=reservation_id, min_count=min_count,
-                                     max_count=max_count, security_groups=security_groups,
-                                     userdata=userdata, key_name=key_name,
-                                     availability_zone=availability_zone, block_device_mapping=block_device_mapping,
-                                     nics=nics, scheduler_hints=scheduler_hints,
-                                     config_drive=config_drive, **kwargs)
+        item = client.servers.create(
+            name,
+            image,
+            flavor,
+            meta=meta,
+            files=files,
+            reservation_id=reservation_id,
+            min_count=min_count,
+            max_count=max_count,
+            security_groups=security_groups,
+            userdata=userdata,
+            key_name=key_name,
+            availability_zone=availability_zone,
+            block_device_mapping=block_device_mapping,
+            nics=nics,
+            scheduler_hints=scheduler_hints,
+            config_drive=config_drive,
+            **kwargs)
         time.sleep(15)
         return item
 
@@ -1118,8 +1143,8 @@ class API(base.Base):
         :param server: The :class:`Server` (or its ID) to query.
         """
         client = kwargs['client']
-        return client.contego.vast_check_prev_snapshot(server=server,
-                                                       params=params, do_checksum=True)
+        return client.contego.vast_check_prev_snapshot(
+            server=server, params=params, do_checksum=True)
 
     @synchronized(novalock)
     @exception_handler(ignore_exception=False, contego=True)
@@ -1129,8 +1154,8 @@ class API(base.Base):
         :param server: The :class:`Server` (or its ID) to query.
         """
         client = kwargs['client']
-        return client.contego.copy_backup_image_to_volume(server=server,
-                                                          params=params, do_checksum=True)
+        return client.contego.copy_backup_image_to_volume(
+            server=server, params=params, do_checksum=True)
 
     @synchronized(novalock)
     @exception_handler(ignore_exception=False, contego=True)

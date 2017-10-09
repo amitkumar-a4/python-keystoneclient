@@ -198,14 +198,17 @@ def get_hadoop_nodes(cntx, host, port, username, password):
                             hypervisor_type = hypervisor.hypervisor_type
                             break
 
-                    utils.append_unique(vms, {'vm_id': instance.id,
-                                              'vm_name': instance.name,
-                                              'vm_metadata': instance.metadata,
-                                              'vm_flavor_id': instance.flavor['id'],
-                                              'vm_power_state': instance.__dict__['OS-EXT-STS:power_state'],
-                                              'hypervisor_hostname': hypervisor_hostname,
-                                              'hypervisor_type': hypervisor_type},
-                                        key="vm_id")
+                    utils.append_unique(
+                        vms,
+                        {
+                            'vm_id': instance.id,
+                            'vm_name': instance.name,
+                            'vm_metadata': instance.metadata,
+                            'vm_flavor_id': instance.flavor['id'],
+                            'vm_power_state': instance.__dict__['OS-EXT-STS:power_state'],
+                            'hypervisor_hostname': hypervisor_hostname,
+                            'hypervisor_type': hypervisor_type},
+                        key="vm_id")
     return vms
 
 
@@ -279,8 +282,8 @@ class HadoopWorkflow(workflow.Workflow):
     #
     def initflow(self, composite=False):
         cntx = amqp.RpcContext.from_dict(self._store['context'])
-        self._store['instances'] = get_hadoop_nodes(cntx, self._store['Namenode'],
-                                                    int(self._store['NamenodeSSHPort']), self._store['Username'], self._store['Password'])
+        self._store['instances'] = get_hadoop_nodes(cntx, self._store['Namenode'], int(
+            self._store['NamenodeSSHPort']), self._store['Username'], self._store['Password'])
         for index, item in enumerate(self._store['instances']):
             self._store['instance_' + str(index)] = item
 

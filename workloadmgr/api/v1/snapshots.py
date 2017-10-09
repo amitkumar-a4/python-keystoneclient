@@ -193,10 +193,14 @@ class SnapshotsController(wsgi.Controller):
             if workload_id:
                 self.workload_api.workload_get(context, workload_id)
 
-            search_opts = {'workload_id': workload_id,
-                           'host': host, 'get_all': get_all,
-                           'date_from': date_from, 'date_to': date_to, 'status': status,
-                           'get_instances': get_instances}
+            search_opts = {
+                'workload_id': workload_id,
+                'host': host,
+                'get_all': get_all,
+                'date_from': date_from,
+                'date_to': date_to,
+                'status': status,
+                'get_instances': get_instances}
             snapshots_all = self.workload_api.snapshot_get_all(
                 context, search_opts)
 
@@ -230,12 +234,13 @@ class SnapshotsController(wsgi.Controller):
                 options = body['restore'].get('options', {})
             if not options:
                 options = {'type': 'openstack'}
-            restore = self.workload_api.snapshot_restore(context,
-                                                         snapshot_id=id,
-                                                         test=test,
-                                                         name=name,
-                                                         description=description,
-                                                         options=options)
+            restore = self.workload_api.snapshot_restore(
+                context,
+                snapshot_id=id,
+                test=test,
+                name=name,
+                description=description,
+                options=options)
         except exception.InvalidInput as error:
             raise exc.HTTPBadRequest(explanation=unicode(error))
         except exception.InvalidState as error:

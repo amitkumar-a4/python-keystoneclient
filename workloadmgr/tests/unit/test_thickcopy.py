@@ -84,8 +84,20 @@ def my_mount_disk(diskslist, mntlist, diskonly=False):
 
 def my_populate_extent(hostip, username, password, vmspec, remotepath,
                        mountpath, start, count):
-    cmd = ["dd", "if=" + remotepath, "of=" + mountpath, "bs=512", "count=" +
-           str(count), "seek=" + str(start), "skip=" + str(start), "conv=notrunc"]
+    cmd = [
+        "dd",
+        "if=" +
+        remotepath,
+        "of=" +
+        mountpath,
+        "bs=512",
+        "count=" +
+        str(count),
+        "seek=" +
+        str(start),
+        "skip=" +
+        str(start),
+        "conv=notrunc"]
     subprocess.check_output(cmd, stderr=subprocess.STDOUT)
 
 
@@ -148,8 +160,8 @@ def test(numberofdisks, method1, method2, method3, method4, method5):
         workloadmgr.virt.vmwareapi.thickcopy.create_empty_vmdk(
             localvmdkpath, dev['capacityInBytes'])
 
-    extentsinfo = workloadmgr.virt.vmwareapi.thickcopy.thickcopyextents(None,
-                                                                        None, None, None, devicemap)
+    extentsinfo = workloadmgr.virt.vmwareapi.thickcopy.thickcopyextents(
+        None, None, None, None, devicemap)
     return extentsinfo
 
 #
@@ -258,8 +270,11 @@ def test_lv_entire_disk():
             for lv in ["lv1", "lv2", "lv3", "lv4"]:
                 cmd = ["mount", "-t", "ext4", "/dev/vg1/" + lv, tempdir]
                 subprocess.check_output(cmd, stderr=subprocess.STDOUT)
-                cmd = ["diff", "/opt/stack/workloadmgr/trilio-vix-disk-cli/VMware-vix-disklib-5.5.3-1909144.x86_64.tar.gz",
-                       tempdir + "/VMware-vix-disklib-5.5.3-1909144.x86_64.tar.gz"]
+                cmd = [
+                    "diff",
+                    "/opt/stack/workloadmgr/trilio-vix-disk-cli/VMware-vix-disklib-5.5.3-1909144.x86_64.tar.gz",
+                    tempdir +
+                    "/VMware-vix-disklib-5.5.3-1909144.x86_64.tar.gz"]
                 subprocess.check_output(cmd, stderr=subprocess.STDOUT)
                 time.sleep(1)
                 cmd = ["umount", tempdir]
@@ -423,8 +438,11 @@ def test_lv_on_partitions():
             for lv in ["lv1", "lv2", "lv3", "lv4"]:
                 cmd = ["mount", "-t", "ext4", "/dev/vg1/" + lv, tempdir]
                 subprocess.check_output(cmd, stderr=subprocess.STDOUT)
-                cmd = ["diff", "/opt/stack/workloadmgr/trilio-vix-disk-cli/VMware-vix-disklib-5.5.3-1909144.x86_64.tar.gz",
-                       tempdir + "/VMware-vix-disklib-5.5.3-1909144.x86_64.tar.gz"]
+                cmd = [
+                    "diff",
+                    "/opt/stack/workloadmgr/trilio-vix-disk-cli/VMware-vix-disklib-5.5.3-1909144.x86_64.tar.gz",
+                    tempdir +
+                    "/VMware-vix-disklib-5.5.3-1909144.x86_64.tar.gz"]
                 subprocess.check_output(cmd, stderr=subprocess.STDOUT)
                 time.sleep(1)
                 cmd = ["umount", tempdir]
@@ -526,8 +544,11 @@ def test_lv_part_mixed():
             for lv in ["lv1", "lv2", "lv3", "lv4"]:
                 cmd = ["mount", "-t", "ext4", "/dev/vg1/" + lv, tempdir]
                 subprocess.check_output(cmd, stderr=subprocess.STDOUT)
-                cmd = ["cp", "/opt/stack/workloadmgr/trilio-vix-disk-cli/" +
-                       "VMware-vix-disklib-5.5.3-1909144.x86_64.tar.gz", tempdir]
+                cmd = [
+                    "cp",
+                    "/opt/stack/workloadmgr/trilio-vix-disk-cli/" +
+                    "VMware-vix-disklib-5.5.3-1909144.x86_64.tar.gz",
+                    tempdir]
                 subprocess.check_output(cmd, stderr=subprocess.STDOUT)
                 time.sleep(1)
                 cmd = ["umount", tempdir]
@@ -600,8 +621,11 @@ def test_lv_part_mixed():
             for lv in ["lv1", "lv2", "lv3", "lv4"]:
                 cmd = ["mount", "-t", "ext4", "/dev/vg1/" + lv, tempdir]
                 subprocess.check_output(cmd, stderr=subprocess.STDOUT)
-                cmd = ["diff", "/opt/stack/workloadmgr/trilio-vix-disk-cli/VMware-vix-disklib-5.5.3-1909144.x86_64.tar.gz",
-                       tempdir + "/VMware-vix-disklib-5.5.3-1909144.x86_64.tar.gz"]
+                cmd = [
+                    "diff",
+                    "/opt/stack/workloadmgr/trilio-vix-disk-cli/VMware-vix-disklib-5.5.3-1909144.x86_64.tar.gz",
+                    tempdir +
+                    "/VMware-vix-disklib-5.5.3-1909144.x86_64.tar.gz"]
                 subprocess.check_output(cmd, stderr=subprocess.STDOUT)
                 time.sleep(1)
                 cmd = ["umount", tempdir]
@@ -611,8 +635,11 @@ def test_lv_part_mixed():
             tempdir = mkdtemp()
             cmd = ["mount", "-t", "ext4", freedev + "p1", tempdir]
             subprocess.check_output(cmd, stderr=subprocess.STDOUT)
-            cmd = ["diff", "/opt/stack/workloadmgr/trilio-vix-disk-cli/VMware-vix-disklib-5.5.3-1909144.x86_64.tar.gz",
-                   tempdir + "/VMware-vix-disklib-5.5.3-1909144.x86_64.tar.gz"]
+            cmd = [
+                "diff",
+                "/opt/stack/workloadmgr/trilio-vix-disk-cli/VMware-vix-disklib-5.5.3-1909144.x86_64.tar.gz",
+                tempdir +
+                "/VMware-vix-disklib-5.5.3-1909144.x86_64.tar.gz"]
             subprocess.check_output(cmd, stderr=subprocess.STDOUT)
             time.sleep(1)
             cmd = ["umount", tempdir]
@@ -992,8 +1019,16 @@ def test_lvs_on_two_partitions():
 
             tempdir = mkdtemp()
             for lv in ["lv1", "lv2", "lv3", "lv4"]:
-                cmd = ["mount", "-t", "ext4", "/dev/vg1" +
-                       dev.split("/")[2] + "/" + dev.split("/")[2] + lv, tempdir]
+                cmd = [
+                    "mount",
+                    "-t",
+                    "ext4",
+                    "/dev/vg1" +
+                    dev.split("/")[2] +
+                    "/" +
+                    dev.split("/")[2] +
+                    lv,
+                    tempdir]
                 subprocess.check_output(cmd, stderr=subprocess.STDOUT)
                 cmd = [
                     "cp",
@@ -1057,8 +1092,11 @@ def test_lvs_on_two_partitions():
             for lv in lvs:
                 cmd = ["mount", "-t", "ext4", lv['LVM2_LV_PATH'], tempdir]
                 subprocess.check_output(cmd, stderr=subprocess.STDOUT)
-                cmd = ["diff", "/opt/stack/workloadmgr/trilio-vix-disk-cli/VMware-vix-disklib-5.5.3-1909144.x86_64.tar.gz",
-                       tempdir + "/VMware-vix-disklib-5.5.3-1909144.x86_64.tar.gz"]
+                cmd = [
+                    "diff",
+                    "/opt/stack/workloadmgr/trilio-vix-disk-cli/VMware-vix-disklib-5.5.3-1909144.x86_64.tar.gz",
+                    tempdir +
+                    "/VMware-vix-disklib-5.5.3-1909144.x86_64.tar.gz"]
                 subprocess.check_output(cmd, stderr=subprocess.STDOUT)
                 time.sleep(1)
                 cmd = ["umount", tempdir]
@@ -1220,8 +1258,11 @@ def test_lvs_span_two_partitions():
             for lv in lvs:
                 cmd = ["mount", "-t", "ext4", lv['LVM2_LV_PATH'], tempdir]
                 subprocess.check_output(cmd, stderr=subprocess.STDOUT)
-                cmd = ["diff", "/opt/stack/workloadmgr/trilio-vix-disk-cli/VMware-vix-disklib-5.5.3-1909144.x86_64.tar.gz",
-                       tempdir + "/VMware-vix-disklib-5.5.3-1909144.x86_64.tar.gz"]
+                cmd = [
+                    "diff",
+                    "/opt/stack/workloadmgr/trilio-vix-disk-cli/VMware-vix-disklib-5.5.3-1909144.x86_64.tar.gz",
+                    tempdir +
+                    "/VMware-vix-disklib-5.5.3-1909144.x86_64.tar.gz"]
                 subprocess.check_output(cmd, stderr=subprocess.STDOUT)
                 time.sleep(1)
                 cmd = ["umount", tempdir]
@@ -1347,17 +1388,23 @@ def test_mbr_4_primary_partitions():
                                                       stderr=subprocess.STDOUT)
                     freedev = freedev.strip("\n")
 
-                    subprocess.check_output(["losetup", freedev, vmdkfile, "-o",
-                                             str(int(part['start'])
-                                                 * 512), "--sizelimit",
+                    subprocess.check_output(["losetup",
+                                             freedev,
+                                             vmdkfile,
+                                             "-o",
+                                             str(int(part['start']) * 512),
+                                             "--sizelimit",
                                              str((int(part['end']) - int(part['start']) + 1) / 2) + "KiB"],
                                             stderr=subprocess.STDOUT)
 
                     tempdir = mkdtemp()
                     cmd = ["mount", "-t", "ext4", freedev, tempdir]
                     subprocess.check_output(cmd, stderr=subprocess.STDOUT)
-                    cmd = ["diff", "/opt/stack/workloadmgr/trilio-vix-disk-cli/VMware-vix-disklib-5.5.3-1909144.x86_64.tar.gz",
-                           tempdir + "/VMware-vix-disklib-5.5.3-1909144.x86_64.tar.gz"]
+                    cmd = [
+                        "diff",
+                        "/opt/stack/workloadmgr/trilio-vix-disk-cli/VMware-vix-disklib-5.5.3-1909144.x86_64.tar.gz",
+                        tempdir +
+                        "/VMware-vix-disklib-5.5.3-1909144.x86_64.tar.gz"]
                     subprocess.check_output(cmd, stderr=subprocess.STDOUT)
                     time.sleep(1)
                     cmd = ["umount", tempdir]
@@ -1485,17 +1532,23 @@ def test_mbr_3_primary_1_logical_partitions():
                                                       stderr=subprocess.STDOUT)
                     freedev = freedev.strip("\n")
 
-                    subprocess.check_output(["losetup", freedev, vmdkfile, "-o",
-                                             str(int(part['start'])
-                                                 * 512), "--sizelimit",
+                    subprocess.check_output(["losetup",
+                                             freedev,
+                                             vmdkfile,
+                                             "-o",
+                                             str(int(part['start']) * 512),
+                                             "--sizelimit",
                                              str((int(part['end']) - int(part['start']) + 1) / 2) + "KiB"],
                                             stderr=subprocess.STDOUT)
 
                     tempdir = mkdtemp()
                     cmd = ["mount", "-t", "ext4", freedev, tempdir]
                     subprocess.check_output(cmd, stderr=subprocess.STDOUT)
-                    cmd = ["diff", "/opt/stack/workloadmgr/trilio-vix-disk-cli/VMware-vix-disklib-5.5.3-1909144.x86_64.tar.gz",
-                           tempdir + "/VMware-vix-disklib-5.5.3-1909144.x86_64.tar.gz"]
+                    cmd = [
+                        "diff",
+                        "/opt/stack/workloadmgr/trilio-vix-disk-cli/VMware-vix-disklib-5.5.3-1909144.x86_64.tar.gz",
+                        tempdir +
+                        "/VMware-vix-disklib-5.5.3-1909144.x86_64.tar.gz"]
                     subprocess.check_output(cmd, stderr=subprocess.STDOUT)
                     time.sleep(1)
                     cmd = ["umount", tempdir]
@@ -1614,17 +1667,23 @@ def test_gpt_partitions():
                                                       stderr=subprocess.STDOUT)
                     freedev = freedev.strip("\n")
 
-                    subprocess.check_output(["losetup", freedev, vmdkfile, "-o",
-                                             str(int(part['start'])
-                                                 * 512), "--sizelimit",
+                    subprocess.check_output(["losetup",
+                                             freedev,
+                                             vmdkfile,
+                                             "-o",
+                                             str(int(part['start']) * 512),
+                                             "--sizelimit",
                                              str((int(part['end']) - int(part['start']) + 1) / 2) + "KiB"],
                                             stderr=subprocess.STDOUT)
 
                     tempdir = mkdtemp()
                     cmd = ["mount", "-t", "ext4", freedev, tempdir]
                     subprocess.check_output(cmd, stderr=subprocess.STDOUT)
-                    cmd = ["diff", "/opt/stack/workloadmgr/trilio-vix-disk-cli/VMware-vix-disklib-5.5.3-1909144.x86_64.tar.gz",
-                           tempdir + "/VMware-vix-disklib-5.5.3-1909144.x86_64.tar.gz"]
+                    cmd = [
+                        "diff",
+                        "/opt/stack/workloadmgr/trilio-vix-disk-cli/VMware-vix-disklib-5.5.3-1909144.x86_64.tar.gz",
+                        tempdir +
+                        "/VMware-vix-disklib-5.5.3-1909144.x86_64.tar.gz"]
                     subprocess.check_output(cmd, stderr=subprocess.STDOUT)
                     time.sleep(1)
                     cmd = ["umount", freedev]
@@ -1853,8 +1912,11 @@ def test_lv_entire_disks():
             for lv in ["lv1", "lv2", "lv3", "lv4"]:
                 cmd = ["mount", "-t", "ext4", "/dev/vg1/" + lv, tempdir]
                 subprocess.check_output(cmd, stderr=subprocess.STDOUT)
-                cmd = ["diff", "/opt/stack/workloadmgr/trilio-vix-disk-cli/VMware-vix-disklib-5.5.3-1909144.x86_64.tar.gz",
-                       tempdir + "/VMware-vix-disklib-5.5.3-1909144.x86_64.tar.gz"]
+                cmd = [
+                    "diff",
+                    "/opt/stack/workloadmgr/trilio-vix-disk-cli/VMware-vix-disklib-5.5.3-1909144.x86_64.tar.gz",
+                    tempdir +
+                    "/VMware-vix-disklib-5.5.3-1909144.x86_64.tar.gz"]
                 subprocess.check_output(cmd, stderr=subprocess.STDOUT)
                 time.sleep(1)
                 cmd = ["umount", tempdir]
@@ -2132,8 +2194,11 @@ def test_lvm_on_single_partition():
             for lv in ["lv1", "lv2", "lv3", "lv4"]:
                 cmd = ["mount", "-t", "ext4", "/dev/vg1/" + lv, tempdir]
                 subprocess.check_output(cmd, stderr=subprocess.STDOUT)
-                cmd = ["diff", "/opt/stack/workloadmgr/trilio-vix-disk-cli/VMware-vix-disklib-5.5.3-1909144.x86_64.tar.gz",
-                       tempdir + "/VMware-vix-disklib-5.5.3-1909144.x86_64.tar.gz"]
+                cmd = [
+                    "diff",
+                    "/opt/stack/workloadmgr/trilio-vix-disk-cli/VMware-vix-disklib-5.5.3-1909144.x86_64.tar.gz",
+                    tempdir +
+                    "/VMware-vix-disklib-5.5.3-1909144.x86_64.tar.gz"]
                 subprocess.check_output(cmd, stderr=subprocess.STDOUT)
                 time.sleep(1)
                 cmd = ["umount", tempdir]
@@ -2376,8 +2441,11 @@ def test_mix_of_lvm_and_partitions():
             for lv in ["lv1", "lv2", "lv3", "lv4"]:
                 cmd = ["mount", "-t", "ext4", "/dev/vg1/" + lv, tempdir]
                 subprocess.check_output(cmd, stderr=subprocess.STDOUT)
-                cmd = ["diff", "/opt/stack/workloadmgr/trilio-vix-disk-cli/VMware-vix-disklib-5.5.3-1909144.x86_64.tar.gz",
-                       tempdir + "/VMware-vix-disklib-5.5.3-1909144.x86_64.tar.gz"]
+                cmd = [
+                    "diff",
+                    "/opt/stack/workloadmgr/trilio-vix-disk-cli/VMware-vix-disklib-5.5.3-1909144.x86_64.tar.gz",
+                    tempdir +
+                    "/VMware-vix-disklib-5.5.3-1909144.x86_64.tar.gz"]
                 subprocess.check_output(cmd, stderr=subprocess.STDOUT)
                 time.sleep(1)
                 cmd = ["umount", tempdir]
@@ -2396,8 +2464,11 @@ def test_mix_of_lvm_and_partitions():
                         str(part),
                         tempdir]
                     subprocess.check_output(cmd, stderr=subprocess.STDOUT)
-                    cmd = ["diff", "/opt/stack/workloadmgr/trilio-vix-disk-cli/VMware-vix-disklib-5.5.3-1909144.x86_64.tar.gz",
-                           tempdir + "/VMware-vix-disklib-5.5.3-1909144.x86_64.tar.gz"]
+                    cmd = [
+                        "diff",
+                        "/opt/stack/workloadmgr/trilio-vix-disk-cli/VMware-vix-disklib-5.5.3-1909144.x86_64.tar.gz",
+                        tempdir +
+                        "/VMware-vix-disklib-5.5.3-1909144.x86_64.tar.gz"]
                     subprocess.check_output(cmd, stderr=subprocess.STDOUT)
                     time.sleep(1)
                     cmd = ["umount", tempdir]
@@ -2801,9 +2872,12 @@ def test_mix_of_lvm_and_partitions_with_unformatted_raw_disks():
             for lv in ["lv1", "lv2", "lv3", "lv4"]:
                 cmd = ["mount", "-t", "ext4", "/dev/vg1/" + lv, tempdir]
                 subprocess.check_output(cmd, stderr=subprocess.STDOUT)
-                cmd = ["diff", "/opt/stack/workloadmgr/trilio-vix-disk-cli/" +
-                       "VMware-vix-disklib-5.5.3-1909144.x86_64.tar.gz",
-                       tempdir + "/VMware-vix-disklib-5.5.3-1909144.x86_64.tar.gz"]
+                cmd = [
+                    "diff",
+                    "/opt/stack/workloadmgr/trilio-vix-disk-cli/" +
+                    "VMware-vix-disklib-5.5.3-1909144.x86_64.tar.gz",
+                    tempdir +
+                    "/VMware-vix-disklib-5.5.3-1909144.x86_64.tar.gz"]
                 subprocess.check_output(cmd, stderr=subprocess.STDOUT)
                 time.sleep(1)
                 cmd = ["umount", tempdir]
@@ -2822,8 +2896,11 @@ def test_mix_of_lvm_and_partitions_with_unformatted_raw_disks():
                         str(part),
                         tempdir]
                     subprocess.check_output(cmd, stderr=subprocess.STDOUT)
-                cmd = ["diff", "/opt/stack/workloadmgr/trilio-vix-disk-cli/VMware-vix-disklib-5.5.3-1909144.x86_64.tar.gz",
-                       tempdir + "/VMware-vix-disklib-5.5.3-1909144.x86_64.tar.gz"]
+                cmd = [
+                    "diff",
+                    "/opt/stack/workloadmgr/trilio-vix-disk-cli/VMware-vix-disklib-5.5.3-1909144.x86_64.tar.gz",
+                    tempdir +
+                    "/VMware-vix-disklib-5.5.3-1909144.x86_64.tar.gz"]
                 subprocess.check_output(cmd, stderr=subprocess.STDOUT)
                 time.sleep(1)
                 cmd = ["umount", tempdir]
@@ -2933,8 +3010,11 @@ def test_mix_of_lvm_and_regular_partitions_on_same_disk():
                     str(part),
                     tempdir]
                 subprocess.check_output(cmd, stderr=subprocess.STDOUT)
-                cmd = ["cp", "/opt/stack/workloadmgr/trilio-vix-disk-cli/" +
-                             "VMware-vix-disklib-5.5.3-1909144.x86_64.tar.gz", tempdir]
+                cmd = [
+                    "cp",
+                    "/opt/stack/workloadmgr/trilio-vix-disk-cli/" +
+                    "VMware-vix-disklib-5.5.3-1909144.x86_64.tar.gz",
+                    tempdir]
                 subprocess.check_output(cmd, stderr=subprocess.STDOUT)
                 time.sleep(1)
                 cmd = ["umount", tempdir]
@@ -2996,9 +3076,12 @@ def test_mix_of_lvm_and_regular_partitions_on_same_disk():
             for lv in ["lv1", "lv2", "lv3", "lv4"]:
                 cmd = ["mount", "-t", "ext4", "/dev/vg1/" + lv, tempdir]
                 subprocess.check_output(cmd, stderr=subprocess.STDOUT)
-                cmd = ["diff", "/opt/stack/workloadmgr/trilio-vix-disk-cli/" +
-                       "VMware-vix-disklib-5.5.3-1909144.x86_64.tar.gz",
-                       tempdir + "/VMware-vix-disklib-5.5.3-1909144.x86_64.tar.gz"]
+                cmd = [
+                    "diff",
+                    "/opt/stack/workloadmgr/trilio-vix-disk-cli/" +
+                    "VMware-vix-disklib-5.5.3-1909144.x86_64.tar.gz",
+                    tempdir +
+                    "/VMware-vix-disklib-5.5.3-1909144.x86_64.tar.gz"]
                 subprocess.check_output(cmd, stderr=subprocess.STDOUT)
                 time.sleep(1)
                 cmd = ["umount", tempdir]
@@ -3017,8 +3100,11 @@ def test_mix_of_lvm_and_regular_partitions_on_same_disk():
                         str(part),
                         tempdir]
                     subprocess.check_output(cmd, stderr=subprocess.STDOUT)
-                    cmd = ["diff", "/opt/stack/workloadmgr/trilio-vix-disk-cli/" +
-                           "VMware-vix-disklib-5.5.3-1909144.x86_64.tar.gz", tempdir]
+                    cmd = [
+                        "diff",
+                        "/opt/stack/workloadmgr/trilio-vix-disk-cli/" +
+                        "VMware-vix-disklib-5.5.3-1909144.x86_64.tar.gz",
+                        tempdir]
                     subprocess.check_output(cmd, stderr=subprocess.STDOUT)
                     time.sleep(1)
                     cmd = ["umount", tempdir]
@@ -3120,8 +3206,11 @@ def test_multiple_vgs_multiple_disk():
 
                 cmd = ["mount", "-t", "ext4", "/dev/" + vg + "/" + lv, tempdir]
                 subprocess.check_output(cmd, stderr=subprocess.STDOUT)
-                cmd = ["cp", "/opt/stack/workloadmgr/trilio-vix-disk-cli/" +
-                       "VMware-vix-disklib-5.5.3-1909144.x86_64.tar.gz", tempdir]
+                cmd = [
+                    "cp",
+                    "/opt/stack/workloadmgr/trilio-vix-disk-cli/" +
+                    "VMware-vix-disklib-5.5.3-1909144.x86_64.tar.gz",
+                    tempdir]
                 subprocess.check_output(cmd, stderr=subprocess.STDOUT)
                 time.sleep(1)
                 cmd = ["umount", tempdir]
@@ -3194,8 +3283,11 @@ def test_multiple_vgs_multiple_disk():
             for lv in ["lv1", "lv2", "lv3", "lv4"]:
                 cmd = ["mount", "-t", "ext4", "/dev/vg1/" + lv, tempdir]
                 subprocess.check_output(cmd, stderr=subprocess.STDOUT)
-                cmd = ["diff", "/opt/stack/workloadmgr/trilio-vix-disk-cli/VMware-vix-disklib-5.5.3-1909144.x86_64.tar.gz",
-                       tempdir + "/VMware-vix-disklib-5.5.3-1909144.x86_64.tar.gz"]
+                cmd = [
+                    "diff",
+                    "/opt/stack/workloadmgr/trilio-vix-disk-cli/VMware-vix-disklib-5.5.3-1909144.x86_64.tar.gz",
+                    tempdir +
+                    "/VMware-vix-disklib-5.5.3-1909144.x86_64.tar.gz"]
                 subprocess.check_output(cmd, stderr=subprocess.STDOUT)
                 time.sleep(1)
                 cmd = ["umount", tempdir]
@@ -3378,8 +3470,11 @@ def test_multiple_vgs_multiple_disk_small_partition():
                         lv,
                         tempdir]
                     subprocess.check_output(cmd, stderr=subprocess.STDOUT)
-                    cmd = ["cp", "/opt/stack/workloadmgr/trilio-vix-disk-cli/" +
-                           "VMware-vix-disklib-5.5.3-1909144.x86_64.tar.gz", tempdir]
+                    cmd = [
+                        "cp",
+                        "/opt/stack/workloadmgr/trilio-vix-disk-cli/" +
+                        "VMware-vix-disklib-5.5.3-1909144.x86_64.tar.gz",
+                        tempdir]
                     subprocess.check_output(cmd, stderr=subprocess.STDOUT)
                     time.sleep(1)
                     cmd = ["umount", tempdir]
@@ -3467,8 +3562,11 @@ def test_multiple_vgs_multiple_disk_small_partition():
                         lv,
                         tempdir]
                     subprocess.check_output(cmd, stderr=subprocess.STDOUT)
-                    cmd = ["diff", "/opt/stack/workloadmgr/trilio-vix-disk-cli/VMware-vix-disklib-5.5.3-1909144.x86_64.tar.gz",
-                           tempdir + "/VMware-vix-disklib-5.5.3-1909144.x86_64.tar.gz"]
+                    cmd = [
+                        "diff",
+                        "/opt/stack/workloadmgr/trilio-vix-disk-cli/VMware-vix-disklib-5.5.3-1909144.x86_64.tar.gz",
+                        tempdir +
+                        "/VMware-vix-disklib-5.5.3-1909144.x86_64.tar.gz"]
                     subprocess.check_output(cmd, stderr=subprocess.STDOUT)
                     time.sleep(1)
                     cmd = ["umount", tempdir]

@@ -254,12 +254,31 @@ class Connection(object):
 
 def _safe_log(log_func, msg, msg_data):
     """Sanitizes the msg_data field before logging."""
-    SANITIZE = {'set_admin_password': [('args', 'new_pass')],
-                'run_instance': [('args', 'admin_password', 'password', 'Password')],
-                'route_message': [('args', 'message', 'args', 'method_info',
-                                   'method_kwargs', 'password', 'Password'),
-                                  ('args', 'message', 'args', 'method_info',
-                                   'method_kwargs', 'admin_password', 'password', 'Password')]}
+    SANITIZE = {
+        'set_admin_password': [
+            ('args',
+             'new_pass')],
+        'run_instance': [
+            ('args',
+             'admin_password',
+             'password',
+             'Password')],
+        'route_message': [
+            ('args',
+             'message',
+             'args',
+             'method_info',
+             'method_kwargs',
+             'password',
+             'Password'),
+            ('args',
+             'message',
+             'args',
+             'method_info',
+             'method_kwargs',
+             'admin_password',
+             'password',
+             'Password')]}
 
     has_method = 'method' in msg_data and msg_data['method'] in SANITIZE
     has_context_token = '_context_auth_token' in msg_data

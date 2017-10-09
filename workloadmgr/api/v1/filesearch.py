@@ -48,15 +48,21 @@ class FileSearchController(wsgi.Controller):
         try:
             context = req.environ['workloadmgr.context']
             if 'file_search' not in body:
-                raise exc.HTTPBadRequest(explanation=unicode("Please provide "
-                                                             "valid requests data"))
+                raise exc.HTTPBadRequest(
+                    explanation=unicode(
+                        "Please provide "
+                        "valid requests data"))
             file_search = body['file_search']
             if file_search.get('vm_id', None) is None:
-                raise exc.HTTPBadRequest(explanation=unicode("Please provide "
-                                                             "vm_id for search"))
+                raise exc.HTTPBadRequest(
+                    explanation=unicode(
+                        "Please provide "
+                        "vm_id for search"))
             if file_search.get('filepath', None) is None:
-                raise exc.HTTPBadRequest(explanation=unicode("Please provide "
-                                                             "filepath for search"))
+                raise exc.HTTPBadRequest(
+                    explanation=unicode(
+                        "Please provide "
+                        "filepath for search"))
             if file_search.get('snapshot_ids', None) is None:
                 file_search['snapshot_ids'] = ''
             if file_search.get('start', None) is None:

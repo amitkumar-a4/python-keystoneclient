@@ -214,10 +214,15 @@ def get_vmdk_attach_config_spec(client_factory,
                                                      controller_key,
                                                      adapter_type)
             device_config_spec.append(controller_spec)
-    virtual_device_config_spec = create_virtual_disk_spec(client_factory,
-                                                          controller_key, disk_type, file_path,
-                                                          disk_size, linked_clone,
-                                                          unit_number, device_name)
+    virtual_device_config_spec = create_virtual_disk_spec(
+        client_factory,
+        controller_key,
+        disk_type,
+        file_path,
+        disk_size,
+        linked_clone,
+        unit_number,
+        device_name)
 
     device_config_spec.append(virtual_device_config_spec)
 
@@ -930,8 +935,12 @@ def get_host_name_from_host_ref(host_ref):
 @autolog.log_method(Logger, log_retval=False)
 def get_vm_state_from_name(session, vm_name):
     vm_ref = get_vm_ref_from_name(session, vm_name)
-    vm_state = session._call_method(vim_util, "get_dynamic_property",
-                                    vm_ref, "VirtualMachine", "runtime.powerState")
+    vm_state = session._call_method(
+        vim_util,
+        "get_dynamic_property",
+        vm_ref,
+        "VirtualMachine",
+        "runtime.powerState")
     return vm_state
 
 
@@ -948,9 +957,12 @@ def get_stats_from_cluster(session, cluster):
         host_ret = prop_dict.get('host')
         if host_ret:
             host_mors = host_ret.ManagedObjectReference
-            result = session._call_method(vim_util,
-                                          "get_properties_for_a_collection_of_objects",
-                                          "HostSystem", host_mors, ["summary.hardware"])
+            result = session._call_method(
+                vim_util,
+                "get_properties_for_a_collection_of_objects",
+                "HostSystem",
+                host_mors,
+                ["summary.hardware"])
             for obj in result.objects:
                 hardware_summary = obj.propSet[0].val
                 # Total vcpus is the sum of all pCPUs of individual hosts
@@ -962,8 +974,12 @@ def get_stats_from_cluster(session, cluster):
 
         res_mor = prop_dict.get('resourcePool')
         if res_mor:
-            res_usage = session._call_method(vim_util, "get_dynamic_property",
-                                             res_mor, "ResourcePool", "summary.runtime.memory")
+            res_usage = session._call_method(
+                vim_util,
+                "get_dynamic_property",
+                res_mor,
+                "ResourcePool",
+                "summary.runtime.memory")
             if res_usage:
                 # maxUsage is the memory limit of the cluster available to VM's
                 mem_info['total'] = int(res_usage.maxUsage / (1024 * 1024))
@@ -1057,8 +1073,8 @@ def _get_datastore_ref_and_name(
         ds_name = propdict['summary.name']
         if ((ds_type == 'VMFS' or ds_type == 'NFS') and
                 propdict['summary.accessible']):
-            if (datastore_moid and datastore_moid == obj_content.obj.value) or \
-               (datastore_moid is None and (datastore_regex is None or datastore_regex.match(ds_name))):
+            if (datastore_moid and datastore_moid == obj_content.obj.value) or (
+                    datastore_moid is None and (datastore_regex is None or datastore_regex.match(ds_name))):
                 new_ds = DSRecord(
                     datastore=obj_content.obj,
                     name=ds_name,
@@ -1081,10 +1097,14 @@ def get_datastore_ref_and_name(session, cluster=None, host=None,
                                datastore_regex=None, datastore_moid=None):
     """Get the datastore list and choose the first local storage."""
     if cluster is None and host is None:
-        data_stores = session._call_method(vim_util, "get_objects",
-                                           "Datastore", ["summary.type", "summary.name",
-                                                         "summary.capacity", "summary.freeSpace",
-                                                         "summary.accessible"])
+        data_stores = session._call_method(vim_util,
+                                           "get_objects",
+                                           "Datastore",
+                                           ["summary.type",
+                                            "summary.name",
+                                            "summary.capacity",
+                                            "summary.freeSpace",
+                                            "summary.accessible"])
     else:
         if cluster is not None:
             datastore_ret = session._call_method(

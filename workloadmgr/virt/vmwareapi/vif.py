@@ -56,8 +56,8 @@ def ensure_vlan_bridge(session, vif, cluster=None, create_vlan=True):
         # Create a port group on the vSwitch associated with the
         # vlan_interface corresponding physical network adapter on the ESX
         # host.
-        vswitch_associated = _get_associated_vswitch_for_interface(session,
-                                                                   vlan_interface, cluster)
+        vswitch_associated = _get_associated_vswitch_for_interface(
+            session, vlan_interface, cluster)
         network_util.create_port_group(session, bridge,
                                        vswitch_associated,
                                        vlan_num if create_vlan else 0,
@@ -67,8 +67,8 @@ def ensure_vlan_bridge(session, vif, cluster=None, create_vlan=True):
                                                              cluster)
     elif create_vlan:
         # Get the vSwitch associated with the Physical Adapter
-        vswitch_associated = _get_associated_vswitch_for_interface(session,
-                                                                   vlan_interface, cluster)
+        vswitch_associated = _get_associated_vswitch_for_interface(
+            session, vlan_interface, cluster)
         # Get the vlan id and vswitch corresponding to the port group
         _get_pg_info = network_util.get_vlanid_and_vswitch_for_portgroup
         pg_vlanid, pg_vswitch = _get_pg_info(session, bridge, cluster)
@@ -119,8 +119,8 @@ def get_neutron_network(session, network_name, cluster, vif):
     if opaque:
         bridge = vif['network']['id']
         opaque_networks = opaque.HostOpaqueNetworkInfo
-        network_ref = _get_network_ref_from_opaque(opaque_networks,
-                                                   CONF.vmware.integration_bridge, bridge)
+        network_ref = _get_network_ref_from_opaque(
+            opaque_networks, CONF.vmware.integration_bridge, bridge)
     else:
         bridge = network_name
         network_ref = network_util.get_network_with_the_name(

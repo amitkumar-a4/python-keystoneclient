@@ -121,7 +121,7 @@ class Workflow(object):
                 vmtasks.LinearPostSnapshot(
                     self._store['instances']))
 
-            if composite == False:
+            if not composite:
                 # apply retention policy
                 self._postsnapshot.add(
                     vmtasks.ApplyRetentionPolicy("ApplyRetentionPolicy"))

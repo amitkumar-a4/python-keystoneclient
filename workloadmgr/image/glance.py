@@ -70,7 +70,7 @@ CONF.register_opts(glance_opts)
 
 def generate_glance_url(production):
     """Generate the URL to glance."""
-    if production == True:
+    if production:
         return "%s://%s:%d" % (CONF.glance_protocol,
                                CONF.glance_production_host,
                                CONF.glance_production_port)
@@ -123,7 +123,7 @@ def get_api_servers(production):
     """
     api_servers = []
 
-    if production == True:
+    if production:
         glance_api_servers = CONF.glance_production_api_servers
     else:
         glance_api_servers = CONF.glance_tvault_api_servers
@@ -143,8 +143,14 @@ def get_api_servers(production):
 class GlanceClientWrapper(object):
     """Glance client wrapper class that implements retries."""
 
-    def __init__(self, production, context=None, host=None, port=None, use_ssl=False,
-                 version=1):
+    def __init__(
+            self,
+            production,
+            context=None,
+            host=None,
+            port=None,
+            use_ssl=False,
+            version=1):
         if host is not None:
             self.client = self._create_static_client(context,
                                                      host, port,
@@ -192,8 +198,9 @@ class GlanceClientWrapper(object):
                 host = self.host
                 port = self.port
                 extra = "retrying"
-                error_msg = _("Error contacting glance server "
-                              "'%(host)s:%(port)s' for '%(method)s', %(extra)s.")
+                error_msg = _(
+                    "Error contacting glance server "
+                    "'%(host)s:%(port)s' for '%(method)s', %(extra)s.")
                 if attempt == num_attempts:
                     extra = 'done trying'
                     LOG.exception(error_msg, locals())
@@ -510,8 +517,11 @@ def get_remote_image_service(context, image_href, production=True):
     try:
         (image_id, glance_host, glance_port, use_ssl) = \
             _parse_image_ref(image_href)
-        glance_client = GlanceClientWrapper(context=context,
-                                            host=glance_host, port=glance_port, use_ssl=use_ssl)
+        glance_client = GlanceClientWrapper(
+            context=context,
+            host=glance_host,
+            port=glance_port,
+            use_ssl=use_ssl)
     except ValueError:
         raise exception.InvalidImageRef(image_href=image_href)
 

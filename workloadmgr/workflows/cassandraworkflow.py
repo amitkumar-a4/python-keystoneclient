@@ -234,19 +234,28 @@ def get_cassandra_nodes(store, findpartitiontype='False'):
         cntx = amqp.RpcContext.from_dict(store['context'])
         db = WorkloadMgrDB().db
         if 'snapshot' in store:
-            db.snapshot_update(cntx, store['snapshot']['id'],
-                               {'progress_msg': 'Discovering Cassandra Topology'})
+            db.snapshot_update(
+                cntx, store['snapshot']['id'], {
+                    'progress_msg': 'Discovering Cassandra Topology'})
 
         fh, outfile_path = mkstemp()
         os.close(fh)
         fh, errfile_path = mkstemp()
         os.close(fh)
-        cmdspec = ["python", "/opt/stack/workloadmgr/workloadmgr/workflows/cassnodes.py",
-                   "--config-file", "/etc/workloadmgr/workloadmgr.conf",
-                   "--defaultnode", store['CassandraNode'],
-                   "--port", store['SSHPort'],
-                   "--username", store['Username'],
-                   "--password", "******", ]
+        cmdspec = [
+            "python",
+            "/opt/stack/workloadmgr/workloadmgr/workflows/cassnodes.py",
+            "--config-file",
+            "/etc/workloadmgr/workloadmgr.conf",
+            "--defaultnode",
+            store['CassandraNode'],
+            "--port",
+            store['SSHPort'],
+            "--username",
+            store['Username'],
+            "--password",
+            "******",
+        ]
 
         if store.get('hostnames', None):
             hosts = ""
@@ -309,8 +318,9 @@ def get_cassandra_instances(store, findpartitiontype='False'):
         cntx = amqp.RpcContext.from_dict(store['context'])
         db = WorkloadMgrDB().db
         if 'snapshot' in store:
-            db.snapshot_update(cntx, store['snapshot']['id'],
-                               {'progress_msg': 'Identifying Virtual Machines of Cassandra'})
+            db.snapshot_update(
+                cntx, store['snapshot']['id'], {
+                    'progress_msg': 'Identifying Virtual Machines of Cassandra'})
 
         interfaces = {}
         root_partition_type = {}
@@ -347,15 +357,16 @@ def get_cassandra_instances(store, findpartitiontype='False'):
 
                     hypervisor_hostname = clustername
 
-                    utils.append_unique(vms, {'vm_id': instance.id,
-                                              'vm_name': instance.name,
-                                              'vm_metadata': instance.metadata,
-                                              'vm_flavor_id': instance.flavor['id'],
-                                              'hostname': interfaces[addr['macAddress'].lower()],
-                                              'root_partition_type': root_partition_type[addr['macAddress'].lower()],
-                                              'vm_power_state': instance.__dict__['OS-EXT-STS:power_state'],
-                                              'hypervisor_hostname': hypervisor_hostname,
-                                              'hypervisor_type': hypervisor_type},
+                    utils.append_unique(vms,
+                                        {'vm_id': instance.id,
+                                         'vm_name': instance.name,
+                                         'vm_metadata': instance.metadata,
+                                         'vm_flavor_id': instance.flavor['id'],
+                                            'hostname': interfaces[addr['macAddress'].lower()],
+                                            'root_partition_type': root_partition_type[addr['macAddress'].lower()],
+                                            'vm_power_state': instance.__dict__['OS-EXT-STS:power_state'],
+                                            'hypervisor_hostname': hypervisor_hostname,
+                                            'hypervisor_type': hypervisor_type},
                                         "vm_id")
                     break
 
@@ -747,15 +758,20 @@ def update_network_interfaces(mountpath, interface, address, netmask,
                                   filename + ".bak")
                         with open(filename + ".bak", 'r') as ethfile:
                             with open(filename, 'w') as newethfile:
-                                stanza = create_interface_stanza(interface, address,
-                                                                 netmask, broadcast,
-                                                                 gateway)
+                                stanza = create_interface_stanza(
+                                    interface, address, netmask, broadcast, gateway)
                                 newethfile.write("\n".join(stanza))
                                 newethfile.write("\n")
                                 for l in ethfile:
                                     skip = False
-                                    for pat in ["auto", "iface", "address",
-                                                "netmask", "network", "broadcast", "gateway"]:
+                                    for pat in [
+                                        "auto",
+                                        "iface",
+                                        "address",
+                                        "netmask",
+                                        "network",
+                                        "broadcast",
+                                            "gateway"]:
                                         if l.lstrip().startswith(pat):
                                             skip = True
                                             break
@@ -774,14 +790,20 @@ def update_network_interfaces(mountpath, interface, address, netmask,
                             newinf.write(line)
                             line = f.readline()
                     else:
-                        stanza = create_interface_stanza(interface, address, netmask,
-                                                         broadcast, gateway)
+                        stanza = create_interface_stanza(
+                            interface, address, netmask, broadcast, gateway)
                         newinf.write("\n".join(stanza))
                         newinf.write("\n")
                         while not line.strip().startswith("auto"):
                             skip = False
-                            for pat in ["auto", "iface", "address",
-                                        "netmask", "network", "broadcast", "gateway"]:
+                            for pat in [
+                                "auto",
+                                "iface",
+                                "address",
+                                "netmask",
+                                "network",
+                                "broadcast",
+                                    "gateway"]:
                                 if l.lstrip().startswith(pat):
                                     skip = True
                                     break
@@ -817,8 +839,8 @@ class CassandraRestoreNode(task.Task):
                                   restore_options['IPAddresses'])
             update_cassandra_topology_yaml(mountpath, ipaddress,
                                            restore_options['Broadcast'])
-            update_cassandra_topology_properties(mountpath,
-                                                 restore_options['IPAddresses'])
+            update_cassandra_topology_properties(
+                mountpath, restore_options['IPAddresses'])
             update_cassandra_env_sh(mountpath, hostname)
             update_hostname(mountpath, hostname)
 

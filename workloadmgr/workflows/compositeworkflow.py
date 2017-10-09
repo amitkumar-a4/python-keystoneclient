@@ -146,8 +146,13 @@ class CompositeWorkflow(workflow.Workflow):
         # apply retention policy
         postsnapshot.add(vmtasks.ApplyRetentionPolicy("ApplyRetentionPolicy"))
 
-        super(CompositeWorkflow, self).initflow(snapshotvms=snapshotvms, presnapshot=presnapshot,
-                                                snapshotmetadata=snapshotmetadata, postsnapshot=postsnapshot)
+        super(
+            CompositeWorkflow,
+            self).initflow(
+            snapshotvms=snapshotvms,
+            presnapshot=presnapshot,
+            snapshotmetadata=snapshotmetadata,
+            postsnapshot=postsnapshot)
 
     def topology(self):
         # Fill in the topology information later, perhaps combine

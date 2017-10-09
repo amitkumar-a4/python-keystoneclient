@@ -400,18 +400,20 @@ def snapshot_vm_security_groups(cntx, db, instances, snapshot):
                     cntx, security_group_id)
                 security_group_rules = security_group['security_group_rules']
                 vm_security_group_snap_values = {
-                    'id': str(uuid.uuid4()),
+                    'id': str(
+                        uuid.uuid4()),
                     'vm_id': instance['vm_id'],
                     'snapshot_id': snapshot['id'],
                     'resource_type': 'security_group',
                     'resource_name': security_group['id'],
                     'resource_pit_id': security_group['id'],
-                    'metadata': {'name': security_group['name'],
-                                 'security_group_type': 'neutron',
-                                 'description': security_group['description'],
-                                 'vm_id': instance['vm_id'],
-                                 'vm_attached': security_group_id in server_security_group_ids,
-                                 },
+                    'metadata': {
+                        'name': security_group['name'],
+                        'security_group_type': 'neutron',
+                        'description': security_group['description'],
+                        'vm_id': instance['vm_id'],
+                        'vm_attached': security_group_id in server_security_group_ids,
+                    },
                     'status': 'available'}
 
                 vm_security_group_snap = db.snapshot_vm_resource_create(
@@ -808,8 +810,9 @@ def restore_keypairs(cntx, db, instances):
 @autolog.log_method(Logger, 'vmtasks_openstack.get_vm_nics')
 def get_vm_nics(cntx, db, instance, restore, restored_net_resources):
 
-    db.restore_update(cntx, restore['id'],
-                      {'progress_msg': 'Restoring network interfaces for Instance ' + instance['vm_id']})
+    db.restore_update(
+        cntx, restore['id'], {
+            'progress_msg': 'Restoring network interfaces for Instance ' + instance['vm_id']})
 
     restore_obj = db.restore_get(cntx, restore['id'])
     restore_options = pickle.loads(str(restore_obj.pickle))
@@ -1166,8 +1169,8 @@ def restore_vm_networks(cntx, db, restore):
                         nic_data['mac_address'], nic_data)
                     restored_net_resources[nic_data['mac_address']
                                            ]['production'] = False
-                    if restored_net_resources[nic_data['mac_address']]['ip_address'] == \
-                       nic_data['ip_address']:
+                    if restored_net_resources[nic_data['mac_address']
+                                              ]['ip_address'] == nic_data['ip_address']:
                         restored_net_resources[nic_data['mac_address']
                                                ]['production'] = True
 
@@ -1181,14 +1184,14 @@ def restore_vm_networks(cntx, db, restore):
                             nic_data['mac_address'], new_port)
                         restored_net_resources[nic_data['mac_address']
                                                ]['production'] = False
-                        if restored_net_resources[nic_data['mac_address']]['fixed_ips'][0]['ip_address'] == \
-                           nic_data['ip_address']:
+                        if restored_net_resources[nic_data['mac_address']
+                                                  ]['fixed_ips'][0]['ip_address'] == nic_data['ip_address']:
                             restored_net_resources[nic_data['mac_address']
                                                    ]['production'] = True
 
                         if nic_data.get('floating_ip', None) is not None:
-                            restored_net_resources[nic_data['mac_address']]['floating_ip'] = \
-                                nic_data['floating_ip']
+                            restored_net_resources[nic_data['mac_address']
+                                                   ]['floating_ip'] = nic_data['floating_ip']
 
                         continue
                     # private network
@@ -1369,7 +1372,8 @@ def restore_vm_security_groups(cntx, db, restore):
                             continue
 
                 if match_rule_values(
-                        dict(vm_security_group_rule_values), dict(rule)) is True:
+                        dict(vm_security_group_rule_values),
+                        dict(rule)) is True:
                     found = True
                     break
 
@@ -1437,17 +1441,21 @@ def restore_vm_security_groups(cntx, db, restore):
                 {'sec_id': security_group['id'],
                  'vm_attached': db.get_metadata_value(snapshot_vm_resource.metadata, 'vm_attached') in ('1', True, None),
                  'res_id': snapshot_vm_resource.id}
-            restored_vm_resource_values = \
-                {'id': str(uuid.uuid4()),
-                 'vm_id': db.get_metadata_value(snapshot_vm_resource.metadata, 'vm_id'),
-                 'restore_id': restore['id'],
-                 'resource_type': 'security_group',
-                 'resource_name': security_group['id'],
-                 'resource_pit_id': security_group['id'],
-                 'metadata': {'name': security_group['name'],
-                              'security_group_type': 'neutron',
-                              'description': security_group['description']},
-                 'status': 'available'}
+            restored_vm_resource_values = {
+                'id': str(
+                    uuid.uuid4()),
+                'vm_id': db.get_metadata_value(
+                    snapshot_vm_resource.metadata,
+                    'vm_id'),
+                'restore_id': restore['id'],
+                'resource_type': 'security_group',
+                'resource_name': security_group['id'],
+                'resource_pit_id': security_group['id'],
+                'metadata': {
+                    'name': security_group['name'],
+                    'security_group_type': 'neutron',
+                    'description': security_group['description']},
+                'status': 'available'}
             db.restored_vm_resource_create(
                 cntx, restored_vm_resource_values)
 
@@ -1496,8 +1504,9 @@ def restore_vm_security_groups(cntx, db, restore):
                 if vm_security_group_rule_values.get(
                         'remote_group_id', None) is not None:
                     for sec_group_rule in security_group['security_group_rules']:
-                        if match_rule_values(dict(vm_security_group_rule_values), dict(
-                                sec_group_rule)) is True:
+                        if match_rule_values(
+                                dict(vm_security_group_rule_values),
+                                dict(sec_group_rule)) is True:
                             network_service.security_group_rule_delete(
                                 cntx, sec_group_rule['id'])
                             break

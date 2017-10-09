@@ -75,6 +75,10 @@ class SchedulerAPI(workloadmgr.openstack.common.rpc.proxy.RpcProxy):
     def update_service_capabilities(self, ctxt,
                                     service_name, host,
                                     capabilities):
-        self.fanout_cast(ctxt, self.make_msg('update_service_capabilities',
-                                             service_name=service_name, host=host,
-                                             capabilities=capabilities))
+        self.fanout_cast(
+            ctxt,
+            self.make_msg(
+                'update_service_capabilities',
+                service_name=service_name,
+                host=host,
+                capabilities=capabilities))

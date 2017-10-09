@@ -19,12 +19,13 @@ RESP_NOT_XML_ERROR = 'Response is "text/html", not "text/xml"'
 CONN_ABORT_ERROR = 'Software caused connection abort'
 ADDRESS_IN_USE_ERROR = 'Address already in use'
 
-vmwareapi_wsdl_loc_opt = cfg.StrOpt('wsdl_location',
-                                    deprecated_name='vmwareapi_wsdl_loc',
-                                    deprecated_group='DEFAULT',
-                                    help='Optional VIM Service WSDL Location '
-                                    'e.g http://<server>/vimService.wsdl. '
-                                    'Optional over-ride to default location for bug work-arounds')
+vmwareapi_wsdl_loc_opt = cfg.StrOpt(
+    'wsdl_location',
+    deprecated_name='vmwareapi_wsdl_loc',
+    deprecated_group='DEFAULT',
+    help='Optional VIM Service WSDL Location '
+    'e.g http://<server>/vimService.wsdl. '
+    'Optional over-ride to default location for bug work-arounds')
 
 CONF = cfg.CONF
 CONF.register_opt(vmwareapi_wsdl_loc_opt, 'vmware')
@@ -142,8 +143,9 @@ class Vim:
                 # SOAP server
                 if hasattr(error_util.FaultCheckers,
                            attr_name.lower() + "_fault_checker"):
-                    fault_checker = getattr(error_util.FaultCheckers,
-                                            attr_name.lower() + "_fault_checker")
+                    fault_checker = getattr(
+                        error_util.FaultCheckers,
+                        attr_name.lower() + "_fault_checker")
                     fault_checker(response)
                 return response
             # Catch the VimFaultException that is raised by the fault
@@ -158,25 +160,25 @@ class Vim:
                     fault_list.append(child.get("type"))
                 raise error_util.VimFaultException(fault_list, excep)
             except AttributeError as excep:
-                raise error_util.VimAttributeError(_("No such SOAP method "
-                                                     "'%s' provided by VI SDK") % (attr_name), excep)
+                raise error_util.VimAttributeError(
+                    _("No such SOAP method " "'%s' provided by VI SDK") % (attr_name), excep)
             except (httplib.CannotSendRequest,
                     httplib.ResponseNotReady,
                     httplib.CannotSendHeader) as excep:
-                raise error_util.SessionOverLoadException(_("httplib "
-                                                            "error in %s: ") % (attr_name), excep)
+                raise error_util.SessionOverLoadException(
+                    _("httplib " "error in %s: ") % (attr_name), excep)
             except Exception as excep:
                 # Socket errors which need special handling for they
                 # might be caused by ESX API call overload
                 if (str(excep).find(ADDRESS_IN_USE_ERROR) != -1 or
                         str(excep).find(CONN_ABORT_ERROR)) != -1:
-                    raise error_util.SessionOverLoadException(_("Socket "
-                                                                "error in %s: ") % (attr_name), excep)
+                    raise error_util.SessionOverLoadException(
+                        _("Socket " "error in %s: ") % (attr_name), excep)
                 # Type error that needs special handling for it might be
                 # caused by ESX host API call overload
                 elif str(excep).find(RESP_NOT_XML_ERROR) != -1:
-                    raise error_util.SessionOverLoadException(_("Type "
-                                                                "error in  %s: ") % (attr_name), excep)
+                    raise error_util.SessionOverLoadException(
+                        _("Type " "error in  %s: ") % (attr_name), excep)
                 else:
                     raise error_util.VimException(
                         _("Exception in %s ") % (attr_name), excep)

@@ -428,16 +428,24 @@ class NfsTrilioVaultBackupTarget(TrilioVaultBackupTarget):
             self.umount_backup_target_swift()
             fileutils.ensure_tree(mountpath)
             self.__mountpath = mountpath
-            super(NfsTrilioVaultBackupTarget, self).__init__(backupendpoint, "nfs",
-                                                             mountpath=mountpath)
+            super(
+                NfsTrilioVaultBackupTarget,
+                self).__init__(
+                backupendpoint,
+                "nfs",
+                mountpath=mountpath)
             if not self.is_mounted():
                 utils.chmod(mountpath, '0777')
 
         elif CONF.vault_storage_type == 'swift-s':
             mountpath = CONF.vault_data_directory
             self.__mountpath = mountpath
-            super(NfsTrilioVaultBackupTarget, self).__init__(backupendpoint, "swift-s",
-                                                             mountpath=mountpath)
+            super(
+                NfsTrilioVaultBackupTarget,
+                self).__init__(
+                backupendpoint,
+                "swift-s",
+                mountpath=mountpath)
 
     def get_progress_tracker_directory(self, tracker_metadata):
         """
@@ -445,8 +453,9 @@ class NfsTrilioVaultBackupTarget(TrilioVaultBackupTarget):
         object is a file on NFS. It can be object in object store
         """
         mountpath = self.mount_path
-        progress_tracker_directory = os.path.join(mountpath,
-                                                  "contego_tasks", 'snapshot_%s' % (tracker_metadata['snapshot_id']))
+        progress_tracker_directory = os.path.join(
+            mountpath, "contego_tasks", 'snapshot_%s' %
+            (tracker_metadata['snapshot_id']))
 
         fileutils.ensure_tree(progress_tracker_directory)
         utils.chmod(progress_tracker_directory, '0777')
@@ -494,8 +503,9 @@ class NfsTrilioVaultBackupTarget(TrilioVaultBackupTarget):
 
     @ensure_mounted()
     def get_workload_path(self, workload_metadata):
-        workload_path = os.path.join(self.mount_path,
-                                     'workload_%s' % (workload_metadata['workload_id']))
+        workload_path = os.path.join(
+            self.mount_path, 'workload_%s' %
+            (workload_metadata['workload_id']))
         return workload_path
 
     @ensure_mounted()
@@ -511,22 +521,28 @@ class NfsTrilioVaultBackupTarget(TrilioVaultBackupTarget):
 
     def get_snapshot_path(self, snapshot_metadata):
         workload_path = self.get_workload_path(snapshot_metadata)
-        snapshot_path = os.path.join(workload_path,
-                                     'snapshot_%s' % (snapshot_metadata['snapshot_id']))
+        snapshot_path = os.path.join(
+            workload_path, 'snapshot_%s' %
+            (snapshot_metadata['snapshot_id']))
         return snapshot_path
 
     def get_snapshot_vm_path(self, snapshot_vm_metadata):
         snapshot_path = self.get_snapshot_path(snapshot_vm_metadata)
-        snapshot_vm_path = os.path.join(snapshot_path,
-                                        'vm_id_%s' % (snapshot_vm_metadata['snapshot_vm_id']))
+        snapshot_vm_path = os.path.join(
+            snapshot_path, 'vm_id_%s' %
+            (snapshot_vm_metadata['snapshot_vm_id']))
         return snapshot_vm_path
 
     def get_snapshot_vm_resource_path(self, snapshot_vm_resource_metadata):
         snapshot_vm_path = self.get_snapshot_vm_path(
             snapshot_vm_resource_metadata)
-        snapshot_vm_resource_path = os.path.join(snapshot_vm_path,
-                                                 'vm_res_id_%s_%s' % (snapshot_vm_resource_metadata['snapshot_vm_resource_id'],
-                                                                      snapshot_vm_resource_metadata['snapshot_vm_resource_name'].replace(' ', '')))
+        snapshot_vm_resource_path = os.path.join(
+            snapshot_vm_path,
+            'vm_res_id_%s_%s' %
+            (snapshot_vm_resource_metadata['snapshot_vm_resource_id'],
+             snapshot_vm_resource_metadata['snapshot_vm_resource_name'].replace(
+                ' ',
+                '')))
 
         return snapshot_vm_resource_path
 
@@ -535,8 +551,9 @@ class NfsTrilioVaultBackupTarget(TrilioVaultBackupTarget):
         snapshot_vm_resource_path = \
             self.get_snapshot_vm_resource_path(
                 snapshot_vm_disk_resource_metadata)
-        snapshot_vm_disk_resource_path = os.path.join(snapshot_vm_resource_path,
-                                                      snapshot_vm_disk_resource_metadata['vm_disk_resource_snap_id'])
+        snapshot_vm_disk_resource_path = os.path.join(
+            snapshot_vm_resource_path,
+            snapshot_vm_disk_resource_metadata['vm_disk_resource_snap_id'])
 
         return snapshot_vm_disk_resource_path
 
@@ -544,32 +561,39 @@ class NfsTrilioVaultBackupTarget(TrilioVaultBackupTarget):
         vault_data_directory = os.path.join(self.mount_path,
                                             "staging",
                                             socket.gethostname())
-        restore_staging_path = os.path.join(vault_data_directory,
-                                            'restore_%s' % (restore_metadata['restore_id']))
+        restore_staging_path = os.path.join(
+            vault_data_directory, 'restore_%s' %
+            (restore_metadata['restore_id']))
         return restore_staging_path
 
     def get_restore_vm_staging_path(self, restore_vm_metadata):
         restore_staging_path = self.get_restore_staging_path(
             restore_vm_metadata)
-        restore_vm_staging_path = os.path.join(restore_staging_path,
-                                               'vm_id_%s' % (restore_vm_metadata['snapshot_vm_id']))
+        restore_vm_staging_path = os.path.join(
+            restore_staging_path, 'vm_id_%s' %
+            (restore_vm_metadata['snapshot_vm_id']))
         return restore_vm_staging_path
 
     def get_restore_vm_resource_staging_path(
             self, restore_vm_resource_metadata):
         restore_vm_staging_path = self.get_restore_vm_staging_path(
             restore_vm_resource_metadata)
-        restore_vm_resource_staging_path = os.path.join(restore_vm_staging_path,
-                                                        'vm_res_id_%s_%s' % (restore_vm_resource_metadata['snapshot_vm_resource_id'],
-                                                                             restore_vm_resource_metadata['snapshot_vm_resource_name'].replace(' ', '')))
+        restore_vm_resource_staging_path = os.path.join(
+            restore_vm_staging_path,
+            'vm_res_id_%s_%s' %
+            (restore_vm_resource_metadata['snapshot_vm_resource_id'],
+             restore_vm_resource_metadata['snapshot_vm_resource_name'].replace(
+                ' ',
+                '')))
         return restore_vm_resource_staging_path
 
     def get_restore_vm_disk_resource_staging_path(
             self, restore_vm_disk_resource_metadata):
         restore_vm_resource_staging_path = self.get_restore_vm_resource_staging_path(
             restore_vm_disk_resource_metadata)
-        restore_vm_disk_resource_staging_path = os.path.join(restore_vm_resource_staging_path,
-                                                             restore_vm_disk_resource_metadata['vm_disk_resource_snap_id'])
+        restore_vm_disk_resource_staging_path = os.path.join(
+            restore_vm_resource_staging_path,
+            restore_vm_disk_resource_metadata['vm_disk_resource_snap_id'])
         return restore_vm_disk_resource_staging_path
 
     def remove_directory(self, path):
@@ -883,8 +907,9 @@ class SwiftTrilioVaultBackupTarget(NfsTrilioVaultBackupTarget):
         object is a file on NFS. It can be object in object store
         """
         mountpath = self.mount_path
-        progress_tracker_directory = os.path.join(mountpath,
-                                                  "contego_tasks", 'snapshot_%s' % (tracker_metadata['snapshot_id']))
+        progress_tracker_directory = os.path.join(
+            mountpath, "contego_tasks", 'snapshot_%s' %
+            (tracker_metadata['snapshot_id']))
 
         fileutils.ensure_tree(progress_tracker_directory)
         return progress_tracker_directory
@@ -1123,7 +1148,7 @@ def get_nfs_share_for_workload_by_free_overcommit(context, workload):
         mountpath = os.path.join(CONF.vault_data_directory, base64encode)
         for w in os.listdir(mountpath):
             try:
-                if not 'workload_' in w:
+                if 'workload_' not in w:
                     continue
                 workload_path = os.path.join(mountpath, w)
                 with open(os.path.join(workload_path, "workload_db"), "r") as f:

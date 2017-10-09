@@ -159,14 +159,18 @@ class VMwareESXDriver(driver.ComputeDriver):
     def suspend(self, cntx, db, instance):
         """Suspend the specified instance."""
         instance['uuid'] = instance['vm_id']
-        vm_ref = vm_util.get_vm_ref(self._session, {'uuid': instance['vm_id'],
-                                                    'vm_name': instance['vm_name'],
-                                                    'vmware_uuid': instance['vm_metadata']['vmware_uuid'],
-                                                    })
+        vm_ref = vm_util.get_vm_ref(self._session,
+                                    {'uuid': instance['vm_id'],
+                                     'vm_name': instance['vm_name'],
+                                        'vmware_uuid': instance['vm_metadata']['vmware_uuid'],
+                                     })
 
-        pwr_state = self._session._call_method(vim_util,
-                                               "get_dynamic_property", vm_ref,
-                                               "VirtualMachine", "runtime.powerState")
+        pwr_state = self._session._call_method(
+            vim_util,
+            "get_dynamic_property",
+            vm_ref,
+            "VirtualMachine",
+            "runtime.powerState")
         # Only PoweredOn VMs can be suspended.
         if pwr_state == "poweredOn":
             LOG.info(_("Suspending the VM %s") % instance['vm_name'])
@@ -186,14 +190,18 @@ class VMwareESXDriver(driver.ComputeDriver):
     def resume(self, cntx, db, instance):
         """Resume the specified instance."""
         instance['uuid'] = instance['vm_id']
-        vm_ref = vm_util.get_vm_ref(self._session, {'uuid': instance['vm_id'],
-                                                    'vm_name': instance['vm_name'],
-                                                    'vmware_uuid': instance['vm_metadata']['vmware_uuid'],
-                                                    })
+        vm_ref = vm_util.get_vm_ref(self._session,
+                                    {'uuid': instance['vm_id'],
+                                     'vm_name': instance['vm_name'],
+                                        'vmware_uuid': instance['vm_metadata']['vmware_uuid'],
+                                     })
 
-        pwr_state = self._session._call_method(vim_util,
-                                               "get_dynamic_property", vm_ref,
-                                               "VirtualMachine", "runtime.powerState")
+        pwr_state = self._session._call_method(
+            vim_util,
+            "get_dynamic_property",
+            vm_ref,
+            "VirtualMachine",
+            "runtime.powerState")
         if pwr_state.lower() == "suspended":
             LOG.info(_("Resuming the VM %s") % instance['vm_name'])
             suspend_task = self._session._call_method(
@@ -208,9 +216,12 @@ class VMwareESXDriver(driver.ComputeDriver):
     @autolog.log_method(Logger, 'VMwareESXDriver.power_off')
     def power_off(self, vm_ref, instance):
         """Power off the specified instance."""
-        pwr_state = self._session._call_method(vim_util,
-                                               "get_dynamic_property", vm_ref,
-                                               "VirtualMachine", "runtime.powerState")
+        pwr_state = self._session._call_method(
+            vim_util,
+            "get_dynamic_property",
+            vm_ref,
+            "VirtualMachine",
+            "runtime.powerState")
         # Only PoweredOn VMs can be powered off.
         if pwr_state == "poweredOn":
             LOG.info(_("Powering off the VM %s") % instance['vm_name'])
@@ -232,9 +243,12 @@ class VMwareESXDriver(driver.ComputeDriver):
     @autolog.log_method(Logger, 'VMwareESXDriver.power_on')
     def power_on(self, vm_ref, instance):
         """Power on the specified instance."""
-        pwr_state = self._session._call_method(vim_util,
-                                               "get_dynamic_property", vm_ref,
-                                               "VirtualMachine", "runtime.powerState")
+        pwr_state = self._session._call_method(
+            vim_util,
+            "get_dynamic_property",
+            vm_ref,
+            "VirtualMachine",
+            "runtime.powerState")
         if pwr_state == "poweredOn":
             LOG.info(_("%s is already in powered on state. So returning "
                        "without doing anything") % instance['vm_name'])
@@ -245,8 +259,8 @@ class VMwareESXDriver(driver.ComputeDriver):
                 self._session._get_vim(),
                 "PowerOnVM_Task", vm_ref)
 
-            vmSummary = self._session._call_method(vim_util, "get_dynamic_property", vm_ref,
-                                                   "VirtualMachine", "summary")
+            vmSummary = self._session._call_method(
+                vim_util, "get_dynamic_property", vm_ref, "VirtualMachine", "summary")
 
             while vmSummary.runtime.powerState != "poweredOn":
                 question_answered = False
@@ -256,15 +270,18 @@ class VMwareESXDriver(driver.ComputeDriver):
                     if "i copied it" in vmSummary.runtime.question.text.lower():
                         for choiceInfo in vmSummary.runtime.question.choice.choiceInfo:
                             if "copied" in choiceInfo.label.lower():
-                                self._session._call_method(self._session._get_vim(), "AnswerVM", vm_ref,
-                                                           questionId=vmSummary.runtime.question.id,
-                                                           answerChoice=choiceInfo.key)
+                                self._session._call_method(
+                                    self._session._get_vim(),
+                                    "AnswerVM",
+                                    vm_ref,
+                                    questionId=vmSummary.runtime.question.id,
+                                    answerChoice=choiceInfo.key)
                                 question_answered = True
                                 break
                 if question_answered:
                     break
-                vmSummary = self._session._call_method(vim_util, "get_dynamic_property", vm_ref,
-                                                       "VirtualMachine", "summary")
+                vmSummary = self._session._call_method(
+                    vim_util, "get_dynamic_property", vm_ref, "VirtualMachine", "summary")
                 end = timeutils.utcnow()
                 delay = CONF.vmware.task_poll_interval - \
                     timeutils.delta_seconds(start, end)
@@ -308,10 +325,13 @@ class VMwareVCDriver(VMwareESXDriver):
         DataStore.
         """
         LOG.info(_("Creating directory with path %s") % ds_path)
-        self._session._call_method(self._session._get_vim(), "MakeDirectory",
-                                   self._session._get_vim().get_service_content().fileManager,
-                                   name=ds_path, datacenter=datacenter_ref,
-                                   createParentDirectories=False)
+        self._session._call_method(
+            self._session._get_vim(),
+            "MakeDirectory",
+            self._session._get_vim().get_service_content().fileManager,
+            name=ds_path,
+            datacenter=datacenter_ref,
+            createParentDirectories=False)
         LOG.info(_("Created directory with path %s") % ds_path)
 
     @autolog.log_method(
@@ -343,8 +363,9 @@ class VMwareVCDriver(VMwareESXDriver):
         datacenter_ref = None
         datacenter_name = None
 
-        datacenters = self._session._call_method(vim_util, "get_objects",
-                                                 "Datacenter", ["datastore", "name"])
+        datacenters = self._session._call_method(
+            vim_util, "get_objects", "Datacenter", [
+                "datastore", "name"])
         while datacenters:
             token = vm_util._get_token(datacenters)
             for obj_content in datacenters.objects:
@@ -363,9 +384,8 @@ class VMwareVCDriver(VMwareESXDriver):
                                                token)
                 return datacenter_ref, datacenter_name
             if token:
-                datacenters = self._session._call_method(vim_util,
-                                                         "continue_to_get_objects",
-                                                         token)
+                datacenters = self._session._call_method(
+                    vim_util, "continue_to_get_objects", token)
             else:
                 break
         raise exception.DatacenterNotFound()
@@ -390,9 +410,8 @@ class VMwareVCDriver(VMwareESXDriver):
     def _get_root_disk_path_from_vm_ref(self, vm_ref):
 
         # Get the vmdk file name that the VM is pointing to
-        virtual_disks = self._session._call_method(vim_util,
-                                                   "get_dynamic_property", vm_ref,
-                                                   "VirtualMachine", "layout.disk")
+        virtual_disks = self._session._call_method(
+            vim_util, "get_dynamic_property", vm_ref, "VirtualMachine", "layout.disk")
         return virtual_disks[0][0].diskFile[0]
 
     @autolog.log_method(Logger, 'VMwareVCDriver._get_vm_ref_from_name_folder')
@@ -437,7 +456,11 @@ class VMwareVCDriver(VMwareESXDriver):
     @autolog.log_method(Logger, 'VMwareVCDriver._get_vmfolder_ref')
     def _get_vmfolder_ref(self, datacenter_ref, vmfolder_moid=None):
         vmfolder_ref = self._session._call_method(
-            vim_util, "get_dynamic_property", datacenter_ref, "Datacenter", "vmFolder")
+            vim_util,
+            "get_dynamic_property",
+            datacenter_ref,
+            "Datacenter",
+            "vmFolder")
         if vmfolder_moid is None or vmfolder_ref.value == vmfolder_moid:
             return vmfolder_ref
         result = self._get_vmfolder_ref_from_parent_folder(
@@ -464,9 +487,8 @@ class VMwareVCDriver(VMwareESXDriver):
                                                token)
                 return computeresource_ref, None
             if token:
-                computeresources = self._session._call_method(vim_util,
-                                                              "continue_to_get_objects",
-                                                              token)
+                computeresources = self._session._call_method(
+                    vim_util, "continue_to_get_objects", token)
             else:
                 break
 
@@ -484,9 +506,8 @@ class VMwareVCDriver(VMwareESXDriver):
                                                token)
                 return computeresource_ref, None
             if token:
-                computeresources = self._session._call_method(vim_util,
-                                                              "continue_to_get_objects",
-                                                              token)
+                computeresources = self._session._call_method(
+                    vim_util, "continue_to_get_objects", token)
             else:
                 break
 
@@ -531,9 +552,8 @@ class VMwareVCDriver(VMwareESXDriver):
                                                token)
                 return res_pool_ref
             if token:
-                resourcepools = self._session._call_method(vim_util,
-                                                           "continue_to_get_objects",
-                                                           token)
+                resourcepools = self._session._call_method(
+                    vim_util, "continue_to_get_objects", token)
             else:
                 break
         raise exception.ResourcePoolNotFound()
@@ -684,12 +704,20 @@ class VMwareVCDriver(VMwareESXDriver):
             raise
 
     @autolog.log_method(Logger, 'VMwareVCDriver._rebase_vmdk')
-    def _rebase_vmdk(self, base, orig_base, base_descriptor, base_monolithicsparse,
-                     top, orig_top, top_descriptor, top_monolithicsparse):
+    def _rebase_vmdk(
+            self,
+            base,
+            orig_base,
+            base_descriptor,
+            base_monolithicsparse,
+            top,
+            orig_top,
+            top_descriptor,
+            top_monolithicsparse):
         """
         rebase the top to base
         """
-        if base_monolithicsparse == False:
+        if not base_monolithicsparse:
             base_path, base_filename = os.path.split(base)
             orig_base_path, orig_base_filename = os.path.split(orig_base)
             base_extent_path = base_path
@@ -726,7 +754,8 @@ class VMwareVCDriver(VMwareESXDriver):
                         top_extent_path,
                         top_extent_filename))
                 top_descriptor = top_descriptor.replace(
-                    (' "' + orig_top_filename + '"'), (' "' + top_extent_filename + '"'))
+                    (' "' + orig_top_filename + '"'),
+                    (' "' + top_extent_filename + '"'))
 
             top_descriptor = re.sub(
                 r'parentFileNameHint="([^"]*)"',
@@ -744,11 +773,25 @@ class VMwareVCDriver(VMwareESXDriver):
         # due to a bug in Nova VMware Driver (https://review.openstack.org/#/c/43994/) we will create a preallocated disk
         #utils.execute( 'vmware-vdiskmanager', '-r', file_to_commit, '-t 0',  commit_to, run_as_root=False)
         if test:
-            utils.execute('env', 'LD_LIBRARY_PATH=/usr/lib/vmware-vix-disklib/lib64',
-                          'vmware-vdiskmanager', '-r', file_to_commit, '-t 2', commit_to, run_as_root=False)
+            utils.execute(
+                'env',
+                'LD_LIBRARY_PATH=/usr/lib/vmware-vix-disklib/lib64',
+                'vmware-vdiskmanager',
+                '-r',
+                file_to_commit,
+                '-t 2',
+                commit_to,
+                run_as_root=False)
         else:
-            utils.execute('env', 'LD_LIBRARY_PATH=/usr/lib/vmware-vix-disklib/lib64',
-                          'vmware-vdiskmanager', '-r', file_to_commit, '-t 4', commit_to, run_as_root=False)
+            utils.execute(
+                'env',
+                'LD_LIBRARY_PATH=/usr/lib/vmware-vix-disklib/lib64',
+                'vmware-vdiskmanager',
+                '-r',
+                file_to_commit,
+                '-t 4',
+                commit_to,
+                run_as_root=False)
 
         utils.chmod(commit_to, '0664')
         utils.chmod(commit_to.replace(".vmdk", "-flat.vmdk"), '0664')
@@ -792,10 +835,11 @@ class VMwareVCDriver(VMwareESXDriver):
 
     @autolog.log_method(Logger, 'VMwareVCDriver.enable_cbt')
     def enable_cbt(self, cntx, db, instance):
-        vm_ref = vm_util.get_vm_ref(self._session, {'uuid': instance['vm_id'],
-                                                    'vm_name': instance['vm_name'],
-                                                    'vmware_uuid': instance['vm_metadata']['vmware_uuid'],
-                                                    })
+        vm_ref = vm_util.get_vm_ref(self._session,
+                                    {'uuid': instance['vm_id'],
+                                     'vm_name': instance['vm_name'],
+                                        'vmware_uuid': instance['vm_metadata']['vmware_uuid'],
+                                     })
 
         # set the change block tracking for VM and for virtual disks
         # make this part of workload create so if there are outstanding
@@ -806,62 +850,84 @@ class VMwareVCDriver(VMwareESXDriver):
             if not self._session._call_method(vim_util, "get_dynamic_property",
                                               vm_ref, "VirtualMachine",
                                               "config.changeTrackingEnabled"):
-                rootsnapshot = self._session._call_method(vim_util, "get_dynamic_property", vm_ref,
-                                                          "VirtualMachine", "rootSnapshot")
+                rootsnapshot = self._session._call_method(
+                    vim_util, "get_dynamic_property", vm_ref, "VirtualMachine", "rootSnapshot")
                 if not rootsnapshot:
                     client_factory = self._session._get_vim().client.factory
                     config_spec = client_factory.create(
                         'ns0:VirtualMachineConfigSpec')
                     config_spec.changeTrackingEnabled = True
-                    reconfig_task = self._session._call_method(self._session._get_vim(),
-                                                               "ReconfigVM_Task", vm_ref,
-                                                               spec=config_spec)
+                    reconfig_task = self._session._call_method(
+                        self._session._get_vim(), "ReconfigVM_Task", vm_ref, spec=config_spec)
                     self._session._wait_for_task(
                         instance['vm_metadata']['vmware_uuid'], reconfig_task)
-                    if not self._session._call_method(vim_util, "get_dynamic_property",
-                                                      vm_ref, "VirtualMachine",
-                                                      "config.changeTrackingEnabled"):
-                        raise Exception(_("VM '%s(%s)' changeTracking is not enabled") %
-                                        (instance['vm_name'], instance['vm_metadata']['vmware_uuid']))
+                    if not self._session._call_method(
+                        vim_util,
+                        "get_dynamic_property",
+                        vm_ref,
+                        "VirtualMachine",
+                            "config.changeTrackingEnabled"):
+                        raise Exception(
+                            _("VM '%s(%s)' changeTracking is not enabled") %
+                            (instance['vm_name'], instance['vm_metadata']['vmware_uuid']))
                 else:
                     raise Exception(_("Since VM '%s(%s)' has existing snapshots, "
                                       "changed block tracking feature can't be enabled. "
                                       "Remove snapshots and try again") %
                                     (instance['vm_name'], instance['vm_metadata']['vmware_uuid']))
         else:
-            raise Exception(_("VM '%s(%s)' does not support changed block tracking") %
-                             (instance['vm_name'], instance['vm_metadata']['vmware_uuid']))
+            raise Exception(
+                _("VM '%s(%s)' does not support changed block tracking") %
+                (instance['vm_name'], instance['vm_metadata']['vmware_uuid']))
 
     @autolog.log_method(Logger, 'VMwareVCDriver.snapshot_vm')
     def snapshot_vm(self, cntx, db, instance, snapshot):
         try:
-            vm_ref = vm_util.get_vm_ref(self._session, {'uuid': instance['vm_id'],
-                                                        'vm_name': instance['vm_name'],
-                                                        'vmware_uuid': instance['vm_metadata']['vmware_uuid'],
-                                                        })
+            vm_ref = vm_util.get_vm_ref(self._session,
+                                        {'uuid': instance['vm_id'],
+                                         'vm_name': instance['vm_name'],
+                                            'vmware_uuid': instance['vm_metadata']['vmware_uuid'],
+                                         })
 
             # set the change block tracking for VM and for virtual disks
             # make this part of workload create so if there are outstanding
             # snapshots on any VM, we can error out
-            if self._session._call_method(vim_util, "get_dynamic_property",
-                                          vm_ref, "VirtualMachine",
-                                          "capability.changeTrackingSupported"):
-                if not self._session._call_method(vim_util, "get_dynamic_property",
-                                                  vm_ref, "VirtualMachine",
-                                                  "config.changeTrackingEnabled"):
-                    raise Exception(_("VM '%s(%s)' does not have changeTracking enabled") %
-                                     (instance['vm_name'], instance['vm_metadata']['vmware_uuid']))
+            if self._session._call_method(
+                vim_util,
+                "get_dynamic_property",
+                vm_ref,
+                "VirtualMachine",
+                    "capability.changeTrackingSupported"):
+                if not self._session._call_method(
+                    vim_util,
+                    "get_dynamic_property",
+                    vm_ref,
+                    "VirtualMachine",
+                        "config.changeTrackingEnabled"):
+                    raise Exception(
+                        _("VM '%s(%s)' does not have changeTracking enabled") %
+                        (instance['vm_name'], instance['vm_metadata']['vmware_uuid']))
             else:
-                raise Exception(_("VM '%s(%s)' does not support changeTracking") %
-                                 (instance['vm_name'], instance['vm_metadata']['vmware_uuid']))
+                raise Exception(
+                    _("VM '%s(%s)' does not support changeTracking") %
+                    (instance['vm_name'], instance['vm_metadata']['vmware_uuid']))
 
-            hardware_devices = self._session._call_method(vim_util, "get_dynamic_property", vm_ref,
-                                                          "VirtualMachine", "config.hardware.device")
+            hardware_devices = self._session._call_method(
+                vim_util,
+                "get_dynamic_property",
+                vm_ref,
+                "VirtualMachine",
+                "config.hardware.device")
             disks = vm_util.get_disks(hardware_devices)
 
             lst_properties = ["config.files.vmPathName", "runtime.powerState"]
-            props = self._session._call_method(vim_util,
-                                               "get_object_properties", None, vm_ref, "VirtualMachine", lst_properties)
+            props = self._session._call_method(
+                vim_util,
+                "get_object_properties",
+                None,
+                vm_ref,
+                "VirtualMachine",
+                lst_properties)
             query = {'config.files.vmPathName': None}
 
             self._get_values_from_object_properties(props, query)
@@ -869,11 +935,11 @@ class VMwareVCDriver(VMwareESXDriver):
             if vmx_file_path:
                 datastore_name, vmx_file_name = vm_util.split_datastore_path(
                     vmx_file_path)
-            datastores = self._session._call_method(vim_util, "get_dynamic_property", vm_ref,
-                                                    "VirtualMachine", "datastore")
+            datastores = self._session._call_method(
+                vim_util, "get_dynamic_property", vm_ref, "VirtualMachine", "datastore")
             for datastore in datastores[0]:
-                name = self._session._call_method(vim_util, "get_dynamic_property", datastore,
-                                                  "Datastore", "name")
+                name = self._session._call_method(
+                    vim_util, "get_dynamic_property", datastore, "Datastore", "name")
                 if name == datastore_name:
                     datastore_ref = datastore
                     break
@@ -896,8 +962,12 @@ class VMwareVCDriver(VMwareESXDriver):
                 instance['vm_id'], snapshot_task)
             snapshot_ref = task_info.result
             snapshot_data = {'disks': disks, 'vmx_file': vmx_file}
-            hardware = self._session._call_method(vim_util, "get_dynamic_property", snapshot_ref,
-                                                  "VirtualMachineSnapshot", "config.hardware")
+            hardware = self._session._call_method(
+                vim_util,
+                "get_dynamic_property",
+                snapshot_ref,
+                "VirtualMachineSnapshot",
+                "config.hardware")
             snapshot_devices = []
             for device in hardware.device:
                 if device.__class__.__name__ == "VirtualDisk":
@@ -906,7 +976,7 @@ class VMwareVCDriver(VMwareESXDriver):
                        backing.__class__.__name__ == "VirtualDiskFlatVer2BackingInfo" or \
                        backing.__class__.__name__ == "VirtualDiskSparseVer1BackingInfo" or \
                        backing.__class__.__name__ == "VirtualDiskSparseVer2BackingInfo":
-                        if not 'capacityInBytes' in device:
+                        if 'capacityInBytes' not in device:
                             device['capacityInBytes'] = device.capacityInKB * 1024
                         snapshot_devices.append(device)
 
@@ -970,25 +1040,27 @@ class VMwareVCDriver(VMwareESXDriver):
             if snapshot_obj.snapshot_type == 'full':
                 parent_changeId = '*'
             else:
-                parent_vault_path, parent_changeId, parent_content_id = self.get_parent_changeId(cntx, db,
-                                                                                                 snapshot['workload_id'],
-                                                                                                 instance['vm_id'],
-                                                                                                 dev.backing.uuid)
+                parent_vault_path, parent_changeId, parent_content_id = self.get_parent_changeId(
+                    cntx, db, snapshot['workload_id'], instance['vm_id'], dev.backing.uuid)
             position = 0
             while position < dev.capacityInBytes:
-                changes = self._session._call_method(self._session._get_vim(),
-                                                     "QueryChangedDiskAreas", snapshot_data['vm_ref'],
-                                                     snapshot=snapshot_data['snapshot_ref'],
-                                                     deviceKey=dev['key'],
-                                                     startOffset=position,
-                                                     changeId=parent_changeId)
+                changes = self._session._call_method(
+                    self._session._get_vim(),
+                    "QueryChangedDiskAreas",
+                    snapshot_data['vm_ref'],
+                    snapshot=snapshot_data['snapshot_ref'],
+                    deviceKey=dev['key'],
+                    startOffset=position,
+                    changeId=parent_changeId)
                 if changes == []:
-                    changes = self._session._call_method(self._session._get_vim(),
-                                                         "QueryChangedDiskAreas", snapshot_data['vm_ref'],
-                                                         snapshot=snapshot_data['snapshot_ref'],
-                                                         deviceKey=dev['key'],
-                                                         startOffset=position,
-                                                         changeId=parent_changeId)
+                    changes = self._session._call_method(
+                        self._session._get_vim(),
+                        "QueryChangedDiskAreas",
+                        snapshot_data['vm_ref'],
+                        snapshot=snapshot_data['snapshot_ref'],
+                        deviceKey=dev['key'],
+                        startOffset=position,
+                        changeId=parent_changeId)
 
                 if 'changedArea' in changes:
                     for change in changes.changedArea:
@@ -1017,11 +1089,7 @@ class VMwareVCDriver(VMwareESXDriver):
                 parent_content_id = None
             else:
                 parent_vault_path, parent_changeId, parent_content_id = self.get_parent_changeId(
-                    cntx,
-                    db,
-                    snapshot['workload_id'],
-                    instance['vm_id'],
-                    dev.backing.uuid)
+                    cntx, db, snapshot['workload_id'], instance['vm_id'], dev.backing.uuid)
             dev['parent_vault_path'] = parent_vault_path
             dev['parent_changeId'] = parent_changeId
             dev['parent_content_id'] = parent_content_id
@@ -1067,10 +1135,12 @@ class VMwareVCDriver(VMwareESXDriver):
                         LOG.exception(ex)
                         raise
 
-                extentsinfo = thickcopyextents(self._session._host_ip,
-                                               self._session._host_username,
-                                               self._session._host_password, vmxspec,
-                                               devicemap)
+                extentsinfo = thickcopyextents(
+                    self._session._host_ip,
+                    self._session._host_username,
+                    self._session._host_password,
+                    vmxspec,
+                    devicemap)
                 if extentsinfo:
                     extentsfiles = extentsinfo['extentsfiles']
                     totalblocks = extentsinfo['totalblocks']
@@ -1089,9 +1159,9 @@ class VMwareVCDriver(VMwareESXDriver):
                         pass
 
         for idx, dev in enumerate(snapshot_data['snapshot_devices']):
-            if not 'extentsfile' in dev or not dev['extentsfile'] or \
+            if 'extentsfile' not in dev or not dev['extentsfile'] or \
                 (hasattr(dev.backing, 'thinProvisioned') and
-                 dev.backing.thinProvisioned == True) or \
+                 dev.backing.thinProvisioned) or \
                     dev['parent_changeId'] != '*':
 
                 try:
@@ -1118,12 +1188,14 @@ class VMwareVCDriver(VMwareESXDriver):
                             startOffset=position,
                             changeId=parent_changeId)
                         if changes == []:
-                            changes = self._session._call_method(self._session._get_vim(),
-                                                                 "QueryChangedDiskAreas", snapshot_data['vm_ref'],
-                                                                 snapshot=snapshot_data['snapshot_ref'],
-                                                                 deviceKey=dev['key'],
-                                                                 startOffset=position,
-                                                                 changeId=parent_changeId)
+                            changes = self._session._call_method(
+                                self._session._get_vim(),
+                                "QueryChangedDiskAreas",
+                                snapshot_data['vm_ref'],
+                                snapshot=snapshot_data['snapshot_ref'],
+                                deviceKey=dev['key'],
+                                startOffset=position,
+                                changeId=parent_changeId)
 
                         if 'changedArea' in changes:
                             for extent in changes.changedArea:
@@ -1157,15 +1229,11 @@ class VMwareVCDriver(VMwareESXDriver):
                     parent_changeId = '*'
                     parent_content_id = None
                 else:
-                    parent_vault_path, parent_changeId, parent_content_id = self.get_parent_changeId(cntx, db,
-                                                                                                     snapshot['workload_id'],
-                                                                                                     instance['vm_id'],
-                                                                                                     dev.backing.uuid)
+                    parent_vault_path, parent_changeId, parent_content_id = self.get_parent_changeId(
+                        cntx, db, snapshot['workload_id'], instance['vm_id'], dev.backing.uuid)
 
-                vm_disk_resource_snap_backing = self.get_top_vm_disk_resource_snap(cntx, db,
-                                                                                   snapshot['workload_id'],
-                                                                                   instance['vm_id'],
-                                                                                   dev.backing.uuid)
+                vm_disk_resource_snap_backing = self.get_top_vm_disk_resource_snap(
+                    cntx, db, snapshot['workload_id'], instance['vm_id'], dev.backing.uuid)
                 if vm_disk_resource_snap_backing:
                     vm_disk_resource_snap_backing_id = vm_disk_resource_snap_backing.id
                 else:
@@ -1180,14 +1248,15 @@ class VMwareVCDriver(VMwareESXDriver):
                 vm_disk_resource_snap_metadata.setdefault(
                     'disk_format', 'vmdk')
                 if hasattr(
-                        dev.backing, 'thinProvisioned') and dev.backing.thinProvisioned == True:
+                        dev.backing,
+                        'thinProvisioned') and dev.backing.thinProvisioned:
                     vm_disk_resource_snap_metadata.setdefault(
                         'vmware_disktype', 'thin')
                 else:
                     vm_disk_resource_snap_metadata.setdefault(
                         'vmware_disktype', 'thick')
                 if hasattr(dev.backing,
-                           'eagerlyScrub') and dev.backing.eagerlyScrub == True:
+                           'eagerlyScrub') and dev.backing.eagerlyScrub:
                     vm_disk_resource_snap_metadata.setdefault(
                         'vmware_eagerlyScrub', 'True')
                 else:
@@ -1196,23 +1265,26 @@ class VMwareVCDriver(VMwareESXDriver):
                 vm_disk_resource_snap_metadata.setdefault(
                     'vmware_adaptertype', 'lsiLogic')
 
-                vm_disk_resource_snap_values = {'id': vm_disk_resource_snap_id,
-                                                'snapshot_vm_resource_id': snapshot_vm_resource.id,
-                                                'vm_disk_resource_snap_backing_id': vm_disk_resource_snap_backing_id,
-                                                'metadata': vm_disk_resource_snap_metadata,
-                                                'top': True,
-                                                'size': dev['disk_data_size'],
-                                                'status': 'creating'}
+                vm_disk_resource_snap_values = {
+                    'id': vm_disk_resource_snap_id,
+                    'snapshot_vm_resource_id': snapshot_vm_resource.id,
+                    'vm_disk_resource_snap_backing_id': vm_disk_resource_snap_backing_id,
+                    'metadata': vm_disk_resource_snap_metadata,
+                    'top': True,
+                    'size': dev['disk_data_size'],
+                    'status': 'creating'}
 
                 vm_disk_resource_snap = db.vm_disk_resource_snap_create(
                     cntx, vm_disk_resource_snap_values)
 
-                snapshot_vm_disk_resource_metadata = {'workload_id': snapshot['workload_id'],
-                                                      'snapshot_id': snapshot['id'],
-                                                      'snapshot_vm_id': instance['vm_id'],
-                                                      'snapshot_vm_resource_id': snapshot_vm_resource.id,
-                                                      'snapshot_vm_resource_name': dev.deviceInfo.label,
-                                                      'vm_disk_resource_snap_id': vm_disk_resource_snap_id, }
+                snapshot_vm_disk_resource_metadata = {
+                    'workload_id': snapshot['workload_id'],
+                    'snapshot_id': snapshot['id'],
+                    'snapshot_vm_id': instance['vm_id'],
+                    'snapshot_vm_resource_id': snapshot_vm_resource.id,
+                    'snapshot_vm_resource_name': dev.deviceInfo.label,
+                    'vm_disk_resource_snap_id': vm_disk_resource_snap_id,
+                }
 
                 copy_to_file_path = vault.get_snapshot_vm_disk_resource_path(
                     snapshot_vm_disk_resource_metadata)
@@ -1380,20 +1452,26 @@ class VMwareVCDriver(VMwareESXDriver):
                     copy_to_file_path, 'vmdk', disk_type)
 
                 # update the entry in the vm_disk_resource_snap table
-                vm_disk_resource_snap_values = {'vault_url': copy_to_file_path.replace(vault.get_vault_data_directory(), '', 1),
-                                                'vault_service_metadata': 'None',
-                                                'finished_at': timeutils.utcnow(),
-                                                'time_taken': int((timeutils.utcnow() - vm_disk_resource_snap.created_at).total_seconds()),
-                                                'metadata': {'content_id': content_id},
-                                                'size': vm_disk_resource_snap_size,
-                                                'restore_size': vm_disk_resource_snap_restore_size,
-                                                'status': 'available'}
+                vm_disk_resource_snap_values = {
+                    'vault_url': copy_to_file_path.replace(
+                        vault.get_vault_data_directory(),
+                        '',
+                        1),
+                    'vault_service_metadata': 'None',
+                    'finished_at': timeutils.utcnow(),
+                    'time_taken': int(
+                        (timeutils.utcnow() - vm_disk_resource_snap.created_at).total_seconds()),
+                    'metadata': {
+                        'content_id': content_id},
+                    'size': vm_disk_resource_snap_size,
+                    'restore_size': vm_disk_resource_snap_restore_size,
+                    'status': 'available'}
                 vm_disk_resource_snap = db.vm_disk_resource_snap_update(
                     cntx, vm_disk_resource_snap.id, vm_disk_resource_snap_values)
                 if vm_disk_resource_snap_backing:
-                    vm_disk_resource_snap_backing = db.vm_disk_resource_snap_update(cntx,
-                                                                                    vm_disk_resource_snap_backing.id,
-                                                                                    {'vm_disk_resource_snap_child_id': vm_disk_resource_snap.id})
+                    vm_disk_resource_snap_backing = db.vm_disk_resource_snap_update(
+                        cntx, vm_disk_resource_snap_backing.id, {
+                            'vm_disk_resource_snap_child_id': vm_disk_resource_snap.id})
                     # Upload snapshot metadata to the vault
                     snapshot_vm_resource_backing = db.snapshot_vm_resource_get(
                         cntx, vm_disk_resource_snap_backing.snapshot_vm_resource_id)
@@ -1428,13 +1506,15 @@ class VMwareVCDriver(VMwareESXDriver):
             vmx_file_handle.close()
             metadata = snapshot_data_ex['vmx_file']
             metadata['vmx_file_data'] = vmx_file_data
-            snapshot_vm_resource_values = {'id': str(uuid.uuid4()),
-                                           'vm_id': instance['vm_id'],
-                                           'snapshot_id': snapshot_obj.id,
-                                           'resource_type': 'vmx',
-                                           'resource_name': snapshot_data_ex['vmx_file']['vmx_file_name'],
-                                           'metadata': metadata,
-                                           'status': 'creating'}
+            snapshot_vm_resource_values = {
+                'id': str(
+                    uuid.uuid4()),
+                'vm_id': instance['vm_id'],
+                'snapshot_id': snapshot_obj.id,
+                'resource_type': 'vmx',
+                'resource_name': snapshot_data_ex['vmx_file']['vmx_file_name'],
+                'metadata': metadata,
+                'status': 'creating'}
 
             snapshot_vm_resource = db.snapshot_vm_resource_create(
                 cntx, snapshot_vm_resource_values)
@@ -1458,47 +1538,59 @@ class VMwareVCDriver(VMwareESXDriver):
                 snapshot_vm_resource_metadata['capacityInKB'] = disk['capacityInKB']
                 snapshot_vm_resource_metadata['changeId'] = dev.backing.changeId
 
-                snapshot_vm_resource_values = {'id': str(uuid.uuid4()),
-                                               'vm_id': instance['vm_id'],
-                                               'snapshot_id': snapshot_obj.id,
-                                               'resource_type': 'disk',
-                                               'resource_name': disk['label'],
-                                               'resource_pit_id': dev.backing.uuid,
-                                               'metadata': snapshot_vm_resource_metadata,
-                                               'status': 'creating'
-                                               }
+                snapshot_vm_resource_values = {
+                    'id': str(
+                        uuid.uuid4()),
+                    'vm_id': instance['vm_id'],
+                    'snapshot_id': snapshot_obj.id,
+                    'resource_type': 'disk',
+                    'resource_name': disk['label'],
+                    'resource_pit_id': dev.backing.uuid,
+                    'metadata': snapshot_vm_resource_metadata,
+                    'status': 'creating'}
 
                 snapshot_vm_resource = db.snapshot_vm_resource_create(
                     cntx, snapshot_vm_resource_values)
-                db.snapshot_update(cntx, snapshot_obj.id,
-                                   {'progress_msg': "Uploading '" + dev.deviceInfo.label + "' of '" + instance['vm_name'] + "'",
-                                    'status': 'uploading'
-                                    })
+                db.snapshot_update(
+                    cntx,
+                    snapshot_obj.id,
+                    {
+                        'progress_msg': "Uploading '" + dev.deviceInfo.label + "' of '" + instance['vm_name'] + "'",
+                        'status': 'uploading'})
                 vmdk_size, snapshot_type = _upload_vmdk(dev)
-                object_store_transfer_time = vault.upload_snapshot_vm_resource_to_object_store(cntx, {'workload_id': snapshot_obj.workload_id,
-                                                                                                      'workload_name': workload_obj.display_name,
-                                                                                                      'snapshot_id': snapshot_obj.id,
-                                                                                                      'snapshot_vm_id': instance['vm_id'],
-                                                                                                      'snapshot_vm_resource_id': snapshot_vm_resource.id,
-                                                                                                      'snapshot_vm_resource_name': dev.deviceInfo.label,
-                                                                                                      'snapshot_vm_name': instance['vm_name']})
+                object_store_transfer_time = vault.upload_snapshot_vm_resource_to_object_store(
+                    cntx,
+                    {
+                        'workload_id': snapshot_obj.workload_id,
+                        'workload_name': workload_obj.display_name,
+                        'snapshot_id': snapshot_obj.id,
+                        'snapshot_vm_id': instance['vm_id'],
+                        'snapshot_vm_resource_id': snapshot_vm_resource.id,
+                        'snapshot_vm_resource_name': dev.deviceInfo.label,
+                        'snapshot_vm_name': instance['vm_name']})
                 workload_utils.purge_snapshot_vm_resource_from_staging_area(
                     cntx, snapshot_obj.id, snapshot_vm_resource.id)
 
-                db.snapshot_update(cntx, snapshot_obj.id,
-                                   {'progress_msg': "Uploaded '" + dev.deviceInfo.label + "' of '" + instance['vm_name'] + "'",
-                                    'status': 'uploading'
-                                    })
+                db.snapshot_update(
+                    cntx,
+                    snapshot_obj.id,
+                    {
+                        'progress_msg': "Uploaded '" + dev.deviceInfo.label + "' of '" + instance['vm_name'] + "'",
+                        'status': 'uploading'})
 
-                snapshot_vm_resource = db.snapshot_vm_resource_update(cntx,
-                                                                      snapshot_vm_resource.id,
-                                                                      {'status': 'available',
-                                                                       'size': vmdk_size,
-                                                                       'snapshot_type': snapshot_type,
-                                                                       'finished_at': timeutils.utcnow(),
-                                                                       'time_taken': int((timeutils.utcnow() - snapshot_vm_resource.created_at).total_seconds()),
-                                                                       'metadata': {'object_store_transfer_time': object_store_transfer_time},
-                                                                       })
+                snapshot_vm_resource = db.snapshot_vm_resource_update(
+                    cntx,
+                    snapshot_vm_resource.id,
+                    {
+                        'status': 'available',
+                        'size': vmdk_size,
+                        'snapshot_type': snapshot_type,
+                        'finished_at': timeutils.utcnow(),
+                        'time_taken': int(
+                            (timeutils.utcnow() - snapshot_vm_resource.created_at).total_seconds()),
+                        'metadata': {
+                            'object_store_transfer_time': object_store_transfer_time},
+                    })
         except Exception as ex:
             LOG.exception(ex)
             raise
@@ -1506,10 +1598,11 @@ class VMwareVCDriver(VMwareESXDriver):
     @autolog.log_method(Logger, 'VMwareVCDriver.remove_snapshot_vm')
     def remove_snapshot_vm(self, cntx, db, instance, snapshot, snapshot_ref):
         try:
-            vm_ref = vm_util.get_vm_ref(self._session, {'uuid': instance['vm_id'],
-                                                        'vm_name': instance['vm_name'],
-                                                        'vmware_uuid': instance['vm_metadata']['vmware_uuid'],
-                                                        })
+            vm_ref = vm_util.get_vm_ref(self._session,
+                                        {'uuid': instance['vm_id'],
+                                         'vm_name': instance['vm_name'],
+                                            'vmware_uuid': instance['vm_metadata']['vmware_uuid'],
+                                         })
             db.snapshot_update(
                 cntx, snapshot['id'], {
                     'progress_msg': 'Removing Snapshot of Virtual Machine ' + instance['vm_name']})
@@ -1529,10 +1622,11 @@ class VMwareVCDriver(VMwareESXDriver):
         top_snapshot_vm_resource = None
         if current_snapshot:
             try:
-                top_snapshot_vm_resource = db.snapshot_vm_resource_get_by_resource_pit_id(cntx,
-                                                                                          snapshot_vm_resource.vm_id,
-                                                                                          current_snapshot['id'],
-                                                                                          snapshot_vm_resource.resource_pit_id)
+                top_snapshot_vm_resource = db.snapshot_vm_resource_get_by_resource_pit_id(
+                    cntx,
+                    snapshot_vm_resource.vm_id,
+                    current_snapshot['id'],
+                    snapshot_vm_resource.resource_pit_id)
             except Exception as ex:
                 LOG.exception(ex)
 
@@ -1543,10 +1637,8 @@ class VMwareVCDriver(VMwareESXDriver):
                 if snapshot.status != "available":
                     continue
                 try:
-                    top_snapshot_vm_resource = db.snapshot_vm_resource_get_by_resource_pit_id(cntx,
-                                                                                              snapshot_vm_resource.vm_id,
-                                                                                              snapshot.id,
-                                                                                              snapshot_vm_resource.resource_pit_id)
+                    top_snapshot_vm_resource = db.snapshot_vm_resource_get_by_resource_pit_id(
+                        cntx, snapshot_vm_resource.vm_id, snapshot.id, snapshot_vm_resource.resource_pit_id)
                     break
                 except Exception as ex:
                     LOG.exception(ex)
@@ -1733,8 +1825,17 @@ class VMwareVCDriver(VMwareESXDriver):
                     'status': 'deleted'})
 
     @autolog.log_method(Logger, 'VMwareVCDriver.restore_vm')
-    def restore_vm(self, cntx, db, instance, restore, restored_net_resources, restored_security_groups,
-                   restored_compute_flavor, restored_nics, instance_options):
+    def restore_vm(
+            self,
+            cntx,
+            db,
+            instance,
+            restore,
+            restored_net_resources,
+            restored_security_groups,
+            restored_compute_flavor,
+            restored_nics,
+            instance_options):
         """
         Restores the specified instance from a snapshot
         """
@@ -1871,8 +1972,12 @@ class VMwareVCDriver(VMwareESXDriver):
             else:
                 computeresource_ref, host_ref = self._get_computeresource_host_ref(
                     instance_options['computeresource']['moid'])
-                resourcepool_ref = self._session._call_method(vim_util, "get_dynamic_property", computeresource_ref,
-                                                              computeresource_ref._type, "resourcePool")
+                resourcepool_ref = self._session._call_method(
+                    vim_util,
+                    "get_dynamic_property",
+                    computeresource_ref,
+                    computeresource_ref._type,
+                    "resourcePool")
 
             vmx_path = vm_util.build_datastore_path(
                 vmx_datastore_name, vmx_name)
@@ -1907,8 +2012,12 @@ class VMwareVCDriver(VMwareESXDriver):
             LOG.info(_("Registered VM %s") % instance_name)
             vm_ref = self._get_vm_ref_from_name_folder(
                 vm_folder_ref, instance_options['name'])
-            hardware_devices = self._session._call_method(vim_util, "get_dynamic_property", vm_ref,
-                                                          "VirtualMachine", "config.hardware.device")
+            hardware_devices = self._session._call_method(
+                vim_util,
+                "get_dynamic_property",
+                vm_ref,
+                "VirtualMachine",
+                "config.hardware.device")
             if hardware_devices.__class__.__name__ == "ArrayOfVirtualDevice":
                 hardware_devices = hardware_devices.VirtualDevice
 
@@ -1948,10 +2057,18 @@ class VMwareVCDriver(VMwareESXDriver):
                         device.backing.deviceName = network['new_network_name']
                         device.backing.network = new_network_ref
                     elif new_network_ref._type == "DistributedVirtualPortgroup":
-                        dvportgroup_config = self._session._call_method(vim_util, "get_dynamic_property", new_network_ref,
-                                                                        "DistributedVirtualPortgroup", "config")
-                        dvswitch_uuid = self._session._call_method(vim_util, "get_dynamic_property", dvportgroup_config.distributedVirtualSwitch,
-                                                                   "VmwareDistributedVirtualSwitch", "uuid")
+                        dvportgroup_config = self._session._call_method(
+                            vim_util,
+                            "get_dynamic_property",
+                            new_network_ref,
+                            "DistributedVirtualPortgroup",
+                            "config")
+                        dvswitch_uuid = self._session._call_method(
+                            vim_util,
+                            "get_dynamic_property",
+                            dvportgroup_config.distributedVirtualSwitch,
+                            "VmwareDistributedVirtualSwitch",
+                            "uuid")
                         device.backing = client_factory.create(
                             'ns0:VirtualEthernetCardDistributedVirtualPortBackingInfo')
                         device.backing.port.portgroupKey = dvportgroup_config.key
@@ -1967,9 +2084,8 @@ class VMwareVCDriver(VMwareESXDriver):
                     vm_config_spec.deviceChange = [virtual_device_config_spec]
                     LOG.info(_("Reconfiguring VM instance %(instance_name)s for nic %(nic_label)s"), {
                              'instance_name': instance_name, 'nic_label': device.deviceInfo.label})
-                    reconfig_task = self._session._call_method(self._session._get_vim(),
-                                                               "ReconfigVM_Task", vm_ref,
-                                                               spec=vm_config_spec)
+                    reconfig_task = self._session._call_method(
+                        self._session._get_vim(), "ReconfigVM_Task", vm_ref, spec=vm_config_spec)
                     self._session._wait_for_task(instance_uuid, reconfig_task)
                     LOG.info(_("Reconfigured VM instance %(instance_name)s for nic %(nic_label)s"),
                              {'instance_name': instance_name, 'nic_label': device.deviceInfo.label})
@@ -1981,10 +2097,8 @@ class VMwareVCDriver(VMwareESXDriver):
             for snapshot_vm_resource in snapshot_vm_resources:
                 if snapshot_vm_resource.resource_type != 'disk':
                     continue
-                snapshot_vm_resource_object_store_transfer_time = workload_utils.download_snapshot_vm_resource_from_object_store(cntx,
-                                                                                                                                 restore_obj.id,
-                                                                                                                                 restore_obj.snapshot_id,
-                                                                                                                                 snapshot_vm_resource.id)
+                snapshot_vm_resource_object_store_transfer_time = workload_utils.download_snapshot_vm_resource_from_object_store(
+                    cntx, restore_obj.id, restore_obj.snapshot_id, snapshot_vm_resource.id)
                 snapshot_vm_object_store_transfer_time += snapshot_vm_resource_object_store_transfer_time
                 snapshot_vm_data_transfer_time += snapshot_vm_resource_object_store_transfer_time
 
@@ -2015,19 +2129,21 @@ class VMwareVCDriver(VMwareESXDriver):
                                                                 db.get_metadata_value(
                                                                     snapshot_vm_resource.metadata, 'disk_type')  # disk_type
                                                                 )
-                vmdk_create_task = self._session._call_method(self._session._get_vim(),
-                                                              "CreateVirtualDisk_Task",
-                                                              service_content.virtualDiskManager,
-                                                              name=vmdk_path,
-                                                              datacenter=datacenter_ref,
-                                                              spec=vmdk_create_spec)
+                vmdk_create_task = self._session._call_method(
+                    self._session._get_vim(),
+                    "CreateVirtualDisk_Task",
+                    service_content.virtualDiskManager,
+                    name=vmdk_path,
+                    datacenter=datacenter_ref,
+                    spec=vmdk_create_spec)
                 if vmdk_create_task == []:
-                    vmdk_create_task = self._session._call_method(self._session._get_vim(),
-                                                                  "CreateVirtualDisk_Task",
-                                                                  service_content.virtualDiskManager,
-                                                                  name=vmdk_path,
-                                                                  datacenter=datacenter_ref,
-                                                                  spec=vmdk_create_spec)
+                    vmdk_create_task = self._session._call_method(
+                        self._session._get_vim(),
+                        "CreateVirtualDisk_Task",
+                        service_content.virtualDiskManager,
+                        name=vmdk_path,
+                        datacenter=datacenter_ref,
+                        spec=vmdk_create_spec)
 
                 self._session._wait_for_task(
                     instance['uuid'], vmdk_create_task)
@@ -2045,12 +2161,17 @@ class VMwareVCDriver(VMwareESXDriver):
                 device_name = db.get_metadata_value(
                     snapshot_vm_resource.metadata, 'label')
 
-                self._volumeops.attach_disk_to_vm(vm_ref, instance,
-                                                  adapter_type, disk_type, vmdk_path,
-                                                  capacityInKB, linked_clone=False,
-                                                  controller_key=vmdk_controler_key,
-                                                  unit_number=unit_number,
-                                                  device_name=device_name)
+                self._volumeops.attach_disk_to_vm(
+                    vm_ref,
+                    instance,
+                    adapter_type,
+                    disk_type,
+                    vmdk_path,
+                    capacityInKB,
+                    linked_clone=False,
+                    controller_key=vmdk_controler_key,
+                    unit_number=unit_number,
+                    device_name=device_name)
 
                 LOG.info(
                     "Uploading '" +
@@ -2060,10 +2181,12 @@ class VMwareVCDriver(VMwareESXDriver):
                     "'" +
                     " from snapshot " +
                     snapshot_obj.id)
-                db.restore_update(cntx, restore['id'],
-                                  {'progress_msg': "Uploading '" + device_name + "' of '" + instance['vm_name'] + "'",
-                                   'status': 'uploading'
-                                   })
+                db.restore_update(
+                    cntx,
+                    restore['id'],
+                    {
+                        'progress_msg': "Uploading '" + device_name + "' of '" + instance['vm_name'] + "'",
+                        'status': 'uploading'})
 
                 vm_disk_resource_snap = db.vm_disk_resource_snap_get_top(
                     cntx, snapshot_vm_resource.id)
@@ -2203,17 +2326,19 @@ class VMwareVCDriver(VMwareESXDriver):
                     cntx, restore_obj.snapshot_id, snapshot_vm_resource.id)
                 # End of for loop for devices
 
-            restored_instance_id = self._session._call_method(vim_util, "get_dynamic_property", vm_ref,
-                                                              "VirtualMachine", "config.instanceUuid")
+            restored_instance_id = self._session._call_method(
+                vim_util, "get_dynamic_property", vm_ref, "VirtualMachine", "config.instanceUuid")
 
             restored_instance_name = instance_options['name']
-            restored_vm_values = {'vm_id': restored_instance_id,
-                                  'vm_name': restored_instance_name,
-                                  'restore_id': restore_obj.id,
-                                  'metadata': {'data_transfer_time': snapshot_vm_data_transfer_time,
-                                               'object_store_transfer_time': snapshot_vm_object_store_transfer_time,
-                                               },
-                                  'status': 'available'}
+            restored_vm_values = {
+                'vm_id': restored_instance_id,
+                'vm_name': restored_instance_name,
+                'restore_id': restore_obj.id,
+                'metadata': {
+                    'data_transfer_time': snapshot_vm_data_transfer_time,
+                    'object_store_transfer_time': snapshot_vm_object_store_transfer_time,
+                },
+                'status': 'available'}
             restored_vm = db.restored_vm_create(cntx, restored_vm_values)
 
             LOG.info(_("RestoreVM %s Completed") % instance_name)
@@ -2229,10 +2354,12 @@ class VMwareVCDriver(VMwareESXDriver):
                 except OSError as exc:
                     pass
 
-            db.restore_update(cntx, restore_obj.id,
-                              {'progress_msg': 'Created VM ' + instance['vm_name'] + ' from snapshot ' + snapshot_obj.id,
-                               'status': 'executing'
-                               })
+            db.restore_update(
+                cntx,
+                restore_obj.id,
+                {
+                    'progress_msg': 'Created VM ' + instance['vm_name'] + ' from snapshot ' + snapshot_obj.id,
+                    'status': 'executing'})
 
             return restored_vm
         except Exception as ex:
@@ -2616,6 +2743,6 @@ class VMwareAPISession(object):
                 raise loopingcall.LoopingCallDone(task_info)
             else:
                 error_info = str(task_info.error.localizedMessage)
-                LOG.info(_("Task [%(task_name)s] %(task_ref)s status: error %(error_info)s"),
-                         {'task_name': task_name, 'task_ref': task_ref, 'error_info': error_info})
+                LOG.info(_("Task [%(task_name)s] %(task_ref)s status: error %(error_info)s"), {
+                         'task_name': task_name, 'task_ref': task_ref, 'error_info': error_info})
                 raise exception

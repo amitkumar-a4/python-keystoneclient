@@ -61,7 +61,7 @@ def build_recursive_traversal_spec(client_factory):
     object hierarchy.
     """
     visit_folders_select_spec = build_selection_spec(client_factory,
-                                    "visitFolders")
+                                                     "visitFolders")
     # For getting to hostFolder from datacenter
     dc_to_hf = build_traversal_spec(client_factory, "dc_to_hf", "Datacenter",
                                     "hostFolder", False,
@@ -71,9 +71,13 @@ def build_recursive_traversal_spec(client_factory):
                                      "vmFolder", False,
                                      [visit_folders_select_spec])
     # For getting to network folder from datacenter
-    dc_to_netf = build_traversal_spec(client_factory, "dc_to_netf", "Datacenter",
-                                     "networkFolder", False,
-                                     [visit_folders_select_spec])
+    dc_to_netf = build_traversal_spec(
+        client_factory,
+        "dc_to_netf",
+        "Datacenter",
+        "networkFolder",
+        False,
+        [visit_folders_select_spec])
     # For getting Host System to virtual machine
     h_to_vm = build_traversal_spec(client_factory, "h_to_vm", "HostSystem",
                                    "vm", False,
@@ -90,27 +94,39 @@ def build_recursive_traversal_spec(client_factory):
     rp_to_rp_select_spec = build_selection_spec(client_factory, "rp_to_rp")
     rp_to_vm_select_spec = build_selection_spec(client_factory, "rp_to_vm")
     # For getting to resource pool from Compute Resource
-    cr_to_rp = build_traversal_spec(client_factory, "cr_to_rp",
-                                "ComputeResource", "resourcePool", False,
-                                [rp_to_rp_select_spec, rp_to_vm_select_spec])
+    cr_to_rp = build_traversal_spec(
+        client_factory, "cr_to_rp", "ComputeResource", "resourcePool", False, [
+            rp_to_rp_select_spec, rp_to_vm_select_spec])
 
     # For getting to child res pool from the parent res pool
-    rp_to_rp = build_traversal_spec(client_factory, "rp_to_rp", "ResourcePool",
-                                "resourcePool", False,
-                                [rp_to_rp_select_spec, rp_to_vm_select_spec])
+    rp_to_rp = build_traversal_spec(
+        client_factory, "rp_to_rp", "ResourcePool", "resourcePool", False, [
+            rp_to_rp_select_spec, rp_to_vm_select_spec])
 
     # For getting to Virtual Machine from the Resource Pool
-    rp_to_vm = build_traversal_spec(client_factory, "rp_to_vm", "ResourcePool",
-                                "vm", False,
-                                [rp_to_rp_select_spec, rp_to_vm_select_spec])
+    rp_to_vm = build_traversal_spec(
+        client_factory, "rp_to_vm", "ResourcePool", "vm", False, [
+            rp_to_rp_select_spec, rp_to_vm_select_spec])
 
     # Get the assorted traversal spec which takes care of the objects to
     # be searched for from the root folder
-    traversal_spec = build_traversal_spec(client_factory, "visitFolders",
-                                  "Folder", "childEntity", False,
-                                  [visit_folders_select_spec, dc_to_hf,
-                                   dc_to_vmf, dc_to_netf, cr_to_ds, cr_to_h, 
-                                   cr_to_rp, rp_to_rp, h_to_vm, rp_to_vm])
+    traversal_spec = build_traversal_spec(
+        client_factory,
+        "visitFolders",
+        "Folder",
+        "childEntity",
+        False,
+        [
+            visit_folders_select_spec,
+            dc_to_hf,
+            dc_to_vmf,
+            dc_to_netf,
+            cr_to_ds,
+            cr_to_h,
+            cr_to_rp,
+            rp_to_rp,
+            h_to_vm,
+            rp_to_vm])
     return traversal_spec
 
 
@@ -195,34 +211,36 @@ def get_objects(vim, type, properties_to_collect=None, all=False):
         properties_to_collect = ["name"]
 
     client_factory = vim.client.factory
-    object_spec = build_object_spec(client_factory,
-                        vim.get_service_content().rootFolder,
-                        [build_recursive_traversal_spec(client_factory)])
-    property_spec = build_property_spec(client_factory, type=type,
-                                properties_to_collect=properties_to_collect,
-                                all_properties=all)
+    object_spec = build_object_spec(
+        client_factory, vim.get_service_content().rootFolder, [
+            build_recursive_traversal_spec(client_factory)])
+    property_spec = build_property_spec(
+        client_factory,
+        type=type,
+        properties_to_collect=properties_to_collect,
+        all_properties=all)
     property_filter_spec = build_property_filter_spec(client_factory,
-                                [property_spec],
-                                [object_spec])
+                                                      [property_spec],
+                                                      [object_spec])
     options = client_factory.create('ns0:RetrieveOptions')
     options.maxObjects = CONF.vmware.maximum_objects
     return vim.RetrievePropertiesEx(
-            vim.get_service_content().propertyCollector,
-            specSet=[property_filter_spec], options=options)
+        vim.get_service_content().propertyCollector,
+        specSet=[property_filter_spec], options=options)
 
 
 def cancel_retrieve(vim, token):
     """Cancels the retrieve operation."""
     return vim.CancelRetrievePropertiesEx(
-            vim.get_service_content().propertyCollector,
-            token=token)
+        vim.get_service_content().propertyCollector,
+        token=token)
 
 
 def continue_to_get_objects(vim, token):
     """Continues to get the list of objects of the type specified."""
     return vim.ContinueRetrievePropertiesEx(
-            vim.get_service_content().propertyCollector,
-            token=token)
+        vim.get_service_content().propertyCollector,
+        token=token)
 
 
 def get_prop_spec(client_factory, spec_type, properties):
@@ -269,8 +287,8 @@ def get_properties_for_a_collection_of_objects(vim, type,
     options = client_factory.create('ns0:RetrieveOptions')
     options.maxObjects = CONF.vmware.maximum_objects
     return vim.RetrievePropertiesEx(
-            vim.get_service_content().propertyCollector,
-            specSet=[prop_filter_spec], options=options)
+        vim.get_service_content().propertyCollector,
+        specSet=[prop_filter_spec], options=options)
 
 
 def get_about_info(vim):

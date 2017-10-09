@@ -179,7 +179,7 @@ def ref_to_obj(ref):
     """
     if not isinstance(ref, basestring):
         raise TypeError('References must be strings')
-    if not ':' in ref:
+    if ':' not in ref:
         raise ValueError('Invalid reference')
 
     modulename, rest = ref.split(':', 1)
