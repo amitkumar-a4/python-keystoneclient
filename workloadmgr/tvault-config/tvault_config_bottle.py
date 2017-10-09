@@ -19,6 +19,7 @@ from tempfile import mkstemp
 from shutil import move
 from os import remove, close
 from urlparse import urlparse
+import urllib
 from xml.dom.minidom import parseString
 import ConfigParser
 import tarfile
@@ -126,14 +127,19 @@ def logout():
     aaa.logout(success_redirect='/login')
 
 
-@bottle.post('/reset_password')
+@bottle.route('/reset_password')
+@authorize()
 def send_password_reset_email():
     """Send out password reset email"""
+    """
     aaa.send_password_reset_email(
         username=post_get('username'),
         email_addr=post_get('email_address')
     )
     return 'Please check your mailbox.'
+    """
+    aaa.current_user.update(email_addr="admin@localhost.local")
+    bottle.redirect("/change_password")
 
 
 @bottle.route('/change_password/:reset_code')
@@ -160,6 +166,91 @@ def change_password():
     aaa.current_user.update(pwd=post_get('newpassword'), email_addr="info@triliodata.com")
     bottle.redirect("/home")
 
+#####
+###   Service account credentials
+#####
+@bottle.route('/update_service_account_password')
+@bottle.view('service_password_change_form')
+@authorize()
+def update_service_account_password():
+    """Show password change form"""
+    message = bottle.request.GET.get('error', '')
+    if bottle.request.GET.get('error') != '':
+        return {'error': message}
+    else:
+        return {'error':''}
+
+
+@bottle.post('/update_service_account_password')
+@authorize()
+def change_service_password():
+    try:
+        config_inputs = bottle.request.POST
+
+        Config = ConfigParser.RawConfigParser()
+        Config.read('/etc/workloadmgr/workloadmgr.conf')
+        old_password = Config.get('keystone_authtoken','admin_password')
+        if config_inputs['oldpassword'] != old_password:
+           raise Exception("Enter you valid current password")
+        service_tenant_name = Config.get('keystone_authtoken','admin_tenant_name')
+        data = {}
+        data['admin_username'] = Config.get('DEFAULT', 'nova_admin_username')
+        data['admin_password'] = Config.get('DEFAULT', 'nova_admin_password')
+        data['admin_tenant_name'] = Config.get('DEFAULT', 'neutron_admin_tenant_name')
+        data['keystone_admin_url'] = Config.get('keystone_authtoken','auth_url')
+        data['keystone_public_url'] = Config.get('keystone_authtoken','auth_uri')
+        data['domain_name'] = Config.get('DEFAULT', 'domain_name')
+    
+        if data['domain_name'] == '':
+           data['domain_name'] = 'default'
+
+        # first authenticate old credentials to make sure the
+        # user is genuine
+        global config_data
+        config_data = data
+        try:
+            keystone, tenants = _validate_keystone_client_and_version(is_admin_url=False)
+        except Exception as e:
+               raise Exception( "KeystoneError:Unable to connect to keystone Public URL "+e.message  )
+
+        for user in keystone.users.list(): 
+            if user.name == 'triliovault':
+               if keystone.version == 'v3':
+                  keystone.users.update(user, password=config_inputs['newpassword'])
+               else:
+                    keystone.users.update_password(user, config_inputs['newpassword'])
+
+        """Change service account password"""
+        Config = ConfigParser.RawConfigParser()
+        Config.read('/etc/workloadmgr/api-paste.ini')
+        Config.set('filter:authtoken','admin_password',
+                   config_inputs['newpassword'])
+        with open('/etc/workloadmgr/api-paste.ini', 'wb') as configfile:
+            Config.write(configfile)
+    
+        Config = ConfigParser.RawConfigParser()
+        Config.read('/etc/workloadmgr/workloadmgr.conf')
+        Config.set('keystone_authtoken','admin_password',
+                   config_inputs['newpassword'])
+        Config.set('keystone_authtoken','password',
+                   config_inputs['newpassword'])
+        with open('/etc/workloadmgr/workloadmgr.conf', 'wb') as configfile:
+            Config.write(configfile)
+
+        _restart_wlm_services()
+        bottle.redirect("/home")
+    except Exception as ex:
+        if str(ex.__class__) == "<class 'bottle.HTTPResponse'>":
+           raise ex
+
+        # put some error message here
+        qstring = urllib.urlencode({'error': ex.message})
+        bottle.redirect("/update_service_account_password?%s" % qstring)
+
+
+####
+### Landing page
+####
 @bottle.route('/landing_page_openstack')
 @bottle.view('landing_page_openstack')
 def landing_page_openstack():
@@ -404,6 +495,17 @@ def get_lan_ip():
                 pass
     return ip
 
+
+def _restart_wlm_services():
+    for service in ['wlm-api', 'wlm-scheduler', 'wlm-workloads']:
+        try:
+            command = ['sudo', 'service', service, 'restart'];
+            subprocess.call(command, shell=False)
+        except:
+            # additional nodes may not have wlm-api and wlm-scheduler
+            pass
+
+
 def _authenticate_with_vcenter():
     if config_data['configuration_type'] == 'vmware':
         from workloadmgr.virt.vmwareapi import vim
@@ -413,6 +515,7 @@ def _authenticate_with_vcenter():
                                 password=config_data['vcenter_password'])
         vim_obj.Logout(vim_obj.get_service_content().sessionManager)
         
+
 def _authenticate_with_swift(config_data):
     if config_data['configuration_type'] == 'vmware' or config_data['configuration_type'] == 'openstack':
         if config_data['swift_auth_url'] and len(config_data['swift_auth_url']) > 0:
@@ -497,7 +600,7 @@ def _validate_keystone_client_and_version(is_admin_url=True, retry=0):
                                     domain_id=config_data['domain_name'],
                                     )
         else:
-              auth = password.Password(auth_url=auth_url,
+             auth = password.Password(auth_url=auth_url,
                                     username=config_data['admin_username'],
                                     password=config_data['admin_password'],
                                     project_name=config_data['admin_tenant_name'],
@@ -687,8 +790,8 @@ def _authenticate_with_keystone():
                                                       region=config_data['region_name']).publicurl
         parse_result = urlparse(wlm_public_url)
         
-        config_data['sql_connection'] = 'mysql://root:' + TVAULT_SERVICE_PASSWORD + '@' + parse_result.hostname + '/workloadmgr?charset=utf8'
-        config_data['rabbit_host'] = parse_result.hostname
+        config_data['sql_connection'] = 'mysql://root:' + TVAULT_SERVICE_PASSWORD + '@' + config_data['floating_ipaddress'] + '/workloadmgr?charset=utf8'
+        config_data['rabbit_host'] = config_data['floating_ipaddress']
         config_data['rabbit_password'] = TVAULT_SERVICE_PASSWORD
 
 def _register_service():
@@ -768,23 +871,30 @@ def _register_service():
                else:
                     config_data['trustee_role'] = rolenames.pop(0)
 
-            if wlm_user == None:
-                if keystone.version == 'v3':
-                   wlm_user = keystone.users.create(name=config_data['workloadmgr_user'],
-                                                    password=config_data['workloadmgr_user_password'],
-                                                    email='workloadmgr@trilio.io',
-                                                    domain=config_data['triliovault_user_domain_id'],
-                                                    default_project=config_data['service_tenant_id'],
-                                                    enabled=True)
-                   keystone.roles.grant(role=admin_role.id, user=wlm_user.id,
-                                        project=config_data['service_tenant_id'])
+            if keystone.version == 'v3':
+                if wlm_user is None:
+                    wlm_user = keystone.users.create(name=config_data['workloadmgr_user'],
+                                                     password=config_data['workloadmgr_user_password'],
+                                                     email='workloadmgr@trilio.io',
+                                                     domain=config_data['triliovault_user_domain_id'],
+                                                     default_project=config_data['service_tenant_id'],
+                                                     enabled=True)
+                    keystone.roles.grant(role=admin_role.id, user=wlm_user.id,
+                                         project=config_data['service_tenant_id'])
                 else:
-                     wlm_user = keystone.users.create(config_data['workloadmgr_user'],
-                                                 config_data['workloadmgr_user_password'],
-                                                 'workloadmgr@trilio.io',
-                                                 tenant_id=config_data['service_tenant_id'],
-                                                 enabled=True)
-                     keystone.roles.add_user_role(wlm_user.id, admin_role.id, config_data['service_tenant_id'])
+                    keystone.users.update(wlm_user, password=config_data['workloadmgr_user_password'])
+            
+            else:
+                if wlm_user is None:
+                    wlm_user = keystone.users.create(config_data['workloadmgr_user'],
+                                                     config_data['workloadmgr_user_password'],
+                                                     'workloadmgr@trilio.io',
+                                                     tenant_id=config_data['service_tenant_id'],
+                                                     enabled=True)
+                    keystone.roles.add_user_role(wlm_user.id, admin_role.id, config_data['service_tenant_id'])
+                else:
+                    keystone.users.update_password(wlm_user,
+                                           config_data['workloadmgr_user_password'])
 
             config_data['cloud_unique_id'] = wlm_user.id
 
@@ -810,7 +920,13 @@ def _register_service():
          wlm_service = keystone.services.create('TrilioVaultWLM', 'workloads',
                                            'Trilio Vault Workload Manager Service')
 
-    wlm_url = 'http://' + config_data['tvault_primary_node'] + ':8780' + '/v1/$(tenant_id)s'
+    appliance_name = socket.gethostname()
+    #wlm_url = 'https://' + config_data['tvault_primary_node'] + ':8780' + '/v1/$(tenant_id)s'
+    if config_data['enable_tls'] == 'on':
+        wlm_url = 'https://' + appliance_name + ':8780' + '/v1/$(tenant_id)s'
+    else:
+        wlm_url = 'http://' + config_data['tvault_primary_node'] + ':8780' + '/v1/$(tenant_id)s'
+
     if keystone.version == 'v3':
        keystone.endpoints.create(region=config_data['region_name'],
                                  service=wlm_service.id,
@@ -840,10 +956,10 @@ def _register_workloadtypes():
                    workload_types = wlm.workload_types.list()
                    break
                except Exception as ex:
-                      time.sleep(10)
-                      now = timeutils.utcnow()
-                      if (now - start_time) > datetime.timedelta(minutes=8):
-                         raise ex
+                   time.sleep(10)
+                   now = timeutils.utcnow()
+                   if (now - start_time) > datetime.timedelta(minutes=1):
+                       raise ex
         
         workload_type_names = {'Hadoop':False,
                                'MongoDB':False,
@@ -1362,7 +1478,7 @@ def configure_glance():
         Config.set('keystone_authtoken','admin_user', config_data['vcenter_username'])
         Config.set('keystone_authtoken','admin_password', config_data['vcenter_password'])
         with open('/etc/glance/glance-api.conf', 'wb') as configfile:
-            Config.write(configfile) 
+            Config.write(configfile)
             
         Config = ConfigParser.RawConfigParser()
         Config.read('/etc/glance/glance-cache.conf')
@@ -2212,8 +2328,6 @@ def configure_service():
                  replace_line('/etc/workloadmgr/workloadmgr.conf', 'vault_swift_tenant = ', 'vault_swift_tenant = ' + config_data['service_tenant_name'])
                  replace_line('/etc/workloadmgr/workloadmgr.conf', 'vault_swift_domain_id = ', 'vault_swift_domain_id = ' + config_data['triliovault_user_domain_id'])
 
-
-                        
         replace_line('/etc/workloadmgr/workloadmgr.conf', 'sql_connection = ', 'sql_connection = ' + config_data['sql_connection'])
         replace_line('/etc/workloadmgr/workloadmgr.conf', 'rabbit_host = ', 'rabbit_host = ' + config_data['rabbit_host'])
         replace_line('/etc/workloadmgr/workloadmgr.conf', 'rabbit_password = ', 'rabbit_password = ' + config_data['rabbit_password'])
@@ -2237,6 +2351,16 @@ def configure_service():
                      'auth_url = ' + config_data['keystone_admin_url'].\
                      strip("v3").strip("v2.0"),
                      starts_with=True)
+
+        replace_line('/etc/workloadmgr/workloadmgr.conf', 'password = ',
+                     'password = ' + config_data['workloadmgr_user_password'],
+                     starts_with=True)
+
+        replace_line('/etc/workloadmgr/workloadmgr.conf', 'admin_password = ',
+                     'admin_password = ' + config_data['workloadmgr_user_password'],
+                     starts_with=True)
+
+
         replace_line('/etc/workloadmgr/workloadmgr.conf', 'auth_uri = ',
                      'auth_uri = ' + config_data['keystone_public_url'],
                      starts_with=True)
@@ -2246,6 +2370,34 @@ def configure_service():
         replace_line('/etc/workloadmgr/workloadmgr.conf', 'trustee_role = ',
                      'trustee_role = ' + config_data.get('trustee_role', '_member_'),
                      starts_with=True)
+        replace_line('/etc/workloadmgr/workloadmgr.conf', 'enable_tls = ',
+                     'enable_tls = ' + config_data.get('enable_tls', 'off'),
+                     starts_with=True)
+
+        if config_data.get('enable_tls', 'off') == 'off':
+            replace_line('/etc/workloadmgr/workloadmgr.conf', 'ssl_cert_file = ',
+                         'ssl_cert_file = ', starts_with=True)
+            replace_line('/etc/workloadmgr/workloadmgr.conf', 'ssl_key_file = ',
+                         'ssl_key_file = ', starts_with=True)
+        else:
+            try:
+                os.mkdir('/opt/stack/data/cert')
+            except:
+                pass
+
+            with open('/opt/stack/data/cert/workloadmgr.cert', 'w') as f:
+                f.write(config_data['cert'])
+
+            with open('/opt/stack/data/cert/workloadmgr.key', 'w') as f:
+                f.write(config_data['privatekey'])
+
+            replace_line('/etc/workloadmgr/workloadmgr.conf', 'ssl_cert_file = ',
+                         'ssl_cert_file = /opt/stack/data/cert/workloadmgr.cert',
+                         starts_with=True)
+            replace_line('/etc/workloadmgr/workloadmgr.conf', 'ssl_key_file = ',
+                         'ssl_key_file = /opt/stack/data/cert/workloadmgr.key',
+                         starts_with=True)
+
         replace_line('/etc/workloadmgr/workloadmgr.conf', 'region_name_for_services = ',
                      'region_name_for_services = ' + config_data.get('region_name', 'RegionOne'),
                      starts_with=True)        
@@ -2714,6 +2866,14 @@ def configure_openstack():
             config_data['trustee_role'] = config_inputs['trustee-role'].strip()
         else:
              config_data['trustee_role'] = None
+
+        config_data['enable_tls'] = config_inputs.get('enable_tls', 'off')
+        if config_data['enable_tls'] == 'on':
+            config_data['cert'] = config_inputs.get('cert', '')
+            config_data['privatekey'] = config_inputs.get('privatekey', '')
+            if config_data['cert'] == '' or config_data['privatekey'] == '':
+                raise Exception("cert or private key is empty. Please enter valid values")
+
         config_data['guest_name'] = config_inputs['guest-name'].strip()
         
         parse_result = urlparse(config_data['keystone_admin_url'])
@@ -2733,7 +2893,10 @@ def configure_openstack():
         config_data['keystone_public_protocol'] = parse_result.scheme
         
         config_data['workloadmgr_user'] = 'triliovault'
-        config_data['workloadmgr_user_password'] = TVAULT_SERVICE_PASSWORD       
+        Config = ConfigParser.RawConfigParser()
+        Config.read('/etc/workloadmgr/workloadmgr.conf')
+        old_password = Config.get('keystone_authtoken','admin_password')
+        config_data['workloadmgr_user_password'] = old_password
 
         config_data['vault_data_directory'] = '/var/triliovault-mounts'
         config_data['vault_data_directory_old'] = '/var/triliovault'

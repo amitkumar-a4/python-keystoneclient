@@ -33,7 +33,7 @@ def _adjust_values(cntx, new_version, values, upgrade):
 def import_settings(cntx, new_version, upgrade=True):
     try:
         db = WorkloadMgrDB().db
-        backup_target = vault.get_settings_backup_target()
+        backup_target, path = vault.get_settings_backup_target()
         settings = json.loads(backup_target.get_object(os.path.join(CONF.cloud_unique_id, 'settings_db')))
         for setting_values in settings:
             try:

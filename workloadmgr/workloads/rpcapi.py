@@ -181,3 +181,12 @@ class WorkloadMgrAPI(workloadmgr.openstack.common.rpc.proxy.RpcProxy):
                   self.make_msg('restore_delete',restore_id=restore_id),
                   topic=topic,
                   timeout=300)        
+
+    @autolog.log_method(logger=Logger)
+    def config_backup(self, ctxt, host, backup_id):
+        LOG.debug("config_backup in rpcapi backup_id:%s", backup_id)
+        topic = rpc.queue_get_for(ctxt, self.topic, host)
+        LOG.debug("create queue topic=%s", topic)
+        self.cast(ctxt,
+                  self.make_msg('config_backup', backup_id=backup_id), topic=topic)
+

@@ -39,6 +39,7 @@ from workloadmgr.compute import nova
 from workloadmgr.network import neutron
 from workloadmgr.workloads import workload_utils
 from workloadmgr.workflows.vmtasks import FreezeVM, ThawVM
+from workloadmgr.virt.libvirt.restore_vm_flow import PowerOnInstance
 
 from workloadmgr.vault import vault
 
@@ -293,53 +294,6 @@ class CinderSnapshot(task.Task):
         pass
 
 
-class PowerOnInstance(task.Task):
-    """
-       Power On restored instance
-    """
-
-    def execute(self, context, restored_instance_id, restore_type):
-        return self.execute_with_log(context, restored_instance_id,
-                                     restore_type)
-
-    def revert(self, *args, **kwargs):
-        return self.revert_with_log(*args, **kwargs)
-
-    @autolog.log_method(Logger, 'PowerOnInstance.execute')
-    def execute_with_log(self, context, restored_instance_id, restore_type):
-        self.cntx = amqp.RpcContext.from_dict(context)
-        self.compute_service = compute_service = \
-                       nova.API(production = (restore_type == 'restore'))
-
-        compute_service.start(self.cntx, restored_instance_id)
-
-        restored_instance =  compute_service.get_server_by_id(self.cntx,
-                                                        restored_instance_id)
-        start_time = timeutils.utcnow()
-        while hasattr(restored_instance,'status') == False or \
-              restored_instance.status != 'ACTIVE':
-            LOG.debug('Waiting for the instance ' + restored_instance_id +\
-                      ' to boot' )
-            time.sleep(10)
-            restored_instance =  compute_service.get_server_by_id(self.cntx,
-                                                        restored_instance_id)
-            if hasattr(restored_instance,'status'):
-                if restored_instance.status == 'ERROR':
-                    raise Exception(_("Error creating instance " + \
-                                        restored_instance_id))
-            now = timeutils.utcnow()
-            if (now - start_time) > datetime.timedelta(minutes=5):
-                raise exception.ErrorOccurred(reason='Timeout waiting for '\
-                                           'the instance to boot from volume')                   
-
-        self.restored_instance = restored_instance
-        return
-
-    @autolog.log_method(Logger, 'PowerOnInstance.revert')
-    def revert_with_log(self, *args, **kwargs):
-        pass
-
-
 def LinearCinderSnapshots(context, instance, instance_options, snapshotobj, restore_id,
                           volumes_to_restore):
     flow = lf.Flow("createsnapshotslf")
@@ -396,6 +350,7 @@ def PowerOnInstanceFlow(context):
 def FreezeNThawFlow(context):
 
     flow = lf.Flow("freezenthawlf")
+
     flow.add(FreezeVM("FreezeVM", rebind={'instance': 'restored_instance_id', 'snapshot': 'restored_instance_id',
                  'source_platform': 'restored_instance_id', 'restored_instance_id': 'restored_instance_id'}))
     flow.add(ThawVM("ThawVM", rebind={'instance': 'restored_instance_id', 'snapshot': 'restored_instance_id',

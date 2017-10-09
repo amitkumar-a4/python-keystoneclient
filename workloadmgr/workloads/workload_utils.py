@@ -7,10 +7,12 @@ from workloadmgr import autolog
 from workloadmgr import flags
 from workloadmgr import settings
 from workloadmgr.vault import vault
+from workloadmgr.compute import nova
 from workloadmgr.db.workloadmgrdb import WorkloadMgrDB
 from workloadmgr.openstack.common import jsonutils
 from workloadmgr.openstack.common import timeutils
 from workloadmgr import exception
+from workloadmgr.common.workloadmgr_keystoneclient import KeystoneClientBase
 import cPickle as pickle
 
 workloads_manager_opts = [
@@ -146,6 +148,35 @@ def upload_snapshot_db_entry(cntx, snapshot_id, snapshot_status = None):
             security_group = db.vm_security_group_rule_snaps_get(cntx, res.id)
             security_group_json = jsonutils.dumps(security_group)
             backup_target.put_object(path, security_group_json)
+
+def upload_config_workload_db_entry(cntx):
+    try:
+        config_workload_db = db.config_workload_get(cntx)
+        backup_endpoint = config_workload_db['backup_media_target']
+        backup_target = vault.get_backup_target(backup_endpoint)
+        config_workload_storage_path = backup_target.get_config_workload_path()
+
+        config_workload_json = jsonutils.dumps(config_workload_db)
+
+        path = os.path.join(config_workload_storage_path, "config_workload_db")
+        backup_target.put_object(path, config_workload_json)
+    except Exception as ex:
+        LOG.exception(ex)
+
+def upload_config_backup_db_entry(cntx, backup_id):
+    try:
+        config_db = db.config_backup_get(cntx, backup_id)
+        config_workload_db = db.config_workload_get(cntx)
+        backup_endpoint = config_workload_db['backup_media_target']
+
+        backup_target = vault.get_backup_target(backup_endpoint)
+        parent = config_db['vault_storage_path']
+
+        config_json = jsonutils.dumps(config_db)
+        path = os.path.join(parent, "config_backup_db")
+        backup_target.put_object(path, config_json)
+    except Exception as ex:
+        LOG.exception(ex)
 
 
 @autolog.log_method(logger=Logger)
@@ -609,3 +640,96 @@ def common_apply_retention_db_backing_update(cntx, snapshot_vm_resource,
         affected_snapshots.append(snapshot_vm_resource_backing.snapshot_id)
 
     return affected_snapshots
+
+@autolog.log_method(logger=Logger)
+def _remove_config_backup_data(context, backup_id):
+    try:
+        LOG.info(_('Deleting the data of config backup %s ') % (backup_id))
+        config_workload_obj = db.config_workload_get(context)
+        backup_endpoint = config_workload_obj['backup_media_target']
+        backup_target = vault.get_backup_target(backup_endpoint)
+        backup_target.config_backup_delete(context, backup_id)
+    except Exception as ex:
+        LOG.exception(ex)
+
+@autolog.log_method(logger=Logger)
+def config_backup_delete(context, backup_id):
+    """
+    Delete an existing config backup
+    """
+    try:
+        db.config_backup_delete(context, backup_id)
+        _remove_config_backup_data(context, backup_id)
+    except Exception as ex:
+        LOG.exception(ex)
+
+@autolog.log_method(logger=Logger)
+def get_compute_host(context):
+    try:
+        #Look for contego node, which is up
+        compute_nodes = get_compute_nodes(context, up_only=True)
+        if len(compute_nodes) > 0:
+            return compute_nodes[0].host
+        else:
+            message = "No compute node is up for validate database credentials."
+            raise exception.ErrorOccurred(reason=message)
+    except Exception as ex:
+        raise ex
+
+@autolog.log_method(logger=Logger)
+def validate_database_creds(context, databases):
+    try:
+        compute_service = nova.API(production=True)
+        params = {'databases':databases}
+        status = compute_service.validate_database_creds(context, params)
+        if status['result'] != "success":
+            message = "Please verify given database credentials."
+            raise exception.ErrorOccurred(reason=message)
+        else:
+            return True
+    except exception as ex:
+        raise ex
+
+@autolog.log_method(logger=Logger)
+def validate_trusted_user_and_key(context, trust_creds):
+    try:
+        host = get_compute_host(context)
+        compute_service = nova.API(production=True)
+        params = {'host':host, 'trust_creds': trust_creds}
+
+        status = compute_service.validate_trusted_user_and_key(context, params)
+        if status['result'] != "success":
+            message = "Please verify, given trusted user should have passwordless sudo access using given private key."
+            raise exception.ErrorOccurred(reason=message)
+        else:
+            return True
+    except Exception as ex:
+        raise ex
+
+@autolog.log_method(logger=Logger)
+def get_controller_nodes(context):
+    try:
+        compute_service = nova.API(production=True)
+        result = compute_service.get_controller_nodes(context)
+        return result['controller_nodes']
+    except exception as ex:
+        raise ex
+
+@autolog.log_method(logger=Logger)
+def get_compute_nodes(context, host=None, up_only=False):
+    try:
+        contego_nodes = []
+        nova_client = KeystoneClientBase(context).nova_client
+        nova_services = nova_client.services.list(host=host)
+        for nova_service in nova_services:
+            if up_only is True:
+               if nova_service.binary.find('contego') != -1 and nova_service.state == 'up':
+                   contego_nodes.append(nova_service)
+            else:
+                if nova_service.binary.find('contego') != -1:
+                    contego_nodes.append(nova_service)
+        return contego_nodes
+    except Exception as ex:
+        raise ex
+
+

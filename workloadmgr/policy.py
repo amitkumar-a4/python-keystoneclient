@@ -2,52 +2,36 @@
 
 # Copyright (c) 2013 TrilioData, Inc.
 # All Rights Reserved.
+"""Policy Engine For Workloadmgr"""
 
-"""Policy Engine For WorkloadMgr"""
 
-from oslo.config import cfg
+from oslo_config import cfg
+from oslo_policy import opts as policy_opts
+from oslo_policy import policy
 
-from workloadmgr.openstack.common.gettextutils import _
 from workloadmgr import exception
-from workloadmgr import flags
-from workloadmgr.openstack.common import policy
-from workloadmgr import utils
 
-policy_opts = [
-    cfg.StrOpt('policy_file',
-               default='policy.json',
-               help=_('JSON file representing policy')),
-    cfg.StrOpt('policy_default_rule',
-               default='default',
-               help=_('Rule checked when requested rule is not found')), ]
+CONF = cfg.CONF
+policy_opts.set_defaults(cfg.CONF, 'policy.json')
 
-FLAGS = flags.FLAGS
-FLAGS.register_opts(policy_opts)
-
-_POLICY_PATH = None
-_POLICY_CACHE = {}
-
-
-def reset():
-    global _POLICY_PATH
-    global _POLICY_CACHE
-    _POLICY_PATH = None
-    _POLICY_CACHE = {}
-    policy.reset()
+_ENFORCER = None
 
 
 def init():
-    global _POLICY_PATH
-    global _POLICY_CACHE
-    if not _POLICY_PATH:
-        _POLICY_PATH = utils.find_config(FLAGS.policy_file)
-    utils.read_cached_file(_POLICY_PATH, _POLICY_CACHE,
-                           reload_func=_set_brain)
+    global _ENFORCER
+    if not _ENFORCER:
+        _ENFORCER = policy.Enforcer(CONF)
 
 
-def _set_brain(data):
-    default_rule = FLAGS.policy_default_rule
-    policy.set_brain(policy.HttpBrain.load_json(data, default_rule))
+def enforce_action(context, action):
+    """Checks that the action can be done by the given context.
+
+    Applies a check to ensure the context's project_id and user_id can be
+    applied to the given action using the policy enforcement api.
+    """
+
+    return enforce(context, action, {'project_id': context.project_id,
+                                     'user_id': context.user_id})
 
 
 def enforce(context, action, target):
@@ -56,39 +40,38 @@ def enforce(context, action, target):
        :param context: workloadmgr context
        :param action: string representing the action to be checked
            this should be colon separated for clarity.
-           i.e. ``compute:create_instance``,
-           ``compute:attach_volume``,
-           ``volume:attach_volume``
-
+           i.e. ``workload:workload_get``,
+           ``workload:workload_show``,
+           ``workload:workload_get_all``
        :param object: dictionary representing the object of the action
            for object creation this should be a dictionary representing the
            location of the object e.g. ``{'project_id': context.project_id}``
 
-       :raises workloadmgr.exception.PolicyNotAuthorized: if verification fails.
+       :raises PolicyNotAuthorized: if verification fails.
 
     """
     init()
 
-    match_list = ('rule:%s' % action,)
-    credentials = context.to_dict()
+    return _ENFORCER.enforce(action, target, context.to_dict(),
+                             do_raise=True,
+                             exc=exception.PolicyNotAuthorized,
+                             action=action)
 
-    policy.enforce(match_list, target, credentials,
-                   exception.PolicyNotAuthorized, action=action)
 
-
-def check_is_admin(roles):
-    """Whether or not roles contains 'admin' role according to policy setting.
+def check_is_admin(roles, context=None):
+    """Whether or not user is admin according to policy setting.
 
     """
     init()
 
-    action = 'context_is_admin'
-    match_list = ('rule:%s' % action,)
     # include project_id on target to avoid KeyError if context_is_admin
     # policy definition is missing, and default admin_or_owner rule
-    # attempts to apply.  Since our credentials dict does not include a
-    # project_id, this target can never match as a generic rule.
+    # attempts to apply.
     target = {'project_id': ''}
-    credentials = {'roles': roles}
+    if context is None:
+        credentials = {'roles': roles}
+    else:
+        credentials = context.to_dict()
 
-    return policy.enforce(match_list, target, credentials)
+    return _ENFORCER.enforce('context_is_admin', target, credentials)
+

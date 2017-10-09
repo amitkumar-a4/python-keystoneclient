@@ -104,7 +104,7 @@ def workflow_lookup_class(class_name):
 
 
 @autolog.log_method(logger=Logger)
-def get_workflow_class(context, workload_type_id, restore=False):
+def get_workflow_class(context, workload_type_id, restore=False ):
     #TODO(giri): implement a driver model for the workload types
     if workload_type_id:
         workload_type = WorkloadMgrDB().db.workload_type_get(context, workload_type_id)
@@ -141,6 +141,8 @@ def get_workflow_class(context, workload_type_id, restore=False):
         else:
             kwargs = {'workload_type_id': workload_type_id}
             raise wlm_exceptions.WorkloadTypeNotFound(**kwargs)
+    else:
+        workflow_class_name = 'workloadmgr.workflows.config_backup_workflow.ConfigBackupWorkflow'
 
     return workflow_lookup_class(workflow_class_name)
 
@@ -1749,3 +1751,153 @@ class WorkloadMgrManager(manager.SchedulerDependentManager):
         except Exception as ex:
             LOG.exception(ex)
             pass
+
+    @autolog.log_method(Logger, 'WorkloadMgrManager.config_backup')
+    def config_backup(self, context, backup_id):
+        """
+        Backup OpenStack configuration
+        """
+        try:
+            backup = self.db.config_backup_update(context, backup_id,
+                                               {'host': self.host})
+            #Get list of services, database and remote nodes to backup
+            config_workload = self.db.config_workload_get(context)
+            config_workload_metadata = config_workload.get('metadata')
+            for metadata in config_workload_metadata:
+                if metadata['key'] == 'services_to_backup':
+                    services_to_backup = pickle.loads(str(metadata['value'])) 
+                elif metadata['key'] == 'databases':
+                    databases = pickle.loads(str(metadata['value']))
+                elif metadata['key'] == 'trusted_user':
+                    trusted_user = pickle.loads(str(metadata['value']))
+                elif metadata['key'] == 'authorized_key':
+                    authorized_key = metadata['value']
+
+            controller_nodes = []
+            contego_nodes = []
+            down_contego_nodes = []
+
+            #Look for contego nodes
+            compute_nodes = workload_utils.get_compute_nodes(context)
+            for compute_node in compute_nodes:
+                #Filtering down nodes
+                if compute_node.state != 'up':
+                    down_contego_nodes.append(compute_node.host)
+                    continue
+                host = compute_node.host
+                if host not in contego_nodes:
+                    contego_nodes.append(host)
+
+            if len(contego_nodes) == 0:
+                error_msg = "No contego node found in up state. Can not take backup."
+                raise wlm_exceptions.ErrorOccurred(reason=error_msg) 
+
+            controller_nodes = workload_utils.get_controller_nodes(context)
+
+            #If contego and controller node are same then remove from controller
+            for controller_node in controller_nodes:
+                if controller_node in contego_nodes:
+                    controller_nodes.remove(controller_node)
+
+            backup_endpoint = config_workload['backup_media_target']
+
+            backup_target = vault.get_backup_target(backup_endpoint)
+            config_workload_storage_path = backup_target.get_config_workload_path()
+
+            backup_vault_storage_path = os.path.join(config_workload_storage_path, "backup_" + str(backup.get('id')))
+
+            values = {
+                      'progress_msg': 'Initializing backup Workflow',
+                      'status': 'executing',
+                      'vault_storage_path': backup_vault_storage_path}
+
+            #If any down node found then adding them to the summary.
+            if len(down_contego_nodes) > 0:
+                backup_summary = {}
+                for down_contego_node in down_contego_nodes:
+                    backup_summary[down_contego_node] = {'config_data': 'Node is down.'}
+                backup_summary = pickle.dumps(backup_summary)
+                metadata = {'backup_summary': backup_summary}
+                values['metadata'] = metadata
+            self.db.config_backup_update(context, backup_id, values)
+    
+            #Create folder structure on backend
+            vault.create_backup_directory(context, services_to_backup, backup_vault_storage_path)
+    
+            params = {'services_to_backup': services_to_backup, 'backup_directory': backup_vault_storage_path,
+                      'backend_endpoint': config_workload['backup_media_target'], 'backup_id': backup_id,
+                      'databases': databases, 'trusted_user': trusted_user, 'compute_hosts': contego_nodes,
+                      'controller_hosts': controller_nodes, 'authorized_key': authorized_key
+                      }
+            context_dict = dict([('%s' % key, value)
+                              for (key, value) in context.to_dict().iteritems()])
+            context_dict['conf'] =  None # RpcContext object looks for this during init
+            store = {
+                'connection': FLAGS.sql_connection,     # taskflow persistence connection
+                'context': context_dict,                # context dictionary
+                'backup_id': backup_id, # backup id
+                'params': params,
+            }
+   
+            for contego_node in contego_nodes:
+                store[contego_node] = contego_node
+            workflow_class = get_workflow_class(context, None)
+            workflow = workflow_class( "config_backup" , store)
+    
+            self.db.config_backup_update(context, backup_id,
+                                    {
+                                     'progress_msg': 'Initializing backup Workflow',
+                                     'status': 'uploading',
+                                     'vault_storage_path': backup_vault_storage_path
+                                     })
+            workflow.initflow()
+            workflow.execute()
+    
+            time_taken = 0
+            if backup:
+                time_taken = int((timeutils.utcnow() - backup.created_at).total_seconds())
+            size = vault.get_directory_size(backup_vault_storage_path)
+            error_msg = None
+            backup = self.db.config_backup_get(context, backup_id)
+            backup_metadata = backup.metadata
+            status = None
+            warning_msg = None
+            for metadata in backup_metadata:
+                if metadata['key'] == 'status':
+                    status = metadata['value']
+                if metadata['key'] == 'warning_msg':
+                    warning_msg = metadata['value']
+
+            if status is None:
+                error_msg = "Config backup failed. Please see backup summary."
+                raise wlm_exceptions.ErrorOccurred(reason=error_ms)
+
+            backup = self.db.config_backup_update(context, backup_id,
+                                    {
+                                     'progress_msg': 'Configuration backup is complete',
+                                     'finished_at' : timeutils.utcnow(),
+                                     'status': status,
+                                     'time_taken': time_taken,
+                                     'size': size,
+                                     'warning_msg': warning_msg
+                                     })
+
+            workload_utils.upload_config_backup_db_entry(context, backup_id)
+            self.db.config_workload_update(context, {'status': 'available'})
+        except Exception as ex:
+            LOG.exception(ex)
+            self.db.config_workload_update(context, {'status': 'available'})
+            msg = _("Failed creating config backup: %(exception)s") %{'exception': ex}
+            time_taken = 0
+            if backup:
+                time_taken = int((timeutils.utcnow() - backup.created_at).total_seconds())
+            backup = self.db.config_backup_update(context, backup_id,
+                                    {
+                                     'progress_msg': 'Configuration backup is complete',
+                                     'error_msg': msg,
+                                     'finished_at' : timeutils.utcnow(),
+                                     'status': 'error',
+                                     'time_taken': time_taken,
+                                     })
+            workload_utils.upload_config_backup_db_entry(context, backup_id)
+

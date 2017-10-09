@@ -31,6 +31,7 @@ DBSession = get_session()
 workloads = []
 workload_backup_endpoint = {}
 workload_backup_media_size = {}
+vault_backend = None
 
 import_map = [
     {'file': 'workload_db',
@@ -80,9 +81,20 @@ import_map = [
      'metadata_model_class': 'VMSecurityGroupRuleSnapMetadata',
      'getter_method' : 'vm_security_group_rule_snaps_get',
      'getter_method_params' : ['vm_security_group_snap_id']
-     }
-]
-
+     },
+     {'file': 'config_workload_db',
+     'model_class': 'ConfigWorkloads',
+     'metadata_model_class': 'ConfigWorkloadMetadata',
+     'getter_method' : 'config_workload_get',
+     'getter_method_params' : ['id']
+     },
+     {'file': 'config_backup_db',
+     'model_class': 'ConfigBackups',
+     'metadata_model_class': 'ConfigBackupMetadata',
+     'getter_method' : 'config_backup_get',
+     'getter_method_params' : ['id']
+     },]
+        
 def project_id_exists(cntx, project_id):
     """clients.initialise()
     client_plugin = clients.Clients(context)
@@ -102,15 +114,17 @@ def check_tenant(cntx, workload_path, upgrade):
     Check for given worlkoad tenant whether it exist with-in the cloud or not.
     '''
     try:
-        workload_values = json.loads( open(os.path.join(workload_path, 'workload_db'), 'r').read() )
-        tenant_id = workload_values.get('tenant_id', None)
-        tenant_id = workload_values.get('project_id', tenant_id)
-        if project_id_exists(cntx, tenant_id):
-            return True
-        else:
-            raise exception.InvalidRequest(
-                  reason=("Workload %s tenant %s does not belong to this cloud" %
-                         (workload_values['id'], tenant_id)))
+        workload_data = vault_backend.get_object(os.path.join(workload_path, 'workload_db'))
+        if workload_data is not None and len(workload_data) > 0:
+            workload_values = json.loads(workload_data)
+            tenant_id = workload_values.get('tenant_id', None)
+            tenant_id = workload_values.get('project_id', tenant_id)
+            if project_id_exists(cntx, tenant_id):
+                return True
+            else:
+                raise exception.InvalidRequest(
+                      reason=("Workload %s tenant %s does not belong to this cloud" %
+                             (workload_values['id'], tenant_id)))
     except Exception as ex:
            LOG.exception(ex)
 
@@ -159,21 +173,36 @@ def import_settings(cntx, new_version, upgrade=True):
 
 def update_backup_media_target(file_path, backup_endpoint):
     try:
-        with open(file_path, 'r') as file_db:
-            file_data = file_db.read()
+        file_data = vault_backend.get_object(file_path)
+        if file_data is None or len(file_data) <= 0:
+            return
         json_obj = json.loads(file_data)
 
-        metadata = json_obj.get('metadata', None)
-        if metadata:
-            for meta in metadata:
-                if meta['key'] == 'backup_media_target':
-                    if backup_endpoint != meta['value']:
-                        meta['value'] = backup_endpoint
-                        break
+        #This case is for config_workload
+        if json_obj.get('backup_media_target', None) :
+            if backup_endpoint != json_obj.get('backup_media_target'):
+                json_obj['backup_media_target'] = backup_endpoint
+        #Check for config_backup
+        elif json_obj.get('vault_storage_path', None):
+            vault_storage_path = json_obj.get('vault_storage_path')
+            mount_path = vault.get_backup_target(backup_endpoint).mount_path
+            if vault_storage_path.startswith(mount_path) is False:
+                backup_path = vault_storage_path.split(vault.CONF.cloud_unique_id + "/")[1]
+                json_obj['vault_storage_path'] = os.path.join(mount_path, vault.CONF.cloud_unique_id, backup_path)
+        else:
+            #Case for workload and snapshot
+            metadata = json_obj.get('metadata', None)
+            if metadata:
+                for meta in metadata:
+                    if meta['key'] == 'backup_media_target':
+                        if backup_endpoint != meta['value']:
+                            meta['value'] = backup_endpoint
+                            break
 
             json_obj['metadata'] = metadata
-            with open(file_path, 'w') as outfile:
-                json.dump(json_obj, outfile)
+
+        with open(file_path, 'w') as outfile:
+            json.dump(json_obj, outfile)
 
     except Exception as ex:
         LOG.exception(ex)
@@ -185,6 +214,23 @@ def get_workload_url(context, workload_ids, upgrade):
     workload_url_iterate = []
     workload_ids_to_import = list(workload_ids)
     failed_workloads = []
+
+    def add_config_workload(context, config_workload_path):
+        try:
+            #If config_workload is not in the database then only import it.
+            db = WorkloadMgrDB().db
+            config_workload = db.config_workload_get(context)
+        except exception.ConfigWorkloadNotFound:
+            workload_url_iterate.append(config_workload_path)
+            #Updating backup media and adding config_workload for import
+            config_workload_db = os.path.join(config_workload_path, "config_workload_db")
+            if os.path.exists(config_workload_db):
+                update_backup_media_target(config_workload_db, backup_endpoint)
+            for item in os.listdir(config_workload_path):
+                config_backup_db = os.path.join(config_workload_path, item, "config_backup_db")
+                if os.path.exists(config_backup_db):
+                    update_backup_media_target(config_backup_db, backup_endpoint)
+
     def add_workload(context, workload_id, workload, backup_endpoint, upgrade):
         #Before adding the workload check whether workload is valid or not
         if vault.validate_workload(workload) is False:
@@ -209,8 +255,19 @@ def get_workload_url(context, workload_ids, upgrade):
 
     for backup_endpoint in vault.CONF.vault_storage_nfs_export.split(','):
         backup_target = None
+        global vault_backend
         try:
             backup_target = vault.get_backup_target(backup_endpoint)
+            if vault_backend is None:
+               vault_backend = backup_target 
+
+            #importing config backup only when user has not specified any workload id
+            if len(workload_ids) == 0:
+                config_workload_path = os.path.join(backup_target.mount_path,
+                                   vault.CONF.cloud_unique_id, 'config_workload' )
+                if os.path.exists(config_workload_path):
+                    add_config_workload(context, config_workload_path)
+
             workload_url = backup_target.get_workloads(context)
 
             for workload in workload_url:
@@ -284,7 +341,9 @@ def get_json_files(context, workload_ids, db_dir, upgrade):
         'resources_db': [],
         'network_db': [],
         'disk_db': [],
-        'security_group_db': []
+        'security_group_db': [],
+        'config_workload_db': [],
+        'config_backup_db': [],
     }
 
     try:
@@ -301,7 +360,11 @@ def get_json_files(context, workload_ids, db_dir, upgrade):
         for workload_path in workload_url_iterate:
             for path, subdirs, files in os.walk(workload_path):
                 for name in files:
-                    if name.endswith("workload_db"):
+                    if name.endswith("config_workload_db"):
+                        db_files_map['config_workload_db'].append(os.path.join(path, name))
+                    elif name.endswith("config_backup_db"):
+                        db_files_map['config_backup_db'].append(os.path.join(path, name))
+                    elif name.endswith("workload_db"):
                         db_files_map['workload_db'].append(os.path.join(path, name))
                     elif name.endswith("workload_vms_db"):
                         db_files_map['workload_vms_db'].append(os.path.join(path, name))
@@ -320,29 +383,29 @@ def get_json_files(context, workload_ids, db_dir, upgrade):
 
         # Creating a map for each workload with workload_backup_media_size.
         for snap in db_files_map['snapshot_db']:
-            with open(snap, 'r') as snapshot_file:
-                snapshot = snapshot_file.read()
-            snapshot_json = json.loads(snapshot)
-            if snapshot_json['snapshot_type'] == 'full':
-                workload_backup_media_size[snapshot_json['workload_id']] = snapshot_json['size']
+            file_data = vault_backend.get_object(snap)
+            if file_data is not None and len(file_data) > 0:
+                snapshot_json = json.loads(file_data)
+                if snapshot_json['snapshot_type'] == 'full':
+                    workload_backup_media_size[snapshot_json['workload_id']] = snapshot_json['size']
 
         # Iterate over each file for a resource in all NFS mounts
         # and create a single db file for that.
         for db, files in db_files_map.iteritems():
             db_json = []
 
-            for file in files:
-                with open(file, 'r') as file_db:
-                    file_data = file_db.read()
-                json_obj = json.loads(file_data)
+            for file_name in files:
+                file_data = vault_backend.get_object(file_name)
+                if file_data is not None and len(file_data) > 0:
+                    json_obj = json.loads(file_data)
 
-                if db == 'workload_db':
-                    # In case of workload updating each object with
-                    # "workload_backup_media_size" and "backup_media_target"
-                    json_obj = update_workload_metadata(json_obj)
-                db_json.append(json_obj)
+                    if db == 'workload_db':
+                        # In case of workload updating each object with
+                        # "workload_backup_media_size" and "backup_media_target"
+                        json_obj = update_workload_metadata(json_obj)
+                    db_json.append(json_obj)
 
-            pickle.dump(db_json, open(os.path.join(db_dir, db), 'wb'))
+                pickle.dump(db_json, open(os.path.join(db_dir, db), 'wb'))
         return failed_workloads
     except Exception as ex:
         LOG.exception(ex)
@@ -359,7 +422,7 @@ def import_resources(tenantcontext, resource_map, new_version, db_dir, upgrade):
     resources_metadata_list = []
     #resources_metadata_list_update = []
  
-    file = resource_map['file']
+    file_name = resource_map['file']
     model_class =  resource_map['model_class']
     metadata_model_class =  resource_map['metadata_model_class']
     getter_method =  resource_map['getter_method']
@@ -375,16 +438,16 @@ def import_resources(tenantcontext, resource_map, new_version, db_dir, upgrade):
         '''
         # if resource is workload then check the status of workload and
         # set it to available.
-        if file == 'workload_db':
+        if file_name in ['workload_db', 'config_workload_db']:
             if resource['status'] == 'locked':
                resource['status'] = 'available'
 
-        if file == 'snapshot_db':
+        if file_name in ['snapshot_db', 'config_backup_db'] :
             if resource['status'] != 'available':
                resource['status'] = 'error'
-               resource['error_msg'] = 'Failed creating workload snapshot: '\
-                                       'Snapshot was not uploaded completely.'
+               resource['error_msg'] = 'Upload was not completed successfully.'
 
+        
         try:
             # Check if resource already in the database then update.
             param_list = tuple([resource[param] for param in getter_method_params])
@@ -406,7 +469,7 @@ def import_resources(tenantcontext, resource_map, new_version, db_dir, upgrade):
 
     try:
         #Load file for resource containing all objects neeed to import
-        resources_db_list = pickle.load(open(os.path.join(db_dir, file), 'rb'))
+        resources_db_list = pickle.load(open(os.path.join(db_dir, file_name), 'rb'))
 
         for resources in resources_db_list:
             if resources is None:
@@ -415,11 +478,11 @@ def import_resources(tenantcontext, resource_map, new_version, db_dir, upgrade):
                 for resource in resources:
                     #In case if workoad/snapshod updating object values
                     #with their respective tenant id and user id using context
-                    if file in ['workload_db', 'snapshot_db']:
+                    if file_name in ['workload_db', 'snapshot_db']:
                         tenantcontext = get_context(resource)
                     update_resource_list(tenantcontext, resource)
             else:
-                if file in ['workload_db', 'snapshot_db']:
+                if file_name in ['workload_db', 'snapshot_db']:
                     tenantcontext = get_context(resources)
                 update_resource_list(tenantcontext,resources)
 
@@ -435,18 +498,23 @@ def import_resources(tenantcontext, resource_map, new_version, db_dir, upgrade):
         DBSession.bulk_insert_mappings(eval('models.%s' % (metadata_model_class)), resources_metadata_list)
         DBSession.commit()
 
-        # if workloads then check for job schedule, if it's there then update it.
-        if file == 'workload_db':
+        # if workloads/config_workload then check for job schedule, if it's there then update it.
+        if file_name in ['workload_db', 'config_workload_db']:
             for resource in resources_list:
-                workload = models.Workloads()
-                workload.update(resource)
-                workloads.append(workload)
+                if file_name == 'workload_db':
+                    workload = models.Workloads()
+                    workload.update(resource)
+                    workloads.append(workload)
+                else:
+                    workload = models.ConfigWorkloads()
+                    workload.update(resource)
 
-                #Check if job schedule is enable then add scheduler.
+                # Check if job schedule is enable then add scheduler.
                 if len(resource['jobschedule']) and \
-                   pickle.loads(str(resource['jobschedule']))['enabled'] == True:
-                   workload_api = workloadAPI.API()
-                   workload_api.workload_add_scheduler_job(pickle.loads(str(resource['jobschedule'])), workload, tenantcontext)
+                                str(pickle.loads(str(resource['jobschedule']))['enabled']).lower() == 'true':
+                    workload_api = workloadAPI.API()
+                    workload_api.workload_add_scheduler_job(tenantcontext, pickle.loads(str(resource['jobschedule'])), workload,
+                                                            is_config_backup=(file_name=='config_workload_db'))
 
     except Exception as ex:
         LOG.exception(ex)

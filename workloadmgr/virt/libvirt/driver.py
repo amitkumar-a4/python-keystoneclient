@@ -583,7 +583,10 @@ class LibvirtDriver(driver.ComputeDriver):
 
         while True:
               try:
-                  time.sleep(10)
+                  if CONF.vault_storage_type == 'nfs':
+                      time.sleep(10)
+                  else:
+                      time.sleep(120)
                   async_task_status = {}
                   if progress_tracking_file_path:
                      try:
@@ -1249,6 +1252,7 @@ class LibvirtDriver(driver.ComputeDriver):
                 workload_utils.upload_snapshot_db_entry(cntx, snapshot_id)
 
             for snap in snapshots_to_delete:
+                db.snapshot_update(cntx, snap.id, {'metadata': {'deleted_by': 'retention'}})
                 workload_utils.common_apply_retention_disk_check(cntx, snapshot_to_commit, snap, workload_obj)
 
         except Exception as ex:

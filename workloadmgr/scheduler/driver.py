@@ -53,6 +53,15 @@ def restore_update_db(context, restore_id, host):
     values = {'host': host, 'scheduled_at': now}
     return db.restore_update(context, restore_id, values)
 
+def config_backup_update_db(context, backup_id, host):
+    '''Set the host and set the scheduled_at field of the backup.
+
+    :returns: A ConfigBackup with the updated fields set properly.
+    '''
+    now = timeutils.utcnow()
+    values = {'host': host, 'scheduled_at': now}
+    return db.config_backup_update(context, backup_id, values)
+
 class Scheduler(object):
     """The base class that all Scheduler classes should inherit from."""
 

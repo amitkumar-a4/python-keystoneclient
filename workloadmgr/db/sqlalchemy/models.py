@@ -25,8 +25,7 @@ FLAGS = flags.FLAGS
 BASE = declarative_base()
 
 
-DB_VERSION = '2.4.47'
-
+DB_VERSION = '2.5.2'
 
 class WorkloadsBase(object):
     """Base class for Workloads Models."""
@@ -623,7 +622,63 @@ class SettingMetadata(BASE, WorkloadsBase):
     settings = relationship(Settings, backref=backref('metadata', cascade="all, delete-orphan"))
     key = Column(String(255), index=True, nullable=False)
     value = Column(Text)      
-    
+
+class ConfigWorkloads(BASE, WorkloadsBase):
+    """Represents a config workload object."""
+    __tablename__ = 'config_workloads'
+
+    id = Column(String(255), primary_key=True)
+    user_id = Column(String(255), nullable=False)
+    project_id = Column(String(255), nullable=False)
+    status = Column(String(255))
+    jobschedule = Column(String(4096))
+    host = Column(String(255))
+    backup_media_target = Column(String(2046))
+    error_msg = Column(String(4096))
+
+class ConfigWorkloadMetadata(BASE, WorkloadsBase):
+    """Represents metadata for the config workload"""
+    __tablename__ = 'config_workload_metadata'
+    __table_args__ = (UniqueConstraint('config_workload_id', 'key'), {})
+
+    id = Column(String(255), primary_key=True)
+    config_workload_id = Column(String(255), ForeignKey('config_workloads.id'), nullable=False)
+    config_workload = relationship(ConfigWorkloads, backref=backref('metadata'))
+    key = Column(String(255), index=True, nullable=False)
+    value = Column(Text)
+
+class ConfigBackups(BASE, WorkloadsBase):
+    """Represents a configuration backup object."""
+    __tablename__ = 'config_backups'
+    id = Column(String(255), primary_key=True)
+    user_id = Column(String(255), nullable=False)
+    project_id = Column(String(255), nullable=False)
+    finished_at = Column(DateTime)
+    config_workload_id = Column(String(255), ForeignKey('config_workloads.id'), nullable=False)
+    display_name = Column(String(255))
+    display_description = Column(String(255))
+    size = Column(BigInteger)
+    host = Column(String(255))
+    progress_msg = Column(String(255))
+    warning_msg = Column(String(4096))
+    error_msg = Column(String(4096))
+    time_taken = Column(BigInteger, default=0)
+    vault_storage_path = Column(String(4096))
+    scheduled_at = Column(DateTime)
+    status = Column(String(255), nullable=False)
+    data_deleted = Column(Boolean, default=False)
+
+class ConfigBackupMetadata(BASE, WorkloadsBase):
+    """Represents  metadata for the config backup"""
+    __tablename__ = 'config_backup_metadata'
+    __table_args__ = (UniqueConstraint('config_backup_id', 'key'), {})
+
+    id = Column(String(255), primary_key=True)
+    config_backup_id = Column(String(255), ForeignKey('config_backups.id'), nullable=False)
+    config_backup = relationship(ConfigBackups, backref=backref('metadata'))
+    key = Column(String(255), index=True, nullable=False)
+    value = Column(Text)
+ 
 def register_models():
     """Register Models and create metadata.
 
@@ -662,7 +717,11 @@ def register_models():
               Tasks,
               TaskStatusMessages,
               Settings,
-              SettingMetadata             
+              SettingMetadata,
+              ConfigWorkloads,
+              ConfigWorkloadMetadata,
+              ConfigBackups,
+              ConfigBackupMetadata,
               )
     engine = create_engine(FLAGS.sql_connection, echo=False)
     for model in models:
