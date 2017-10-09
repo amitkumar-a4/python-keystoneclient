@@ -41,8 +41,10 @@ from workloadmgr.vault import vault
 
 CONF = cfg.CONF
 
+
 class BaseVaultTestCase(test.TestCase):
     """Test Case for vmtasks."""
+
     def setUp(self):
         super(BaseVaultTestCase, self).setUp()
 
@@ -52,7 +54,8 @@ class BaseVaultTestCase(test.TestCase):
         self.context = context.get_admin_context()
         patch('sys.stderr').start()
 
-        self.is_online_patch = patch('workloadmgr.vault.vault.NfsTrilioVaultBackupTarget.is_online')
+        self.is_online_patch = patch(
+            'workloadmgr.vault.vault.NfsTrilioVaultBackupTarget.is_online')
         self.subprocess_patch = patch('subprocess.check_call')
         self.MockMethod = self.is_online_patch.start()
         self.SubProcessMockMethod = self.subprocess_patch.start()
@@ -74,7 +77,8 @@ class BaseVaultTestCase(test.TestCase):
         self.subprocess_patch.stop()
 
         import workloadmgr.vault.vault
-        for share in ['server1:nfsshare1','server2:nfsshare2','server3:nfsshare3']:
+        for share in ['server1:nfsshare1',
+                      'server2:nfsshare2', 'server3:nfsshare3']:
             backup_target = workloadmgr.vault.vault.get_backup_target(share)
             shutil.rmtree(backup_target.mount_path)
             fileutils.ensure_tree(backup_target.mount_path)
@@ -93,9 +97,9 @@ class BaseVaultTestCase(test.TestCase):
         from workloadmgr.db.imports.import_workload_1_0_177 import import_workload
         from workloadmgr.db.imports.import_workload_1_0_177 import import_settings
 
-        values = [{'server1:nfsshare1': [1099511627776, 0],}.values()[0],
-                   {'server2:nfsshare2': [1099511627776, 0],}.values()[0],
-                   {'server3:nfsshare3': [1099511627776, 0],}.values()[0],]
+        values = [{'server1:nfsshare1': [1099511627776, 0], }.values()[0],
+                  {'server2:nfsshare2': [1099511627776, 0], }.values()[0],
+                  {'server3:nfsshare3': [1099511627776, 0], }.values()[0], ]
 
         mock_method1.return_value = True
         mock_method3.return_value = True
@@ -107,23 +111,23 @@ class BaseVaultTestCase(test.TestCase):
             mock_method2.return_value = None
             mock_method2.side_effect = values
             workload = {
-                        'id': str(uuid.uuid4()),
-                        'size': size,
-                        'error_msg': '',
-                        'user_id': self.context.user_id,
-                        'tenant_id': self.context.tenant_id,
-                        'status': 'creating',
-                        'instances': [],
-                        'jobschedule': pickle.dumps({'start_date': '06/05/2014',
-                                        'end_date': '07/05/2015',
-                                        'enabled': False,
-                                        'interval': '1 hr',
-                                        'start_time': '2:30 PM',
-                                        'fullbackup_interval': '-1',
-                                        'retention_policy_type': 'Number of Snapshots to Keep',
-                                        'retention_policy_value': str(noofsnapshots)}),
-                        'metadata': {'workload_approx_backup_size': 1024}
-                       }
+                'id': str(uuid.uuid4()),
+                'size': size,
+                'error_msg': '',
+                'user_id': self.context.user_id,
+                'tenant_id': self.context.tenant_id,
+                'status': 'creating',
+                'instances': [],
+                'jobschedule': pickle.dumps({'start_date': '06/05/2014',
+                                             'end_date': '07/05/2015',
+                                             'enabled': False,
+                                             'interval': '1 hr',
+                                             'start_time': '2:30 PM',
+                                             'fullbackup_interval': '-1',
+                                             'retention_policy_type': 'Number of Snapshots to Keep',
+                                             'retention_policy_value': str(noofsnapshots)}),
+                'metadata': {'workload_approx_backup_size': 1024}
+            }
 
             workload_backup_media_size = size
             jobschedule = pickle.loads(workload['jobschedule'])
@@ -139,7 +143,7 @@ class BaseVaultTestCase(test.TestCase):
                 fulls = incrs
                 incrs = 0
             else:
-                fulls = incrs/int(jobschedule['fullbackup_interval'])
+                fulls = incrs / int(jobschedule['fullbackup_interval'])
                 incrs = incrs - fulls
 
             workload_approx_backup_size = \
@@ -150,7 +154,8 @@ class BaseVaultTestCase(test.TestCase):
                                   'deleted': False, 'created_at': None, 'updated_at': None,
                                   'version': '2.3.1', 'workload_id': workload['id'], 'deleted_at': None}]
             workload['metadata'] = workload_metadata
-            backup_endpoint = workloadmgr.vault.vault.get_nfs_share_for_workload_by_free_overcommit(self.context, workload)
+            backup_endpoint = workloadmgr.vault.vault.get_nfs_share_for_workload_by_free_overcommit(
+                self.context, workload)
             workload_metadata = [{'key': 'workload_approx_backup_size', 'value': workload_approx_backup_size,
                                   'deleted': False, 'created_at': None, 'updated_at': None,
                                   'version': '2.3.1', 'workload_id': workload['id'], 'deleted_at': None,
@@ -163,28 +168,44 @@ class BaseVaultTestCase(test.TestCase):
             workload['metadata'] = workload_metadata
 
             # write json here
-            backup_target = workloadmgr.vault.vault.get_backup_target(backup_endpoint)
-            workload_path = os.path.join(backup_target.mount_path, "workload_" + workload['id'])
+            backup_target = workloadmgr.vault.vault.get_backup_target(
+                backup_endpoint)
+            workload_path = os.path.join(
+                backup_target.mount_path,
+                "workload_" + workload['id'])
             os.mkdir(workload_path)
             workload_json_file = os.path.join(workload_path, "workload_db")
             with open(workload_json_file, "w") as f:
-                 f.write(json.dumps(workload))
+                f.write(json.dumps(workload))
 
             return workload
- 
+
         def create_setting(cntx):
-            (backup_target, path) = vault.get_settings_backup_target() 
-            settings_db = [{"status": "available", "category": "job_scheduler", "user_id": cntx.user_id, "description": "Controls job scheduler status", "deleted": False, "value": "1", "name": "global-job-scheduler", "version": "2.3.1", "hidden": False, "project_id": cntx.project_id, "type": "job-scheduler-setting", "public": False, "metadata": []}]
+            (backup_target, path) = vault.get_settings_backup_target()
+            settings_db = [{"status": "available",
+                            "category": "job_scheduler",
+                            "user_id": cntx.user_id,
+                            "description": "Controls job scheduler status",
+                            "deleted": False,
+                            "value": "1",
+                            "name": "global-job-scheduler",
+                            "version": "2.3.1",
+                            "hidden": False,
+                            "project_id": cntx.project_id,
+                            "type": "job-scheduler-setting",
+                            "public": False,
+                            "metadata": []}]
             backup_target.put_object(path, json.dumps(settings_db))
 
         def delete_workload(workload):
             for meta in workload['metadata']:
                 if meta['key'] == 'backup_media_target':
                     backup_endpoint = meta['value']
-            backup_target = workloadmgr.vault.vault.get_backup_target(backup_endpoint)
+            backup_target = workloadmgr.vault.vault.get_backup_target(
+                backup_endpoint)
             workload_path = os.path.join(backup_target.mount_path,
                                          "workload_" + workload['id'])
-            shutil.rmtree(workload_path) 
+            shutil.rmtree(workload_path)
 
         def create_snapshot(workload, full=False):
             """ create a sparse file
@@ -196,11 +217,14 @@ class BaseVaultTestCase(test.TestCase):
             for meta in workload['metadata']:
                 if meta['key'] == 'backup_media_target':
                     backup_endpoint = meta['value']
-            backup_target = workloadmgr.vault.vault.get_backup_target(backup_endpoint)
-            workload_path = os.path.join(backup_target.mount_path, "workload_" + workload['id'])
+            backup_target = workloadmgr.vault.vault.get_backup_target(
+                backup_endpoint)
+            workload_path = os.path.join(
+                backup_target.mount_path,
+                "workload_" + workload['id'])
             snap_path = os.path.join(workload_path, snapname)
             fileutils.ensure_tree(snap_path)
- 
+
             if full:
                 snapsize = workload['size']
             else:
@@ -234,7 +258,7 @@ class BaseVaultTestCase(test.TestCase):
                            "data_deleted": False, "workload_id": workload['id']}
 
             with open(os.path.join(snap_path, 'snapshot_db'), "w") as f:
-                 f.write(json.dumps(snapshot_db))
+                f.write(json.dumps(snapshot_db))
 
             # apply retention policy
             snaps = []
@@ -245,7 +269,8 @@ class BaseVaultTestCase(test.TestCase):
                     continue
                 snaps.append(snap)
 
-            if len(snaps) >= pickle.loads(workload['jobschedule'])['retention_policy_value']:
+            if len(snaps) >= pickle.loads(workload['jobschedule'])[
+                    'retention_policy_value']:
                 os.remove(os.path.join(workload_path, snaps[0]))
 
             return snap_path

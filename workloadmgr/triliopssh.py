@@ -15,7 +15,8 @@
 
 # You should have received a copy of the GNU Lesser General Public
 # License along with this library; if not, write to the Free Software
-# Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301  USA
+# Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA
+# 02110-1301  USA
 
 """Asynchronous parallel SSH library
 
@@ -46,6 +47,7 @@ host_logger.setLevel(logging.INFO)
 DEFAULT_RETRIES = 3
 
 logger = logging.getLogger(__name__)
+
 
 class UnknownHostException(Exception):
     """Raised when a host is unknown (dns failure)"""
@@ -79,7 +81,7 @@ class SSHClient(object):
                  proxy_host=None, proxy_port=22):
         """Connect to host honouring any user set configuration in ~/.ssh/config \
         or /etc/ssh/ssh_config
-        
+
         :param host: Hostname to connect to
         :type host: str
         :param user: (Optional) User to login as. Defaults to logged in user or \
@@ -158,18 +160,20 @@ class SSHClient(object):
         :rtype: `:mod:paramiko.SSHClient` Client to remote SSH destination
         via intermediate SSH tunnel server."""
         self.proxy_client = paramiko.SSHClient()
-        self.proxy_client.set_missing_host_key_policy(paramiko.MissingHostKeyPolicy())
+        self.proxy_client.set_missing_host_key_policy(
+            paramiko.MissingHostKeyPolicy())
         self._connect(self.proxy_client, self.proxy_host, self.proxy_port)
         logger.info("Connecting via SSH proxy %s:%s -> %s:%s", self.proxy_host,
                     self.proxy_port, self.host, self.port,)
         proxy_channel = self.proxy_client.get_transport().\
-          open_channel('direct-tcpip', (self.host, self.port,),
-                       ('127.0.0.1', 0))
-        return self._connect(self.client, self.host, self.port, sock=proxy_channel)
-        
+            open_channel('direct-tcpip', (self.host, self.port,),
+                         ('127.0.0.1', 0))
+        return self._connect(self.client, self.host,
+                             self.port, sock=proxy_channel)
+
     def _connect(self, client, host, port, sock=None, retries=1):
         """Connect to host
-        
+
         :raises: :mod:`pssh.AuthenticationException` on authentication error
         :raises: :mod:`pssh.UnknownHostException` on DNS resolution error
         :raises: :mod:`pssh.ConnectionErrorException` on error connecting
@@ -180,42 +184,43 @@ class SSHClient(object):
                            password=self.password, port=port,
                            pkey=self.pkey,
                            sock=sock, timeout=self.timeout)
-        except sock_gaierror, ex:
+        except sock_gaierror as ex:
             logger.error("Could not resolve host '%s' - retry %s/%s" %
                          (host, retries, self.num_retries))
             while retries < self.num_retries:
                 gevent.sleep(5)
                 return self._connect(client, host, port, sock=sock,
-                                     retries=retries+1)
+                                     retries=retries + 1)
             """
             raise UnknownHostException("%s - %s - retry %s/%s" %
                                        (str(ex.args[1]), host, retries, self.num_retries))
             """
-            logger.info("%s - %s - retry %s/%s" % (str(ex.args[1]), host, retries, self.num_retries))            
+            logger.info("%s - %s - retry %s/%s" %
+                        (str(ex.args[1]), host, retries, self.num_retries))
             raise ConnectionErrorException("Unable to establish connection")
-        except sock_error, ex:
+        except sock_error as ex:
             logger.error("Error connecting to host '%s:%s' - retry %s/%s" %
                          (host, port, retries, self.num_retries))
             while retries < self.num_retries:
                 gevent.sleep(5)
                 return self._connect(client, host, port, sock=sock,
-                                     retries=retries+1)
+                                     retries=retries + 1)
             error_type = ex.args[1] if len(ex.args) > 1 else ex.args[0]
-            
+
             """
             raise ConnectionErrorException("%s for host '%s:%s' - retry %s/%s" %
                                            (str(error_type), host, port,
                                            retries, self.num_retries))
             """
             logger.info("%s for host '%s:%s' - retry %s/%s" %
-                               (str(error_type), host, port,
-                               retries, self.num_retries))
+                        (str(error_type), host, port,
+                         retries, self.num_retries))
             raise ConnectionErrorException("Unable to establish connection")
-        except paramiko.AuthenticationException, ex:
+        except paramiko.AuthenticationException as ex:
             raise AuthenticationException(ex)
         # SSHException is more general so should be below other types
         # of SSH failure
-        except paramiko.SSHException, ex:
+        except paramiko.SSHException as ex:
             logger.error("General SSH error - %s", ex)
             raise SSHException(ex)
 
@@ -245,10 +250,10 @@ class SSHClient(object):
         if self.timeout:
             channel.settimeout(self.timeout)
         _stdout, _stderr = channel.makefile('rb'), \
-                           channel.makefile_stderr('rb')
+            channel.makefile_stderr('rb')
         stdout, stderr = self._read_output_buffer(_stdout,), \
-                         self._read_output_buffer(_stderr,
-                                                  prefix='\t[err]')
+            self._read_output_buffer(_stderr,
+                                     prefix='\t[err]')
         if sudo and not user:
             command = 'sudo -S bash -c "%s"' % command.replace('"', '\\"')
         elif user:
@@ -261,10 +266,10 @@ class SSHClient(object):
         channel.exec_command(command, **kwargs)
         gevent.sleep(.2)
         if sudo or user:
-            if stdin.channel.closed is False: # If stdin is still open then sudo is asking us for a password
+            if stdin.channel.closed is False:  # If stdin is still open then sudo is asking us for a password
                 logger.debug("Writing credetials for sudo")
                 stdin.write('%s\n' % self.password)
-                stdin.flush()        
+                stdin.flush()
         logger.debug("Command started")
         while not (channel.recv_ready() or channel.closed):
             gevent.sleep(.2)
@@ -286,7 +291,7 @@ class SSHClient(object):
 
     def mkdir(self, sftp, directory):
         """Make directory via SFTP channel
-        
+
         :param sftp: SFTP client object
         :type sftp: :mod:`paramiko.SFTPClient`
         :param directory: Remote directory to create
@@ -295,7 +300,7 @@ class SSHClient(object):
         Catches and logs at error level remote IOErrors on creating directory."""
         try:
             sftp.mkdir(directory)
-        except IOError, error:
+        except IOError as error:
             logger.error("Error occured creating directory on %s - %s",
                          self.host, error)
 
@@ -321,12 +326,13 @@ class SSHClient(object):
                 self.mkdir(sftp, directory)
         try:
             sftp.put(local_file, remote_file)
-        except Exception, error:
+        except Exception as error:
             logger.error("Error occured copying file to host %s - %s",
                          self.host, error)
         else:
             logger.info("Copied local file %s to remote destination %s:%s",
                         local_file, self.host, remote_file)
+
 
 class ParallelSSHClient(object):
     """Uses :mod:`pssh.SSHClient`, performs tasks over SSH on multiple hosts in \
@@ -377,7 +383,7 @@ class ParallelSSHClient(object):
         :param proxy_port: (Optional) SSH port to use to login to proxy host if \
         set. Defaults to 22.
         :type proxy_port: int
-        
+
         **Example**
 
         >>> from pssh import ParallelSSHClient, AuthenticationException, \
@@ -400,7 +406,7 @@ UnknownHostException, ConnectionErrorException
                          'stderr' : <generator>,
                          'cmd' : <greenlet>,
             }}
-        >>> # Print output as it comes in. 
+        >>> # Print output as it comes in.
         >>> for host in output: for line in output[host]['stdout']: print line
         [myhost1]     ls: cannot access /tmp/aasdfasdf: No such file or directory
         [myhost2]     ls: cannot access /tmp/aasdfasdf: No such file or directory
@@ -414,25 +420,25 @@ UnknownHostException, ConnectionErrorException
         >>> import paramiko
         >>> client_key = paramiko.RSAKey.from_private_key_file('user.key')
         >>> client = ParallelSSHClient(['myhost1', 'myhost2'], pkey=client_key)
-        
+
         .. note ::
-        
+
           **Connection persistence**
-          
+
           Connections to hosts will remain established for the duration of the
           object's life. To close them, just `del` or reuse the object reference.
-          
+
           >>> client = ParallelSSHClient(['localhost'])
           >>> output = client.run_command('ls -ltrh /tmp/aasdfasdf')
           >>> client.pool.join()
-          
+
           :netstat: ``tcp        0      0 127.0.0.1:53054         127.0.0.1:22            ESTABLISHED``
-          
+
           Connection remains active after commands have finished executing. Any \
           additional commands will use the same connection.
-          
+
           >>> del client
-          
+
           Connection is terminated.
         """
         self.pool_size = len(hosts) if len(hosts) < pool_size else pool_size
@@ -463,18 +469,18 @@ UnknownHostException, ConnectionErrorException
         :type kwargs: dict
 
         :rtype: Dictionary with host as key as per :mod:`ParallelSSH.get_output`
-        
+
         :raises: :mod:`pssh.AuthenticationException` on authentication error
         :raises: :mod:`pssh.UnknownHostException` on DNS resolution error
         :raises: :mod:`pssh.ConnectionErrorException` on error connecting
         :raises: :mod:`pssh.SSHException` on other undefined SSH errors
 
         **Example Usage**
-        
+
         >>> output = client.run_command('ls -ltrh')
 
         print stdout for each command:
-        
+
         >>> for host in output:
         >>>     for line in output[host]['stdout']: print line
 
@@ -483,15 +489,15 @@ UnknownHostException, ConnectionErrorException
         >>> for host in output:
         >>>     for line in output[host]['stdout']: print line
         >>>     exit_code = client.get_exit_code(output[host])
-        
+
         Wait for completion, no stdout:
-        
+
         >>> client.pool.join()
-        
+
         Capture stdout - **WARNING** - this will store the entirety of stdout
         into memory and may exhaust available memory if command output is
         large enough:
-        
+
         >>> for host in output:
         >>>     stdout = list(output[host]['stdout'])
         >>>     print "Complete stdout for host %s is %s" % (host, stdout,)
@@ -499,7 +505,7 @@ UnknownHostException, ConnectionErrorException
         **Example Output**
 
         ::
-        
+
           {'myhost1': {'exit_code': exit code if ready else None,
                        'channel' : SSH channel of command,
                        'stdout'  : <iterable>,
@@ -510,17 +516,17 @@ UnknownHostException, ConnectionErrorException
         for host in self.hosts:
             self.pool.spawn(self._exec_command, host, *args, **kwargs)
         return self.get_output()
-    
+
     def exec_command(self, *args, **kwargs):
         """Run command on all hosts in parallel, honoring `self.pool_size`
-        
+
         **Deprecated by** :mod:`pssh.ParallelSSHClient.run_command`
-        
+
         :param args: Position arguments for command
         :type args: tuple
         :param kwargs: Keyword arguments for command
         :type kwargs: dict
-        
+
         :rtype: List of :mod:`gevent.Greenlet`"""
         warnings.warn("This method is being deprecated and will be removed in \
 future releases - use self.run_command instead", DeprecationWarning)
@@ -542,29 +548,29 @@ future releases - use self.run_command instead", DeprecationWarning)
 
     def get_output(self, commands=None):
         """Get output from running commands.
-        
+
         :param commands: (Optional) Override commands to get output from.\
         Uses running commands in pool if not given.
         :type commands: :mod:`gevent.Greenlet`
         :rtype: Dictionary with host as key as in:
 
         ::
-        
+
           {'myhost1': {'exit_code': exit code if ready else None,
                        'channel' : SSH channel of command,
                        'stdout'  : <iterable>,
                        'stderr'  : <iterable>,
                        'cmd'     : <greenlet>}}
-        
+
         Stdout and stderr are also logged via the logger named ``host_logger``
         which is enabled by default.
         ``host_logger`` output can be disabled by removing its handler.
-        
+
         >>> logger = logging.getLogger('pssh.host_logger')
         >>> for handler in logger.handlers: logger.removeHandler(handler)
-        
+
         **Example usage**:
-        
+
         >>> output = client.get_output()
         >>> for host in output: print output[host]['stdout']
         <stdout>
@@ -579,10 +585,10 @@ future releases - use self.run_command instead", DeprecationWarning)
             (channel, host, stdout, stderr) = cmd.get(timeout=self.timeout)
             output.setdefault(host, {})
             output[host].update({'exit_code': self._get_exit_code(channel),
-                                 'channel' : channel,
-                                 'stdout' : stdout,
-                                 'stderr' : stderr,
-                                 'cmd' : cmd, })
+                                 'channel': channel,
+                                 'stdout': stdout,
+                                 'stderr': stderr,
+                                 'cmd': cmd, })
         return output
 
     def get_exit_code(self, host_output):
@@ -604,9 +610,9 @@ future releases - use self.run_command instead", DeprecationWarning)
 
     def get_stdout(self, greenlet, return_buffers=False):
         """Get/print stdout from greenlet and return exit code for host
-        
+
         **Deprecated** - use self.get_output() instead.
-        
+
         :param greenlet: Greenlet object containing an \
         SSH channel reference, hostname, stdout and stderr buffers
         :type greenlet: :mod:`gevent.Greenlet`
@@ -627,8 +633,10 @@ future releases - use self.get_output instead", DeprecationWarning)
         if channel.exit_status_ready():
             channel.close()
         else:
-            logger.debug("Command still executing on get_stdout call - not closing channel and returning None as exit code.")
-            # If channel is not closed we cannot get full stdout/stderr so must return buffers
+            logger.debug(
+                "Command still executing on get_stdout call - not closing channel and returning None as exit code.")
+            # If channel is not closed we cannot get full stdout/stderr so must
+            # return buffers
             return_buffers = True
         # Channel must be closed or reading stdout/stderr will block forever
         if not return_buffers and channel.closed:
@@ -636,16 +644,16 @@ future releases - use self.get_output instead", DeprecationWarning)
                 pass
             for _ in stderr:
                 pass
-            return {host: {'exit_code': channel.recv_exit_status(),}}
+            return {host: {'exit_code': channel.recv_exit_status(), }}
         gevent.sleep(.2)
         return {host: {'exit_code': channel.recv_exit_status() if channel.exit_status_ready() else None,
-                       'channel' : channel if not channel.closed else None,
-                       'stdout' : stdout,
-                       'stderr' : stderr, }}
+                       'channel': channel if not channel.closed else None,
+                       'stdout': stdout,
+                       'stderr': stderr, }}
 
     def copy_file(self, local_file, remote_file):
         """Copy local file to remote file in parallel
-        
+
         :param local_file: Local filepath to copy to remote host
         :type local_file: str
         :param remote_file: Remote filepath on remote host to copy file to

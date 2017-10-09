@@ -225,7 +225,7 @@ def trycmd(*args, **kwargs):
     try:
         out, err = execute(*args, **kwargs)
         failed = False
-    except exception.ProcessExecutionError, exn:
+    except exception.ProcessExecutionError as exn:
         out, err = '', str(exn)
         LOG.debug(err)
         failed = True
@@ -252,7 +252,7 @@ def ssh_execute(ssh, cmd, process_input=None,
     channel = stdout_stream.channel
 
     #stdin.write('process_input would go here')
-    #stdin.flush()
+    # stdin.flush()
 
     # NOTE(justinsb): This seems suspicious...
     # ...other SSH clients have buffering issues with this approach
@@ -368,7 +368,8 @@ class SSHPool(pools.Pool):
 
 def workloadmgrdir():
     import workloadmgr
-    return os.path.abspath(workloadmgr.__file__).split('workloadmgr/__init__.py')[0]
+    return os.path.abspath(workloadmgr.__file__).split(
+        'workloadmgr/__init__.py')[0]
 
 
 def debug(arg):
@@ -489,7 +490,7 @@ class LoopingCall(object):
                     if not self._running:
                         break
                     greenthread.sleep(interval)
-            except LoopingCallDone, e:
+            except LoopingCallDone as e:
                 self.stop()
                 done.send(e.retvalue)
             except Exception:
@@ -915,7 +916,7 @@ def generate_mac_address():
     #             conflict with libvirt, so we use the next highest octet
     #             that has the unicast and locally administered bits set
     #             properly: 0xfa.
-    #             Discussion: https://bugs.launchpad.net/workloadmgr/+bug/921838
+    # Discussion: https://bugs.launchpad.net/workloadmgr/+bug/921838
     mac = [0xfa, 0x16, 0x3e,
            random.randint(0x00, 0x7f),
            random.randint(0x00, 0xff),
@@ -950,14 +951,14 @@ def temporary_chown(path, owner_uid=None):
     finally:
         if orig_uid != owner_uid:
             execute('chown', orig_uid, path, run_as_root=True)
-            
+
+
 def chmod(path, mode):
     """change the mode of the file.
 
     :params mode
     """
     execute('chmod', mode, path, run_as_root=True)
-      
 
 
 @contextlib.contextmanager
@@ -968,7 +969,7 @@ def tempdir(**kwargs):
     finally:
         try:
             shutil.rmtree(tmpdir)
-        except OSError, e:
+        except OSError as e:
             LOG.debug(_('Could not remove tmpdir: %s'), str(e))
 
 
@@ -1009,6 +1010,7 @@ class UndoManager(object):
     """Provides a mechanism to facilitate rolling back a series of actions
     when an exception is raised.
     """
+
     def __init__(self):
         self.undo_stack = []
 
@@ -1082,6 +1084,7 @@ def to_bytes(text, default=0):
     except ValueError:
         return default
 
+
 class LoopingCallDone(Exception):
     """Exception to break out and stop a LoopingCall.
 
@@ -1131,7 +1134,7 @@ class FixedIntervalLoopingCall(LoopingCallBase):
                     if not self._running:
                         break
                     greenthread.sleep(interval)
-            except LoopingCallDone, e:
+            except LoopingCallDone as e:
                 self.stop()
                 done.send(e.retvalue)
             except Exception:
@@ -1145,6 +1148,7 @@ class FixedIntervalLoopingCall(LoopingCallBase):
 
         greenthread.spawn(_inner)
         return self.done
+
 
 def is_valid_ipv4(address):
     """Verify that address represents a valid IPv4 address."""
@@ -1216,6 +1220,7 @@ def get_ip_version(network):
     elif netaddr.IPNetwork(network).version == 4:
         return "IPv4"
 
+
 def is_neutron():
     global _IS_NEUTRON_ATTEMPTED
     global _IS_NEUTRON
@@ -1225,7 +1230,7 @@ def is_neutron():
 
     try:
         # compatibility with Folsom/Grizzly configs
-        cls_name = 'workloadmgr.network.neutronv2.api.API' #CONF.network_api_class
+        cls_name = 'workloadmgr.network.neutronv2.api.API'  # CONF.network_api_class
         if cls_name == 'workloadmgr.network.quantumv2.api.API':
             cls_name = 'workloadmgr.network.neutronv2.api.API'
         _IS_NEUTRON_ATTEMPTED = True
@@ -1246,26 +1251,31 @@ def reset_is_neutron():
     _IS_NEUTRON_ATTEMPTED = False
     _IS_NEUTRON = False
 
- 
+
 def move_file(src, dest):
     execute('mv', src, dest)
-    
+
+
 def copy_file(src, dest):
-    execute('cp', src, dest)    
-    
+    execute('cp', src, dest)
+
+
 def append_unique(dict, new_item, key="id"):
     for item in dict:
         if item[key] == new_item[key]:
             return
-    dict.append(new_item)    
+    dict.append(new_item)
+
 
 def get_file_mode(path):
     """This primarily exists to make unit testing easier."""
     return stat.S_IMODE(os.stat(path).st_mode)
 
+
 def get_file_gid(path):
     """This primarily exists to make unit testing easier."""
     return os.stat(path).st_gid
+
 
 def generate_password(length=20, symbolgroups=DEFAULT_PASSWORD_SYMBOLS):
     """Generate a random password from the supplied symbol groups.
@@ -1304,6 +1314,7 @@ def generate_username(length=20, symbolgroups=DEFAULT_PASSWORD_SYMBOLS):
     # Use the same implementation as the password generation.
     return generate_password(length, symbolgroups)
 
+
 class ChunkedFile(object):
     """
     something that can iterate over a large file
@@ -1316,14 +1327,16 @@ class ChunkedFile(object):
         self.fp = open(self.filepath, 'rb')
         self.update = update
         self.uploaded_size_incremental = 0
-        
+
     def _update(self, size):
         self.uploaded_size_incremental = self.uploaded_size_incremental + size
-        if self.update and ((self.uploaded_size_incremental > (5 * 1024 * 1024)) or (self.tell() == os.SEEK_END)):
-            object = self.update['function'](self.update['context'], 
-                                             self.update['id'], 
+        if self.update and ((self.uploaded_size_incremental > (
+                5 * 1024 * 1024)) or (self.tell() == os.SEEK_END)):
+            object = self.update['function'](self.update['context'],
+                                             self.update['id'],
                                              {'uploaded_size_incremental': self.uploaded_size_incremental})
-            LOG.debug(_("progress_percent: %(progress_percent)s") %{'progress_percent': object.progress_percent,})
+            LOG.debug(_("progress_percent: %(progress_percent)s") %
+                      {'progress_percent': object.progress_percent, })
             self.uploaded_size_incremental = 0
 
     def __iter__(self):
@@ -1339,32 +1352,32 @@ class ChunkedFile(object):
                         break
         finally:
             self.close()
-            
+
     def __len__(self):
-        return os.path.getsize(self.filepath)  
-    
+        return os.path.getsize(self.filepath)
+
     def tell(self):
         if self.fp:
             return self.fp.tell()
-    
+
     def seek(self, offset, whence=os.SEEK_SET):
         if self.fp:
-            return self.fp.seek(offset,whence)
-    
+            return self.fp.seek(offset, whence)
+
     def read(self, size):
         if self.fp:
             data = self.fp.read(size)
             if data:
                 self._update(len(data))
-            return data            
-            
-    
+            return data
+
     def close(self):
         """Close the internal file pointer"""
         if self.fp:
             self.fp.close()
             self.fp = None
-            
+
+
 def get_instance_restore_options(restore_options, instance_id, platform):
     if restore_options and platform in restore_options:
         if 'instances' in restore_options[platform]:
@@ -1372,6 +1385,7 @@ def get_instance_restore_options(restore_options, instance_id, platform):
                 if instance['id'] == instance_id:
                     return instance
     return {}
+
 
 def last_completed_audit_period(unit=None):
     """This method gives you the most recently *completed* audit period.
@@ -1459,6 +1473,7 @@ def last_completed_audit_period(unit=None):
 
     return (begin, end)
 
+
 def check_ssh_injection(cmd_list):
     ssh_injection_pattern = ['`', '$', '|', '||', ';', '&', '&&', '>', '>>',
                              '<']
@@ -1493,7 +1508,9 @@ def check_ssh_injection(cmd_list):
                 if result == 0 or not arg[result - 1] == '\\':
                     raise exception.SSHInjectionThreat(command=cmd_list)
 
-def get_mac_addresses(hostname, sshport, username=None, password=None, timeout=None):
+
+def get_mac_addresses(hostname, sshport, username=None,
+                      password=None, timeout=None):
     mac_addresses = []
     client = paramiko.SSHClient()
     client.load_system_host_keys()
@@ -1509,22 +1526,24 @@ def get_mac_addresses(hostname, sshport, username=None, password=None, timeout=N
     exitcode = stdout.channel.recv_exit_status()
     if exitcode:
         raise exception.ProcessExecutionError(stdout=None, stderr=stderr.read(),
-                                exit_code=exitcode, cmd=ifcfgcmd,
-                                description=None)
+                                              exit_code=exitcode, cmd=ifcfgcmd,
+                                              description=None)
     else:
         for macline in stdout.read().strip().split('\n'):
-            mac_addresses.append(macline);
+            mac_addresses.append(macline)
         return mac_addresses
-    
+
+
 def get_ip_addresses():
     # we will configure only br-eth0 and eth1 on the appliance
     ip_addresses = []
     try:
         for ifaceName in interfaces():
-            addresses = [i['addr'] for i in ifaddresses(ifaceName).setdefault(AF_INET, [{'addr':'No IP addr'}] )]
+            addresses = [i['addr'] for i in ifaddresses(
+                ifaceName).setdefault(AF_INET, [{'addr': 'No IP addr'}])]
             if ifaceName in ('eth0', 'eth1'):
                 ip_addresses += addresses
-                
+
         Config = ConfigParser.RawConfigParser()
         Config.read('/etc/tvault-config/tvault-config.conf')
         config_data = dict(Config._defaults)
@@ -1533,20 +1552,21 @@ def get_ip_addresses():
             #floating_ipaddress = config_data['floating_ipaddress']
             if tvault_ipaddress not in ip_addresses:
                 ip_addresses.insert(0, str(tvault_ipaddress))
-            #if floating_ipaddress not in ip_addresses:
+            # if floating_ipaddress not in ip_addresses:
             #    ip_addresses.insert(0, str(floating_ipaddress))
-                 
+
     except Exception as ex:
         pass
     try:
         ip_addresses.append(ni.ifaddresses('eth1')[AF_INET][0]['addr'])
     except Exception as ex:
         pass
-    return ip_addresses             
+    return ip_addresses
+
 
 def sizeof_fmt(num, suffix='B'):
     try:
-        for unit in ['','K','M','G','T','P','E','Z']:
+        for unit in ['', 'K', 'M', 'G', 'T', 'P', 'E', 'Z']:
             if abs(num) < 1024.0:
                 return "%3.1f %s%s" % (num, unit, suffix)
             num /= 1024.0
@@ -1555,34 +1575,34 @@ def sizeof_fmt(num, suffix='B'):
         LOG.exception(ex)
         return num
 
+
 def get_local_time(record_time, input_format, output_format, tz):
-        """
-        Convert and return the date and time - from differnt timezone to local
-        """
-        try:
-            if record_time in (0, None, ''):
-                return ''
-            else:
-                if not input_format \
-                        or input_format == None \
-                        or input_format == '':
-                    input_format = '%Y-%m-%dT%H:%M:%S.%f';
-                if not  output_format  \
-                        or output_format == None \
-                        or output_format == '':
-                    output_format = "%m/%d/%Y %I:%M:%S %p";
+    """
+    Convert and return the date and time - from differnt timezone to local
+    """
+    try:
+        if record_time in (0, None, ''):
+            return ''
+        else:
+            if not input_format \
+                    or input_format is None \
+                    or input_format == '':
+                input_format = '%Y-%m-%dT%H:%M:%S.%f';
+            if not output_format  \
+                    or output_format is None \
+                    or output_format == '':
+                output_format = "%m/%d/%Y %I:%M:%S %p";
 
-                local_time = datetime.datetime.strptime(
-                                record_time, input_format)
-                local_tz = pytz.timezone(tz)
-                from_zone = pytz.timezone(get_localzone().zone)
-                local_time = local_tz.localize(local_time)
-                #local_time = local_time.replace(tzinfo=local_tz)
-                local_time = local_time.astimezone(from_zone)
-                local_time = datetime.datetime.strftime(
-                                local_time, output_format)
-                return local_time
-        except Exception as ex:
-            LOG.exception(ex)
-            return record_time
-
+            local_time = datetime.datetime.strptime(
+                record_time, input_format)
+            local_tz = pytz.timezone(tz)
+            from_zone = pytz.timezone(get_localzone().zone)
+            local_time = local_tz.localize(local_time)
+            #local_time = local_time.replace(tzinfo=local_tz)
+            local_time = local_time.astimezone(from_zone)
+            local_time = datetime.datetime.strftime(
+                local_time, output_format)
+            return local_time
+    except Exception as ex:
+        LOG.exception(ex)
+        return record_time

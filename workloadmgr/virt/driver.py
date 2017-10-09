@@ -22,7 +22,7 @@ from workloadmgr.virt import event as virtevent
 driver_opts = [
     cfg.StrOpt('compute_driver',
                help='Driver to use for controlling workload snapshots. Options '
-                   'include: libvirt.LibvirtDriver for the initial version ' ),
+               'include: libvirt.LibvirtDriver for the initial version '),
 ]
 
 CONF = cfg.CONF
@@ -59,7 +59,7 @@ class ComputeDriver(object):
 
     capabilities = {
         "live_snapshot": False,
-        }
+    }
 
     def __init__(self, virtapi):
         self.virtapi = virtapi
@@ -117,7 +117,7 @@ class ComputeDriver(object):
         workloadmgr manager to dispatch the event. This
         must only be invoked from a green thread.
         """
-        #TODO(gbasava):Implementation
+        # TODO(gbasava):Implementation
         return
 
     def get_vcenter_info(self):
@@ -158,45 +158,59 @@ def load_compute_driver(virtapi, compute_driver=None):
         LOG.error(_("Unable to load the virtualization driver: %s") % (e))
         sys.exit(1)
 
+
 def compute_driver_matches(match):
     return CONF.compute_driver.endswith(match)
+
 
 def pre_snapshot_vm(self, cntx, db, instance, snapshot):
     raise NotImplementedError()
 
+
 def freeze_vm(self, cntx, db, instance, snapshot):
     raise NotImplementedError()
 
+
 def thaw_vm(self, cntx, db, instance, snapshot):
     raise NotImplementedError()
- 
-def enable_cbt(self, cntx, db, instance): 
+
+
+def enable_cbt(self, cntx, db, instance):
     raise NotImplementedError()
 
-def snapshot_vm(self, cntx, db, instance, snapshot): 
-    raise NotImplementedError()  
+
+def snapshot_vm(self, cntx, db, instance, snapshot):
+    raise NotImplementedError()
+
 
 def get_snapshot_data_size(self, cntx, db, instance, snapshot, snapshot_data):
-    raise NotImplementedError()    
+    raise NotImplementedError()
+
 
 def upload_snapshot(self, cntx, db, instance, snapshot, snapshot_data_ex):
     raise NotImplementedError()
 
+
 def post_snapshot_vm(self, cntx, db, instance, snapshot, snapshot_data):
-    raise NotImplementedError()   
-    
-def restore_vm(self, cntx, db, instance, restore, restored_net_resources, 
+    raise NotImplementedError()
+
+
+def restore_vm(self, cntx, db, instance, restore, restored_net_resources,
                restored_compute_flavor, restored_nics, instance_options):
-    raise NotImplementedError() 
-
-def mount_instance_root_device(self, cntx, db, instance, restore): 
     raise NotImplementedError()
 
-def umount_instance_root_device(self, process): 
+
+def mount_instance_root_device(self, cntx, db, instance, restore):
     raise NotImplementedError()
+
+
+def umount_instance_root_device(self, process):
+    raise NotImplementedError()
+
 
 def snapshot_mount(self, cntx, snapshot):
     raise NotImplementedError()
+
 
 def snapshot_dismount(self, cntx, snapshot):
     raise NotImplementedError()

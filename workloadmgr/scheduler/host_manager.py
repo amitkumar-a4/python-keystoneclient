@@ -44,6 +44,7 @@ LOG = logging.getLogger(__name__)
 
 class ReadOnlyDict(UserDict.IterableUserDict):
     """A read-only dict."""
+
     def __init__(self, source=None):
         self.data = {}
         self.update(source)
@@ -81,7 +82,7 @@ class HostState(object):
         self.host = host
         self.update_capabilities(capabilities, service)
 
-        self.workloadmgr_backend_name = None # Swift/LocalFS/tvaultfs
+        self.workloadmgr_backend_name = None  # Swift/LocalFS/tvaultfs
         self.vendor_name = None
         self.driver_version = 0
 
@@ -108,7 +109,8 @@ class HostState(object):
             if self.updated and self.updated > capability['timestamp']:
                 return
 
-            self.workloadmgr_backend = capability.get('workloadmgr_backend_name', None)
+            self.workloadmgr_backend = capability.get(
+                'workloadmgr_backend_name', None)
             self.vendor_name = capability.get('vendor_name', None)
             self.driver_version = capability.get('driver_version', None)
 
@@ -145,13 +147,13 @@ class HostManager(object):
         self.filter_handler = filters.HostFilterHandler('workloadmgr.scheduler.'
                                                         'filters')
         self.filter_classes = self.filter_handler.get_all_classes()
-        self.weight_handler = weights.HostWeightHandler('workloadmgr.scheduler.weights')
+        self.weight_handler = weights.HostWeightHandler(
+            'workloadmgr.scheduler.weights')
         self.weight_classes = self.weight_handler.get_all_classes()
         # Hardcode this for now. For some reason get_all_classes() is not getting
         # all weight classes. The routine was working in the python interpreter
         # though.
         self.weight_classes = [CapacityWeigher]
-
 
     def _choose_host_filters(self, filter_cls_names):
         """Since the caller may specify which filters to use we need
@@ -162,7 +164,8 @@ class HostManager(object):
         if filter_cls_names is None:
             filter_cls_names = FLAGS.scheduler_default_filters
 
-        if filter_cls_names and not isinstance(filter_cls_names, (list, tuple)):
+        if filter_cls_names and not isinstance(
+                filter_cls_names, (list, tuple)):
             filter_cls_names = [filter_cls_names]
         good_filters = []
         bad_filters = []
@@ -189,7 +192,8 @@ class HostManager(object):
         """
         if weight_cls_names is None:
             weight_cls_names = FLAGS.scheduler_default_weighers
-        if weight_cls_names and not isinstance(weight_cls_names, (list, tuple)):
+        if weight_cls_names and not isinstance(
+                weight_cls_names, (list, tuple)):
             weight_cls_names = [weight_cls_names]
 
         good_weighers = []
@@ -214,9 +218,9 @@ class HostManager(object):
         """Filter hosts and return only ones passing all filters"""
         return hosts
         #filter_classes = self._choose_host_filters(filter_class_names)
-        #return self.filter_handler.get_filtered_objects(filter_classes,
-                                                        #hosts,
-                                                        #filter_properties)
+        # return self.filter_handler.get_filtered_objects(filter_classes,
+        # hosts,
+        # filter_properties)
 
     def get_weighed_hosts(self, hosts, weight_properties,
                           weigher_class_names=None):
@@ -266,19 +270,18 @@ class HostManager(object):
             capabilities = self.service_states.get(host, None)
             host_state = self.host_state_map.get(host)
             if host_state:
-               # copy capabilities to host_state.capabilities
-               host_state.update_capabilities(capabilities,
+                # copy capabilities to host_state.capabilities
+                host_state.update_capabilities(capabilities,
                                                dict(service.iteritems()))
             else:
                 host_state = self.host_state_cls(host,
                                                  capabilities=capabilities,
-                                                 service=
-                                                 dict(service.iteritems()))
+                                                 service=dict(service.iteritems()))
             # update host_state
             if host in self.host_state_running.keys():
-               host_state.running_snapshots = self.host_state_running[host]
-            else: 
-                 host_state.running_snapshots = 0
+                host_state.running_snapshots = self.host_state_running[host]
+            else:
+                host_state.running_snapshots = 0
 
             self.host_state_map[host] = host_state
             host_state.update_from_workloadmgr_capability(capabilities)

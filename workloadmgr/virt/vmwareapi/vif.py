@@ -31,11 +31,11 @@ CONF.register_opts(vmwareapi_vif_opts, 'vmware')
 def _get_associated_vswitch_for_interface(session, interface, cluster=None):
     # Check if the physical network adapter exists on the host.
     if not network_util.check_if_vlan_interface_exists(session,
-                                        interface, cluster):
+                                                       interface, cluster):
         raise exception.NetworkAdapterNotFound(adapter=interface)
     # Get the vSwitch associated with the Physical Adapter
     vswitch_associated = network_util.get_vswitch_for_vlan_interface(
-                                    session, interface, cluster)
+        session, interface, cluster)
     if not vswitch_associated:
         raise exception.SwitchNotFoundForNetworkAdapter(adapter=interface)
     return vswitch_associated
@@ -57,7 +57,7 @@ def ensure_vlan_bridge(session, vif, cluster=None, create_vlan=True):
         # vlan_interface corresponding physical network adapter on the ESX
         # host.
         vswitch_associated = _get_associated_vswitch_for_interface(session,
-                                 vlan_interface, cluster)
+                                                                   vlan_interface, cluster)
         network_util.create_port_group(session, bridge,
                                        vswitch_associated,
                                        vlan_num if create_vlan else 0,
@@ -68,7 +68,7 @@ def ensure_vlan_bridge(session, vif, cluster=None, create_vlan=True):
     elif create_vlan:
         # Get the vSwitch associated with the Physical Adapter
         vswitch_associated = _get_associated_vswitch_for_interface(session,
-                                 vlan_interface, cluster)
+                                                                   vlan_interface, cluster)
         # Get the vlan id and vswitch corresponding to the port group
         _get_pg_info = network_util.get_vlanid_and_vswitch_for_portgroup
         pg_vlanid, pg_vswitch = _get_pg_info(session, bridge, cluster)
@@ -82,7 +82,7 @@ def ensure_vlan_bridge(session, vif, cluster=None, create_vlan=True):
         # Check if the vlan id is proper for the port group
         if pg_vlanid != vlan_num:
             raise exception.InvalidVLANTag(bridge=bridge, tag=vlan_num,
-                                       pgroup=pg_vlanid)
+                                           pgroup=pg_vlanid)
     return network_ref
 
 
@@ -120,11 +120,11 @@ def get_neutron_network(session, network_name, cluster, vif):
         bridge = vif['network']['id']
         opaque_networks = opaque.HostOpaqueNetworkInfo
         network_ref = _get_network_ref_from_opaque(opaque_networks,
-                CONF.vmware.integration_bridge, bridge)
+                                                   CONF.vmware.integration_bridge, bridge)
     else:
         bridge = network_name
         network_ref = network_util.get_network_with_the_name(
-                session, network_name, cluster)
+            session, network_name, cluster)
     if not network_ref:
         raise exception.NetworkNotFoundForBridge(bridge=bridge)
     return network_ref

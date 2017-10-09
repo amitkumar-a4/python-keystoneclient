@@ -5,6 +5,7 @@
 
 from workloadmgr.db import base
 
+
 class WorkloadMgrDB(base.Base):
 
     def __init__(self, host=None, db_driver=None):

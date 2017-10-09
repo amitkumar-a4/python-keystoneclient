@@ -27,8 +27,10 @@ from workloadmgr.openstack.common import importutils
 
 CONF = cfg.CONF
 
+
 class BaseWorkloadTestCase(test.TestCase):
     """Test Case for workloads."""
+
     def setUp(self):
         super(BaseWorkloadTestCase, self).setUp()
         self.context = context.get_admin_context()
@@ -37,7 +39,8 @@ class BaseWorkloadTestCase(test.TestCase):
                          'server1:nfsshare1, server2:nfsshare2, server3:nfsshare3')
 
         patch('sys.stderr').start()
-        self.is_online_patch = patch('workloadmgr.vault.vault.NfsTrilioVaultBackupTarget.is_online')
+        self.is_online_patch = patch(
+            'workloadmgr.vault.vault.NfsTrilioVaultBackupTarget.is_online')
         self.subprocess_patch = patch('subprocess.check_call')
         self.MockMethod = self.is_online_patch.start()
         self.SubProcessMockMethod = self.subprocess_patch.start()
@@ -58,13 +61,13 @@ class BaseWorkloadTestCase(test.TestCase):
             'status': 'creating',
             'instances': [],
             'jobschedule': pickle.dumps({'start_date': '06/05/2014',
-                            'end_date': '07/05/2015',
-                            'interval': '1 hr',
-                            'start_time': '2:30 PM',
-                            'fullbackup_interval': -1,
-                            'retention_policy_type': 'Number of Snapshots to Keep',
-                            'retention_policy_value': '30'}),
-            'host': CONF.host,}
+                                         'end_date': '07/05/2015',
+                                         'interval': '1 hr',
+                                         'start_time': '2:30 PM',
+                                         'fullbackup_interval': -1,
+                                         'retention_policy_type': 'Number of Snapshots to Keep',
+                                         'retention_policy_value': '30'}),
+            'host': CONF.host, }
 
     def tearDown(self):
         self.is_online_patch.stop()
@@ -82,7 +85,8 @@ class BaseWorkloadTestCase(test.TestCase):
 
         self.assertEqual(len(storage_usage['storage_usage']), 3)
         self.assertTrue('count_dict' in storage_usage)
-        shares = set(['server1:nfsshare1', 'server2:nfsshare2', 'server3:nfsshare3'])
+        shares = set(
+            ['server1:nfsshare1', 'server2:nfsshare2', 'server3:nfsshare3'])
         sharesinusage = []
         storage_usage['storage_usage'][0]['nfs_share(s)'][0]['nfsshare']
         for details in storage_usage['storage_usage']:

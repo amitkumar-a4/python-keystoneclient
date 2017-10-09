@@ -94,7 +94,7 @@ def to_primitive(value, convert_instances=False, convert_datetime=True,
 
     # value of itertools.count doesn't get caught by nasty_type_tests
     # and results in infinite loop when list(value) is called.
-    if type(value) == itertools.count:
+    if isinstance(value, itertools.count):
         return six.text_type(value)
 
     # FIXME(vish): Workaround for LP bug 852095. Without this workaround,

@@ -523,27 +523,27 @@ class LibvirtConfigGuestDisk(LibvirtConfigGuestDevice):
 
         if self.disk_read_bytes_sec is not None:
             iotune.append(self._text_node("read_bytes_sec",
-                self.disk_read_bytes_sec))
+                                          self.disk_read_bytes_sec))
 
         if self.disk_read_iops_sec is not None:
             iotune.append(self._text_node("read_iops_sec",
-                self.disk_read_iops_sec))
+                                          self.disk_read_iops_sec))
 
         if self.disk_write_bytes_sec is not None:
             iotune.append(self._text_node("write_bytes_sec",
-                self.disk_write_bytes_sec))
+                                          self.disk_write_bytes_sec))
 
         if self.disk_write_iops_sec is not None:
             iotune.append(self._text_node("write_iops_sec",
-                self.disk_write_iops_sec))
+                                          self.disk_write_iops_sec))
 
         if self.disk_total_bytes_sec is not None:
             iotune.append(self._text_node("total_bytes_sec",
-                self.disk_total_bytes_sec))
+                                          self.disk_total_bytes_sec))
 
         if self.disk_total_iops_sec is not None:
             iotune.append(self._text_node("total_iops_sec",
-                self.disk_total_iops_sec))
+                                          self.disk_total_iops_sec))
 
         if len(iotune) > 0:
             dev.append(iotune)
@@ -813,7 +813,7 @@ class LibvirtConfigGuestInterface(LibvirtConfigGuestDevice):
             bandwidth = etree.Element("bandwidth")
             if self.vif_inbound_average is not None:
                 vif_inbound = etree.Element("inbound",
-                average=str(self.vif_inbound_average))
+                                            average=str(self.vif_inbound_average))
                 if self.vif_inbound_peak is not None:
                     vif_inbound.set("peak", str(self.vif_inbound_peak))
                 if self.vif_inbound_burst is not None:
@@ -822,7 +822,7 @@ class LibvirtConfigGuestInterface(LibvirtConfigGuestDevice):
 
             if self.vif_outbound_average is not None:
                 vif_outbound = etree.Element("outbound",
-                average=str(self.vif_outbound_average))
+                                             average=str(self.vif_outbound_average))
                 if self.vif_outbound_peak is not None:
                     vif_outbound.set("peak", str(self.vif_outbound_peak))
                 if self.vif_outbound_burst is not None:
@@ -887,7 +887,7 @@ class LibvirtConfigGuestGraphics(LibvirtConfigGuestDevice):
 class LibvirtConfigGuestHostdev(LibvirtConfigGuestDevice):
     def __init__(self, **kwargs):
         super(LibvirtConfigGuestHostdev, self).\
-                __init__(root_name="hostdev", **kwargs)
+            __init__(root_name="hostdev", **kwargs)
         self.mode = kwargs.get('mode')
         self.type = kwargs.get('type')
         self.managed = 'yes'
@@ -910,8 +910,8 @@ class LibvirtConfigGuestHostdev(LibvirtConfigGuestDevice):
 class LibvirtConfigGuestHostdevPCI(LibvirtConfigGuestHostdev):
     def __init__(self, **kwargs):
         super(LibvirtConfigGuestHostdevPCI, self).\
-                __init__(mode='subsystem', type='pci',
-                         **kwargs)
+            __init__(mode='subsystem', type='pci',
+                     **kwargs)
         self.domain = None
         self.bus = None
         self.slot = None
@@ -958,7 +958,7 @@ class LibvirtConfigGuestCharBase(LibvirtConfigGuestDevice):
             dev.append(etree.Element("source", path=self.source_path))
         elif self.type == "unix":
             dev.append(etree.Element("source", mode="bind",
-                                    path=self.source_path))
+                                     path=self.source_path))
 
         return dev
 
@@ -1184,7 +1184,7 @@ class LibvirtConfigNodeDevice(LibvirtConfigObject):
 
     def __init__(self, **kwargs):
         super(LibvirtConfigNodeDevice, self).__init__(root_name="device",
-                                                **kwargs)
+                                                      **kwargs)
         self.name = None
         self.parent = None
         self.driver = None
@@ -1239,7 +1239,7 @@ class LibvirtConfigNodeDevicePciCap(LibvirtConfigObject):
                 self.vendor = c.text
                 self.vendor_id = c.get('id')
             elif c.tag == "capability" and c.get('type') in \
-                            ('virt_functions', 'phys_function'):
+                    ('virt_functions', 'phys_function'):
                 funcap = LibvirtConfigNodeDevicePciSubFunctionCap()
                 funcap.parse_dom(c)
                 self.fun_capability.append(funcap)
@@ -1248,7 +1248,7 @@ class LibvirtConfigNodeDevicePciCap(LibvirtConfigObject):
 class LibvirtConfigNodeDevicePciSubFunctionCap(LibvirtConfigObject):
     def __init__(self, **kwargs):
         super(LibvirtConfigNodeDevicePciSubFunctionCap, self).__init__(
-                                        root_name="capability", **kwargs)
+            root_name="capability", **kwargs)
         self.type = None
         self.device_addrs = list()  # list of tuple (domain,bus,slot,function)
 

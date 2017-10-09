@@ -32,13 +32,15 @@ nbd_opts = [
                default=10,
                help='Amount of time, in seconds, to wait for NBD '
                'device start up.'),
-    ]
+]
 
 CONF = cfg.CONF
 CONF.register_opts(nbd_opts)
 NBD_DEVICE_RE = re.compile('nbd[0-9]+')
 
 workloadlock = Lock()
+
+
 def synchronized(lock=workloadlock):
     '''Synchronization decorator.'''
     def wrap(f):
@@ -50,7 +52,8 @@ def synchronized(lock=workloadlock):
                 lock.release()
         return new_function
     return wrap
-  
+
+
 class NbdMount(object):
     """qemu-nbd support disk images."""
     mode = 'nbd'
@@ -80,7 +83,7 @@ class NbdMount(object):
                     return device
                 else:
                     LOG.error(_('NBD error - previous umount did not '
-                                  'cleanup /var/lock/qemu-nbd-%s.'), device)
+                                'cleanup /var/lock/qemu-nbd-%s.'), device)
         LOG.warning(_('No free nbd devices'))
         return None
 
@@ -133,7 +136,7 @@ class NbdMount(object):
                                      run_as_root=True)
             if err:
                 LOG.warning(_('Detaching from erroneous nbd device returned '
-                                'error: %s'), err)
+                              'error: %s'), err)
             return False
 
         self.error = ''
@@ -153,7 +156,7 @@ class NbdMount(object):
             time.sleep(2)
             if time.time() - start_time > CONF.timeout_nbd:
                 LOG.warning(_('Device allocation failed after repeated '
-                                'retries.'))
+                              'retries.'))
                 return False
             device = self._inner_get_dev()
         return True

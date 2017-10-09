@@ -32,6 +32,7 @@ from workloadmgr.openstack.common import importutils
 from workloadmgr.openstack.common import jsonutils
 from workloadmgr.openstack.common import processutils as utils
 from workloadmgr.openstack.common.rpc import common as rpc_common
+from functools import reduce
 
 zmq = importutils.try_import('eventlet.green.zmq')
 
@@ -223,13 +224,13 @@ class ZmqClient(object):
 
         if not envelope:
             self.outq.send(map(bytes,
-                           (msg_id, topic, 'cast', _serialize(data))))
+                               (msg_id, topic, 'cast', _serialize(data))))
             return
 
         rpc_envelope = rpc_common.serialize_msg(data[1], envelope)
         zmq_msg = reduce(lambda x, y: x + y, rpc_envelope.items())
         self.outq.send(map(bytes,
-                       (msg_id, topic, 'impl_zmq_v2', data[0]) + zmq_msg))
+                           (msg_id, topic, 'impl_zmq_v2', data[0]) + zmq_msg))
 
     def close(self):
         self.outq.close()
@@ -237,6 +238,7 @@ class ZmqClient(object):
 
 class RpcContext(rpc_common.CommonRpcContext):
     """Context that supports replying to a rpc.call."""
+
     def __init__(self, **kwargs):
         self.replies = []
         super(RpcContext, self).__init__(**kwargs)
@@ -282,7 +284,7 @@ class InternalContext(object):
         except greenlet.GreenletExit:
             # ignore these since they are just from shutdowns
             pass
-        except rpc_common.ClientException, e:
+        except rpc_common.ClientException as e:
             LOG.debug(_("Expected exception during message handling (%s)") %
                       e._exc_info[1])
             return {'exc':
@@ -299,7 +301,7 @@ class InternalContext(object):
         # NOTE(ewindisch): context kwarg exists for Grizzly compat.
         #                  this may be able to be removed earlier than
         #                  'I' if ConsumerBase.process were refactored.
-        if type(msg) is list:
+        if isinstance(msg, list):
             payload = msg[-1]
         else:
             payload = msg
@@ -326,7 +328,7 @@ class ConsumerBase(object):
 
     @classmethod
     def normalize_reply(self, result, replies):
-        #TODO(ewindisch): re-evaluate and document this method.
+        # TODO(ewindisch): re-evaluate and document this method.
         if isinstance(result, types.GeneratorType):
             return list(result)
         elif replies:
@@ -446,7 +448,7 @@ class ZmqProxy(ZmqBaseReactor):
     def consume(self, sock):
         ipc_dir = CONF.rpc_zmq_ipc_dir
 
-        #TODO(ewindisch): use zero-copy (i.e. references, not copying)
+        # TODO(ewindisch): use zero-copy (i.e. references, not copying)
         data = sock.recv()
         topic = data[1]
 
@@ -571,7 +573,7 @@ class ZmqReactor(ZmqBaseReactor):
         super(ZmqReactor, self).__init__(conf)
 
     def consume(self, sock):
-        #TODO(ewindisch): use zero-copy (i.e. references, not copying)
+        # TODO(ewindisch): use zero-copy (i.e. references, not copying)
         data = sock.recv()
         LOG.debug(_("CONSUMER RECEIVED DATA: %s"), data)
         if sock in self.mapping:
@@ -617,7 +619,7 @@ class Connection(rpc_common.Connection):
         # Subscription scenarios
         if fanout:
             sock_type = zmq.SUB
-            subscribe = ('', fanout)[type(fanout) == str]
+            subscribe = ('', fanout)[isinstance(fanout, str)]
             topic = 'fanout~' + topic.split('.', 1)[0]
         else:
             sock_type = zmq.PULL

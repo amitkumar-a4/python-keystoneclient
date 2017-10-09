@@ -38,40 +38,39 @@ class ViewBuilder(common.ViewBuilder):
         d['snapshot_id'] = restore['snapshot_id']
         if 'workload_id' in restore:
             d['workload_id'] = restore['workload_id']
-            
+
         if 'instances' in restore:
             instances = []
             for vm in restore['instances']:
-                instance = {'id':vm['id'],
-                            'name':vm['name'],
-                            'status':vm['status'],
-                            'metadata':vm['metadata'],
+                instance = {'id': vm['id'],
+                            'name': vm['name'],
+                            'status': vm['status'],
+                            'metadata': vm['metadata'],
                             }
                 if 'flavor' in vm:
                     instance['flavor'] = vm['flavor']
                 if 'nics' in vm:
                     instance['nics'] = vm['nics']
-                instances.append(instance)    
-                
-            d['instances'] = instances  
-            
+                instances.append(instance)
+
+            d['instances'] = instances
+
         if 'networks' in restore:
             d['networks'] = restore['networks']
         if 'subnets' in restore:
             d['subnets'] = restore['subnets']
         if 'routers' in restore:
-            d['routers'] = restore['routers']  
+            d['routers'] = restore['routers']
         if 'flavors' in restore:
             d['flavors'] = restore['flavors']
         if 'flavors' in restore:
-            d['flavors'] = restore['flavors']             
+            d['flavors'] = restore['flavors']
         d['links'] = self._get_links(request, restore['id'])
         d['name'] = restore['display_name']
-        d['description'] =  restore['display_description']
+        d['description'] = restore['display_description']
         d['host'] = restore['host']
-                
-        return {'restore': d}        
 
+        return {'restore': d}
 
     def detail(self, request, restore):
         """Detailed view of a single restore."""
@@ -86,26 +85,26 @@ class ViewBuilder(common.ViewBuilder):
         d['restore_type'] = restore['restore_type']
         d['snapshot_id'] = restore['snapshot_id']
         if 'snapshot_details' in restore:
-            d['snapshot_details'] = restore['snapshot_details']        
+            d['snapshot_details'] = restore['snapshot_details']
         if 'workload_id' in restore:
             d['workload_id'] = restore['workload_id']
-            
+
         if 'instances' in restore:
             instances = []
             for vm in restore['instances']:
-                instance = {'id':vm['id'],
-                            'name':vm['name'],
-                            'status':vm['status'],
-                            'metadata':vm['metadata'],
+                instance = {'id': vm['id'],
+                            'name': vm['name'],
+                            'status': vm['status'],
+                            'metadata': vm['metadata'],
                             }
                 if 'flavor' in vm:
                     instance['flavor'] = vm['flavor']
                 if 'nics' in vm:
                     instance['nics'] = vm['nics']
-                instances.append(instance)    
-                
-            d['instances'] = instances            
-            
+                instances.append(instance)
+
+            d['instances'] = instances
+
         if 'instances' in restore:
             d['instances'] = restore['instances']
         if 'networks' in restore:
@@ -113,34 +112,35 @@ class ViewBuilder(common.ViewBuilder):
         if 'subnets' in restore:
             d['subnets'] = restore['subnets']
         if 'routers' in restore:
-            d['routers'] = restore['routers']  
+            d['routers'] = restore['routers']
 
         d['links'] = self._get_links(request, restore['id'])
         d['name'] = restore['display_name']
-        d['description'] =  restore['display_description']
+        d['description'] = restore['display_description']
         d['host'] = restore['host']
-        d['size'] = restore['size']        
-        d['uploaded_size'] =  min(restore['uploaded_size'],restore['size'])
-        d['progress_percent'] =  restore['progress_percent']          
-        d['progress_msg'] =  restore['progress_msg'] 
-        d['warning_msg'] =  restore['warning_msg']
-        d['error_msg'] =  restore['error_msg']
+        d['size'] = restore['size']
+        d['uploaded_size'] = min(restore['uploaded_size'], restore['size'])
+        d['progress_percent'] = restore['progress_percent']
+        d['progress_msg'] = restore['progress_msg']
+        d['warning_msg'] = restore['warning_msg']
+        d['error_msg'] = restore['error_msg']
         d['time_taken'] = restore['time_taken']
 
         d['restore_options'] = pickle.loads(str(restore.get('pickle', '(d.')))
 
         if hasattr(restore, 'metadata') or 'metadata' in restore:
-            d['metadata'] = restore['metadata'] 
+            d['metadata'] = restore['metadata']
         else:
             d['metadata'] = []
         return {'restore': d}
 
     def _list_view(self, func, request, restores):
         """Provide a view for a list of restores."""
-        restores_list = [func(request, restore)['restore'] for restore in restores]
+        restores_list = [func(request, restore)['restore']
+                         for restore in restores]
         restores_links = self._get_collection_links(request,
-                                                   restores,
-                                                   self._collection_name)
+                                                    restores,
+                                                    self._collection_name)
         restores_dict = dict(restores=restores_list)
 
         if restores_links:

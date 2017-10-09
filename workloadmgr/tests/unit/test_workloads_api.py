@@ -30,13 +30,16 @@ from workloadmgr.openstack.common import fileutils
 
 CONF = cfg.CONF
 
+
 class BaseWorkloadAPITestCase(test.TestCase):
     """Test Case for workloads."""
+
     def setUp(self):
         super(BaseWorkloadAPITestCase, self).setUp()
         self.context = context.get_admin_context()
 
-        self.is_online_patch = patch('workloadmgr.vault.vault.NfsTrilioVaultBackupTarget.is_online')
+        self.is_online_patch = patch(
+            'workloadmgr.vault.vault.NfsTrilioVaultBackupTarget.is_online')
         self.subprocess_patch = patch('subprocess.check_call')
 
         self.MockMethod = self.is_online_patch.start()
@@ -64,13 +67,13 @@ class BaseWorkloadAPITestCase(test.TestCase):
             'error_msg': '',
             'instances': [],
             'jobschedule': pickle.dumps({'start_date': '06/05/2014',
-                            'end_date': '07/05/2015',
-                            'interval': '1 hr',
-                            'start_time': '2:30 PM',
-                            'fullbackup_interval': -1,
-                            'retention_policy_type': 'Number of Snapshots to Keep',
-                            'retention_policy_value': '30'}),
-            'host': CONF.host,}
+                                         'end_date': '07/05/2015',
+                                         'interval': '1 hr',
+                                         'start_time': '2:30 PM',
+                                         'fullbackup_interval': -1,
+                                         'retention_policy_type': 'Number of Snapshots to Keep',
+                                         'retention_policy_value': '30'}),
+            'host': CONF.host, }
 
     def tearDown(self):
         self.is_online_patch.stop()
@@ -82,17 +85,19 @@ class BaseWorkloadAPITestCase(test.TestCase):
         self.context.tenant_id = '000d038df75743a88cefaacd9b704b94'
 
         for snapshot in self.workloadAPI.snapshot_get_all(self.context):
-            self.db.snapshot_update(self.context, snapshot.id, 
-                                    { 'status': 'available' })
+            self.db.snapshot_update(self.context, snapshot.id,
+                                    {'status': 'available'})
             self.db.snapshot_delete(self.context, snapshot.id)
         for workload in self.workloadAPI.workload_get_all(self.context):
-            self.db.workload_update(self.context, workload.id, 
-                                    { 'status': 'available' })
+            self.db.workload_update(self.context, workload.id,
+                                    {'status': 'available'})
             for vm in self.db.workload_vms_get(self.context, workload.id):
-                self.db.workload_vms_delete(self.context, vm.vm_id, workload.id)
+                self.db.workload_vms_delete(
+                    self.context, vm.vm_id, workload.id)
             self.db.workload_delete(self.context, workload.id)
 
-        for share in ['server1:nfsshare1','server2:nfsshare2','server3:nfsshare3']:
+        for share in ['server1:nfsshare1',
+                      'server2:nfsshare2', 'server3:nfsshare3']:
             backup_target = workloadmgr.vault.vault.get_backup_target(share)
             shutil.rmtree(backup_target.mount_path)
             fileutils.ensure_tree(backup_target.mount_path)
@@ -115,7 +120,7 @@ class BaseWorkloadAPITestCase(test.TestCase):
                         'key2': 'value2',
                         'key3': 'value3',
                         'key4': 'value4',
-                        'key5': 'value5',}
+                        'key5': 'value5', }
 
             self.workloadAPI.workload_type_create(
                 self.context, str(uuid.uuid4()), name,
@@ -145,23 +150,23 @@ class BaseWorkloadAPITestCase(test.TestCase):
                     'key2': 'value2',
                     'key3': 'value3',
                     'key4': 'value4',
-                    'key5': 'value5',}
+                    'key5': 'value5', }
 
         workload_type_id = str(uuid.uuid4())
         self.workloadAPI.workload_type_create(
-                self.context, workload_type_id, name,
-                description, is_public, metadata)
+            self.context, workload_type_id, name,
+            description, is_public, metadata)
         source_platform = 'openstack'
         name = 'test-workload'
         description = 'test-workload'
         instances = []
-        jobschedule =  {'start_date': '06/05/2014',
-                        'end_date': '07/05/2015',
-                        'interval': '1 hr',
-                        'start_time': '2:30 PM',
-                        'fullbackup_interval': -1,
-                        'retention_policy_type': 'Number of Snapshots to Keep',
-                        'retention_policy_value': '30'}
+        jobschedule = {'start_date': '06/05/2014',
+                       'end_date': '07/05/2015',
+                       'interval': '1 hr',
+                       'start_time': '2:30 PM',
+                       'fullbackup_interval': -1,
+                       'retention_policy_type': 'Number of Snapshots to Keep',
+                       'retention_policy_value': '30'}
         availability_zone = 'testnova'
         self.assertRaises(exception.InvalidRequest,
                           self.workloadAPI.workload_create,
@@ -172,7 +177,8 @@ class BaseWorkloadAPITestCase(test.TestCase):
 
     @patch('workloadmgr.compute.nova.API.get_servers')
     @patch('workloadmgr.autolog.Logger.log')
-    def test_workload_create_invalid_instances(self, log_mock, mock_get_servers):
+    def test_workload_create_invalid_instances(
+            self, log_mock, mock_get_servers):
 
         mock_get_servers.side_effect = tests_utils.get_vms
         x = 0
@@ -183,23 +189,23 @@ class BaseWorkloadAPITestCase(test.TestCase):
                     'key2': 'value2',
                     'key3': 'value3',
                     'key4': 'value4',
-                    'key5': 'value5',}
+                    'key5': 'value5', }
 
         workload_type_id = str(uuid.uuid4())
         self.workloadAPI.workload_type_create(
-                self.context, workload_type_id, name,
-                description, is_public, metadata)
+            self.context, workload_type_id, name,
+            description, is_public, metadata)
         source_platform = 'openstack'
         name = 'test-workload'
         description = 'test-workload'
         instances = [{'instance-id': str(uuid.uuid4())}]
-        jobschedule =  {'start_date': '06/05/2014',
-                        'end_date': '07/05/2015',
-                        'interval': '1 hr',
-                        'start_time': '2:30 PM',
-                        'fullbackup_interval': -1,
-                        'retention_policy_type': 'Number of Snapshots to Keep',
-                        'retention_policy_value': '30'}
+        jobschedule = {'start_date': '06/05/2014',
+                       'end_date': '07/05/2015',
+                       'interval': '1 hr',
+                       'start_time': '2:30 PM',
+                       'fullbackup_interval': -1,
+                       'retention_policy_type': 'Number of Snapshots to Keep',
+                       'retention_policy_value': '30'}
         availability_zone = 'testnova'
         self.assertRaises(exception.InstanceNotFound,
                           self.workloadAPI.workload_create,
@@ -223,12 +229,12 @@ class BaseWorkloadAPITestCase(test.TestCase):
                     'key2': 'value2',
                     'key3': 'value3',
                     'key4': 'value4',
-                    'key5': 'value5',}
+                    'key5': 'value5', }
 
         workload_type_id = str(uuid.uuid4())
         self.workloadAPI.workload_type_create(
-                self.context, workload_type_id, name,
-                description, is_public, metadata)
+            self.context, workload_type_id, name,
+            description, is_public, metadata)
         source_platform = 'openstack'
         name = 'test-workload'
         description = 'test-workload'
@@ -236,16 +242,18 @@ class BaseWorkloadAPITestCase(test.TestCase):
                      {'instance-id': 'a0635eb1-7a88-46d0-8c90-fe5b3a4b0132'}]
 
         for instance in instances:
-            for wl in self.db.workload_vm_get_by_id(self.context, instance['instance-id']):
-                self.db.workload_vms_delete(self.context, wl.vm_id, wl.workload_id)
+            for wl in self.db.workload_vm_get_by_id(
+                    self.context, instance['instance-id']):
+                self.db.workload_vms_delete(
+                    self.context, wl.vm_id, wl.workload_id)
 
-        jobschedule =  {'start_date': '06/05/2014',
-                        'end_date': '07/05/2015',
-                        'interval': '1 hr',
-                        'start_time': '2:30 PM',
-                        'fullbackup_interval': -1,
-                        'retention_policy_type': 'Number of Snapshots to Keep',
-                        'retention_policy_value': '30'}
+        jobschedule = {'start_date': '06/05/2014',
+                       'end_date': '07/05/2015',
+                       'interval': '1 hr',
+                       'start_time': '2:30 PM',
+                       'fullbackup_interval': -1,
+                       'retention_policy_type': 'Number of Snapshots to Keep',
+                       'retention_policy_value': '30'}
         availability_zone = 'testnova'
         self.context.user_id = str(uuid.uuid4())
         self.context.project_id = '000d038df75743a88cefaacd9b704b94'
@@ -272,12 +280,12 @@ class BaseWorkloadAPITestCase(test.TestCase):
                     'key2': 'value2',
                     'key3': 'value3',
                     'key4': 'value4',
-                    'key5': 'value5',}
+                    'key5': 'value5', }
 
         workload_type_id = str(uuid.uuid4())
         self.workloadAPI.workload_type_create(
-                self.context, workload_type_id, name,
-                description, is_public, metadata)
+            self.context, workload_type_id, name,
+            description, is_public, metadata)
         source_platform = 'openstack'
         name = 'test-workload'
         description = 'test-workload'
@@ -285,30 +293,36 @@ class BaseWorkloadAPITestCase(test.TestCase):
                      {'instance-id': 'a0635eb1-7a88-46d0-8c90-fe5b3a4b0132'}]
 
         for instance in instances:
-            for wl in self.db.workload_vm_get_by_id(self.context, instance['instance-id']):
-                self.db.workload_vms_delete(self.context, wl.vm_id, wl.workload_id)
+            for wl in self.db.workload_vm_get_by_id(
+                    self.context, instance['instance-id']):
+                self.db.workload_vms_delete(
+                    self.context, wl.vm_id, wl.workload_id)
 
-        jobschedule =  {'start_date': '06/05/2014',
-                        'end_date': '07/05/2015',
-                        'interval': '1 hr',
-                        'start_time': '2:30 PM',
-                        'fullbackup_interval': -1,
-                        'retention_policy_type': 'Number of Snapshots to Keep',
-                        'retention_policy_value': '30'}
+        jobschedule = {'start_date': '06/05/2014',
+                       'end_date': '07/05/2015',
+                       'interval': '1 hr',
+                       'start_time': '2:30 PM',
+                       'fullbackup_interval': -1,
+                       'retention_policy_type': 'Number of Snapshots to Keep',
+                       'retention_policy_value': '30'}
         availability_zone = 'testnova'
         self.context.user_id = str(uuid.uuid4())
         self.context.project_id = '000d038df75743a88cefaacd9b704b94'
         self.context.tenant_id = '000d038df75743a88cefaacd9b704b94'
 
         workload = self.workloadAPI.workload_create(
-                          self.context, name, description,
-                          workload_type_id, source_platform,
-                          instances, jobschedule, metadata,
-                          availability_zone=availability_zone)
+            self.context, name, description,
+            workload_type_id, source_platform,
+            instances, jobschedule, metadata,
+            availability_zone=availability_zone)
 
-        self.assertEqual(len(self.db.workload_vms_get(self.context, workload.id)), 2)
-        self.assertEqual(self.db.workload_get(self.context, workload.id).id, workload.id)
-
+        self.assertEqual(
+            len(self.db.workload_vms_get(self.context, workload.id)), 2)
+        self.assertEqual(
+            self.db.workload_get(
+                self.context,
+                workload.id).id,
+            workload.id)
 
     @patch('workloadmgr.workloads.api.API.trust_create')
     @patch('workloadmgr.compute.nova.API.get_servers')
@@ -325,12 +339,12 @@ class BaseWorkloadAPITestCase(test.TestCase):
                     'key2': 'value2',
                     'key3': 'value3',
                     'key4': 'value4',
-                    'key5': 'value5',}
+                    'key5': 'value5', }
 
         workload_type_id = str(uuid.uuid4())
         self.workloadAPI.workload_type_create(
-                self.context, workload_type_id, name,
-                description, is_public, metadata)
+            self.context, workload_type_id, name,
+            description, is_public, metadata)
         source_platform = 'openstack'
         name = 'test-workload'
         description = 'test-workload'
@@ -338,36 +352,45 @@ class BaseWorkloadAPITestCase(test.TestCase):
                      {'instance-id': 'a0635eb1-7a88-46d0-8c90-fe5b3a4b0132'}]
 
         for instance in instances:
-            for wl in self.db.workload_vm_get_by_id(self.context, instance['instance-id']):
-                self.db.workload_vms_delete(self.context, wl.vm_id, wl.workload_id)
+            for wl in self.db.workload_vm_get_by_id(
+                    self.context, instance['instance-id']):
+                self.db.workload_vms_delete(
+                    self.context, wl.vm_id, wl.workload_id)
 
-        jobschedule =  {'enabled': True,
-                        'start_date': '06/05/2014',
-                        'end_date': '07/05/2019',
-                        'interval': '1 hr',
-                        'start_time': '2:30 PM',
-                        'fullbackup_interval': -1,
-                        'retention_policy_type': 'Number of Snapshots to Keep',
-                        'retention_policy_value': '30'}
+        jobschedule = {'enabled': True,
+                       'start_date': '06/05/2014',
+                       'end_date': '07/05/2019',
+                       'interval': '1 hr',
+                       'start_time': '2:30 PM',
+                       'fullbackup_interval': -1,
+                       'retention_policy_type': 'Number of Snapshots to Keep',
+                       'retention_policy_value': '30'}
         availability_zone = 'testnova'
         self.context.user_id = str(uuid.uuid4())
         self.context.project_id = '000d038df75743a88cefaacd9b704b94'
         self.context.tenant_id = '000d038df75743a88cefaacd9b704b94'
 
         workload = self.workloadAPI.workload_create(
-                          self.context, name, description,
-                          workload_type_id, source_platform,
-                          instances, jobschedule, metadata,
-                          availability_zone=availability_zone)
+            self.context, name, description,
+            workload_type_id, source_platform,
+            instances, jobschedule, metadata,
+            availability_zone=availability_zone)
 
-        self.assertEqual(len(self.db.workload_vms_get(self.context, workload.id)), 2)
-        self.assertEqual(self.db.workload_get(self.context, workload.id).id, workload.id)
+        self.assertEqual(
+            len(self.db.workload_vms_get(self.context, workload.id)), 2)
+        self.assertEqual(
+            self.db.workload_get(
+                self.context,
+                workload.id).id,
+            workload.id)
         workload = self.workloadAPI.workload_show(self.context, workload.id)
         self.assertTrue('nextrun' in workload['jobschedule'])
 
         for instance in instances:
-            for wl in self.db.workload_vm_get_by_id(self.context, instance['instance-id']):
-                self.db.workload_vms_delete(self.context, wl.vm_id, wl.workload_id)
+            for wl in self.db.workload_vm_get_by_id(
+                    self.context, instance['instance-id']):
+                self.db.workload_vms_delete(
+                    self.context, wl.vm_id, wl.workload_id)
 
         self.db.workload_delete(self.context, wl.workload_id)
 
@@ -386,12 +409,12 @@ class BaseWorkloadAPITestCase(test.TestCase):
                     'key2': 'value2',
                     'key3': 'value3',
                     'key4': 'value4',
-                    'key5': 'value5',}
+                    'key5': 'value5', }
 
         workload_type_id = str(uuid.uuid4())
         self.workloadAPI.workload_type_create(
-                self.context, workload_type_id, name,
-                description, is_public, metadata)
+            self.context, workload_type_id, name,
+            description, is_public, metadata)
         source_platform = 'openstack'
         name = 'test-workload'
         description = 'test-workload'
@@ -399,30 +422,37 @@ class BaseWorkloadAPITestCase(test.TestCase):
                      {'instance-id': 'a0635eb1-7a88-46d0-8c90-fe5b3a4b0132'}]
 
         for instance in instances:
-            for wl in self.db.workload_vm_get_by_id(self.context, instance['instance-id']):
-                self.db.workload_vms_delete(self.context, wl.vm_id, wl.workload_id)
+            for wl in self.db.workload_vm_get_by_id(
+                    self.context, instance['instance-id']):
+                self.db.workload_vms_delete(
+                    self.context, wl.vm_id, wl.workload_id)
 
-        jobschedule =  {'enabled': True,
-                        'start_date': '06/05/2014',
-                        'end_date': '07/05/2019',
-                        'interval': '1 hr',
-                        'start_time': '2:30 PM',
-                        'fullbackup_interval': -1,
-                        'retention_policy_type': 'Number of Snapshots to Keep',
-                        'retention_policy_value': '30'}
+        jobschedule = {'enabled': True,
+                       'start_date': '06/05/2014',
+                       'end_date': '07/05/2019',
+                       'interval': '1 hr',
+                       'start_time': '2:30 PM',
+                       'fullbackup_interval': -1,
+                       'retention_policy_type': 'Number of Snapshots to Keep',
+                       'retention_policy_value': '30'}
         availability_zone = 'testnova'
         self.context.user_id = str(uuid.uuid4())
         self.context.project_id = '000d038df75743a88cefaacd9b704b94'
         self.context.tenant_id = '000d038df75743a88cefaacd9b704b94'
 
         workload = self.workloadAPI.workload_create(
-                          self.context, name, description,
-                          workload_type_id, source_platform,
-                          instances, jobschedule, metadata,
-                          availability_zone=availability_zone)
+            self.context, name, description,
+            workload_type_id, source_platform,
+            instances, jobschedule, metadata,
+            availability_zone=availability_zone)
 
-        self.assertEqual(len(self.db.workload_vms_get(self.context, workload.id)), 2)
-        self.assertEqual(self.db.workload_get(self.context, workload.id).id, workload.id)
+        self.assertEqual(
+            len(self.db.workload_vms_get(self.context, workload.id)), 2)
+        self.assertEqual(
+            self.db.workload_get(
+                self.context,
+                workload.id).id,
+            workload.id)
         workload = self.workloadAPI.workload_show(self.context, workload.id)
 
         # negative tests
@@ -446,12 +476,12 @@ class BaseWorkloadAPITestCase(test.TestCase):
                     'key2': 'value2',
                     'key3': 'value3',
                     'key4': 'value4',
-                    'key5': 'value5',}
+                    'key5': 'value5', }
 
         workload_type_id = str(uuid.uuid4())
         self.workloadAPI.workload_type_create(
-                self.context, workload_type_id, name,
-                description, is_public, metadata)
+            self.context, workload_type_id, name,
+            description, is_public, metadata)
         source_platform = 'openstack'
         name = 'test-workload'
         description = 'test-workload'
@@ -459,40 +489,47 @@ class BaseWorkloadAPITestCase(test.TestCase):
                      {'instance-id': 'a0635eb1-7a88-46d0-8c90-fe5b3a4b0132'}]
 
         for instance in instances:
-            for wl in self.db.workload_vm_get_by_id(self.context, instance['instance-id']):
-                self.db.workload_vms_delete(self.context, wl.vm_id, wl.workload_id)
+            for wl in self.db.workload_vm_get_by_id(
+                    self.context, instance['instance-id']):
+                self.db.workload_vms_delete(
+                    self.context, wl.vm_id, wl.workload_id)
 
-        jobschedule =  {'enabled': True,
-                        'start_date': '06/05/2014',
-                        'end_date': '07/05/2019',
-                        'interval': '1 hr',
-                        'start_time': '2:30 PM',
-                        'fullbackup_interval': -1,
-                        'retention_policy_type': 'Number of Snapshots to Keep',
-                        'retention_policy_value': '30'}
+        jobschedule = {'enabled': True,
+                       'start_date': '06/05/2014',
+                       'end_date': '07/05/2019',
+                       'interval': '1 hr',
+                       'start_time': '2:30 PM',
+                       'fullbackup_interval': -1,
+                       'retention_policy_type': 'Number of Snapshots to Keep',
+                       'retention_policy_value': '30'}
         availability_zone = 'testnova'
         self.context.user_id = str(uuid.uuid4())
         self.context.project_id = '000d038df75743a88cefaacd9b704b94'
         self.context.tenant_id = '000d038df75743a88cefaacd9b704b94'
 
         workload = self.workloadAPI.workload_create(
-                          self.context, name, description,
-                          workload_type_id, source_platform,
-                          instances, jobschedule, metadata,
-                          availability_zone=availability_zone)
+            self.context, name, description,
+            workload_type_id, source_platform,
+            instances, jobschedule, metadata,
+            availability_zone=availability_zone)
 
-        self.assertEqual(len(self.db.workload_vms_get(self.context, workload.id)), 2)
-        self.assertEqual(self.db.workload_get(self.context, workload.id).id, workload.id)
+        self.assertEqual(
+            len(self.db.workload_vms_get(self.context, workload.id)), 2)
+        self.assertEqual(
+            self.db.workload_get(
+                self.context,
+                workload.id).id,
+            workload.id)
         workload = self.workloadAPI.workload_show(self.context, workload.id)
 
         insts = []
         for ins in workload['instances']:
             ins['instance-id'] = ins.pop('id')
             insts.append(ins)
- 
+
         insts.append({'instance-id': str(uuid.uuid4())})
         workload['instances'] = insts
-     
+
         # negative tests
         # instances is not a dict
         self.assertRaises(exception.Invalid,
@@ -514,12 +551,12 @@ class BaseWorkloadAPITestCase(test.TestCase):
                     'key2': 'value2',
                     'key3': 'value3',
                     'key4': 'value4',
-                    'key5': 'value5',}
+                    'key5': 'value5', }
 
         workload_type_id = str(uuid.uuid4())
         self.workloadAPI.workload_type_create(
-                self.context, workload_type_id, name,
-                description, is_public, metadata)
+            self.context, workload_type_id, name,
+            description, is_public, metadata)
         source_platform = 'openstack'
         name = 'test-workload'
         description = 'test-workload'
@@ -527,44 +564,54 @@ class BaseWorkloadAPITestCase(test.TestCase):
                      {'instance-id': 'a0635eb1-7a88-46d0-8c90-fe5b3a4b0132'}]
 
         for instance in instances:
-            for wl in self.db.workload_vm_get_by_id(self.context, instance['instance-id']):
-                self.db.workload_vms_delete(self.context, wl.vm_id, wl.workload_id)
+            for wl in self.db.workload_vm_get_by_id(
+                    self.context, instance['instance-id']):
+                self.db.workload_vms_delete(
+                    self.context, wl.vm_id, wl.workload_id)
 
-        jobschedule =  {'enabled': True,
-                        'start_date': '06/05/2014',
-                        'end_date': '07/05/2019',
-                        'interval': '1 hr',
-                        'start_time': '2:30 PM',
-                        'fullbackup_interval': -1,
-                        'retention_policy_type': 'Number of Snapshots to Keep',
-                        'retention_policy_value': '30'}
+        jobschedule = {'enabled': True,
+                       'start_date': '06/05/2014',
+                       'end_date': '07/05/2019',
+                       'interval': '1 hr',
+                       'start_time': '2:30 PM',
+                       'fullbackup_interval': -1,
+                       'retention_policy_type': 'Number of Snapshots to Keep',
+                       'retention_policy_value': '30'}
         availability_zone = 'testnova'
         self.context.user_id = str(uuid.uuid4())
         self.context.project_id = '000d038df75743a88cefaacd9b704b94'
         self.context.tenant_id = '000d038df75743a88cefaacd9b704b94'
 
         workload = self.workloadAPI.workload_create(
-                          self.context, name, description,
-                          workload_type_id, source_platform,
-                          instances, jobschedule, metadata,
-                          availability_zone=availability_zone)
+            self.context, name, description,
+            workload_type_id, source_platform,
+            instances, jobschedule, metadata,
+            availability_zone=availability_zone)
 
-        self.assertEqual(len(self.db.workload_vms_get(self.context, workload.id)), 2)
-        self.assertEqual(self.db.workload_get(self.context, workload.id).id, workload.id)
+        self.assertEqual(
+            len(self.db.workload_vms_get(self.context, workload.id)), 2)
+        self.assertEqual(
+            self.db.workload_get(
+                self.context,
+                workload.id).id,
+            workload.id)
         workload = self.workloadAPI.workload_show(self.context, workload.id)
 
         instances = [{'instance-id': 'dc35b6fe-38fb-46d2-bdfb-c9cee76f3991'}]
         for instance in instances:
-            for wl in self.db.workload_vm_get_by_id(self.context, instance['instance-id']):
-                self.db.workload_vms_delete(self.context, wl.vm_id, wl.workload_id)
+            for wl in self.db.workload_vm_get_by_id(
+                    self.context, instance['instance-id']):
+                self.db.workload_vms_delete(
+                    self.context, wl.vm_id, wl.workload_id)
 
         wl2 = self.workloadAPI.workload_create(
-                          self.context, name, description,
-                          workload_type_id, source_platform,
-                          instances, jobschedule, metadata,
-                          availability_zone=availability_zone)
+            self.context, name, description,
+            workload_type_id, source_platform,
+            instances, jobschedule, metadata,
+            availability_zone=availability_zone)
 
-        self.assertEqual(len(self.db.workload_vms_get(self.context, wl2.id)), 1)
+        self.assertEqual(
+            len(self.db.workload_vms_get(self.context, wl2.id)), 1)
         self.assertEqual(self.db.workload_get(self.context, wl2.id).id, wl2.id)
         wl2 = self.workloadAPI.workload_show(self.context, wl2.id)
 
@@ -572,10 +619,10 @@ class BaseWorkloadAPITestCase(test.TestCase):
         for ins in workload['instances']:
             ins['instance-id'] = ins.pop('id')
             insts.append(ins)
- 
+
         insts.append({'instance-id': 'dc35b6fe-38fb-46d2-bdfb-c9cee76f3991'})
         workload['instances'] = insts
-     
+
         # negative tests
         # instances is not a dict
         self.assertRaises(exception.Invalid,
@@ -606,8 +653,8 @@ class BaseWorkloadAPITestCase(test.TestCase):
 
         workload_type_id = str(uuid.uuid4())
         self.workloadAPI.workload_type_create(
-                self.context, workload_type_id, name,
-                description, is_public, metadata)
+            self.context, workload_type_id, name,
+            description, is_public, metadata)
         source_platform = 'openstack'
         name = 'test-workload'
         description = 'test-workload'
@@ -615,49 +662,63 @@ class BaseWorkloadAPITestCase(test.TestCase):
                      {'instance-id': 'a0635eb1-7a88-46d0-8c90-fe5b3a4b0132'}]
 
         for instance in instances:
-            for wl in self.db.workload_vm_get_by_id(self.context, instance['instance-id']):
-                self.db.workload_vms_delete(self.context, wl.vm_id, wl.workload_id)
+            for wl in self.db.workload_vm_get_by_id(
+                    self.context, instance['instance-id']):
+                self.db.workload_vms_delete(
+                    self.context, wl.vm_id, wl.workload_id)
 
-        jobschedule =  {'enabled': True,
-                        'start_date': '06/05/2014',
-                        'end_date': '07/05/2019',
-                        'interval': '1 hr',
-                        'start_time': '2:30 PM',
-                        'fullbackup_interval': -1,
-                        'retention_policy_type': 'Number of Snapshots to Keep',
-                        'retention_policy_value': '30'}
+        jobschedule = {'enabled': True,
+                       'start_date': '06/05/2014',
+                       'end_date': '07/05/2019',
+                       'interval': '1 hr',
+                       'start_time': '2:30 PM',
+                       'fullbackup_interval': -1,
+                       'retention_policy_type': 'Number of Snapshots to Keep',
+                       'retention_policy_value': '30'}
         availability_zone = 'testnova'
         self.context.user_id = str(uuid.uuid4())
         self.context.project_id = '000d038df75743a88cefaacd9b704b94'
         self.context.tenant_id = '000d038df75743a88cefaacd9b704b94'
 
         workload = self.workloadAPI.workload_create(
-                          self.context, name, description,
-                          workload_type_id, source_platform,
-                          instances, jobschedule, metadata,
-                          availability_zone=availability_zone)
+            self.context, name, description,
+            workload_type_id, source_platform,
+            instances, jobschedule, metadata,
+            availability_zone=availability_zone)
 
-        self.assertEqual(len(self.db.workload_vms_get(self.context, workload.id)), 2)
-        self.assertEqual(self.db.workload_get(self.context, workload.id).id, workload.id)
+        self.assertEqual(
+            len(self.db.workload_vms_get(self.context, workload.id)), 2)
+        self.assertEqual(
+            self.db.workload_get(
+                self.context,
+                workload.id).id,
+            workload.id)
         workload = self.workloadAPI.workload_show(self.context, workload.id)
 
         insts = []
         for ins in workload['instances']:
             ins['instance-id'] = ins.pop('id')
             insts.append(ins)
- 
+
         insts.append({'instance-id': 'dc35b6fe-38fb-46d2-bdfb-c9cee76f3991'})
         workload['instances'] = insts
 
-        for wl in self.db.workload_vm_get_by_id(self.context, 'dc35b6fe-38fb-46d2-bdfb-c9cee76f3991'):
+        for wl in self.db.workload_vm_get_by_id(
+                self.context, 'dc35b6fe-38fb-46d2-bdfb-c9cee76f3991'):
             self.db.workload_vms_delete(self.context, wl.vm_id, wl.workload_id)
 
         # negative tests
         # instances is not a dict
-        self.workloadAPI.workload_modify(self.context, workload['id'], workload)
+        self.workloadAPI.workload_modify(
+            self.context, workload['id'], workload)
 
-        self.assertEqual(len(self.db.workload_vms_get(self.context, workload['id'])), 3)
-        self.assertEqual(self.db.workload_get(self.context, workload['id']).id, workload['id'])
+        self.assertEqual(len(self.db.workload_vms_get(
+            self.context, workload['id'])), 3)
+        self.assertEqual(
+            self.db.workload_get(
+                self.context,
+                workload['id']).id,
+            workload['id'])
         wl2 = self.workloadAPI.workload_show(self.context, workload['id'])
 
     @patch('workloadmgr.workloads.workload_utils.upload_workload_db_entry')
@@ -667,8 +728,8 @@ class BaseWorkloadAPITestCase(test.TestCase):
     @patch('workloadmgr.compute.nova.API.get_servers')
     @patch('workloadmgr.autolog.Logger.log')
     def test_workload_modify_remove_instance(self, log_mock, mock_get_servers,
-                                              trust_create_mock, set_meta_item_mock,
-                                              delete_meta_mock, upload_mock):
+                                             trust_create_mock, set_meta_item_mock,
+                                             delete_meta_mock, upload_mock):
 
         mock_get_servers.side_effect = tests_utils.get_vms
         x = 0
@@ -684,8 +745,8 @@ class BaseWorkloadAPITestCase(test.TestCase):
 
         workload_type_id = str(uuid.uuid4())
         self.workloadAPI.workload_type_create(
-                self.context, workload_type_id, name,
-                description, is_public, metadata)
+            self.context, workload_type_id, name,
+            description, is_public, metadata)
         source_platform = 'openstack'
         name = 'test-workload'
         description = 'test-workload'
@@ -693,45 +754,58 @@ class BaseWorkloadAPITestCase(test.TestCase):
                      {'instance-id': 'a0635eb1-7a88-46d0-8c90-fe5b3a4b0132'}]
 
         for instance in instances:
-            for wl in self.db.workload_vm_get_by_id(self.context, instance['instance-id']):
-                self.db.workload_vms_delete(self.context, wl.vm_id, wl.workload_id)
+            for wl in self.db.workload_vm_get_by_id(
+                    self.context, instance['instance-id']):
+                self.db.workload_vms_delete(
+                    self.context, wl.vm_id, wl.workload_id)
 
-        jobschedule =  {'enabled': True,
-                        'start_date': '06/05/2014',
-                        'end_date': '07/05/2019',
-                        'interval': '1 hr',
-                        'start_time': '2:30 PM',
-                        'fullbackup_interval': -1,
-                        'retention_policy_type': 'Number of Snapshots to Keep',
-                        'retention_policy_value': '30'}
+        jobschedule = {'enabled': True,
+                       'start_date': '06/05/2014',
+                       'end_date': '07/05/2019',
+                       'interval': '1 hr',
+                       'start_time': '2:30 PM',
+                       'fullbackup_interval': -1,
+                       'retention_policy_type': 'Number of Snapshots to Keep',
+                       'retention_policy_value': '30'}
         availability_zone = 'testnova'
         self.context.user_id = str(uuid.uuid4())
         self.context.project_id = '000d038df75743a88cefaacd9b704b94'
         self.context.tenant_id = '000d038df75743a88cefaacd9b704b94'
 
         workload = self.workloadAPI.workload_create(
-                          self.context, name, description,
-                          workload_type_id, source_platform,
-                          instances, jobschedule, metadata,
-                          availability_zone=availability_zone)
+            self.context, name, description,
+            workload_type_id, source_platform,
+            instances, jobschedule, metadata,
+            availability_zone=availability_zone)
 
-        self.assertEqual(len(self.db.workload_vms_get(self.context, workload.id)), 2)
-        self.assertEqual(self.db.workload_get(self.context, workload.id).id, workload.id)
+        self.assertEqual(
+            len(self.db.workload_vms_get(self.context, workload.id)), 2)
+        self.assertEqual(
+            self.db.workload_get(
+                self.context,
+                workload.id).id,
+            workload.id)
         workload = self.workloadAPI.workload_show(self.context, workload.id)
 
         insts = []
         for ins in workload['instances'][1:]:
             ins['instance-id'] = ins.pop('id')
             insts.append(ins)
- 
+
         workload['instances'] = insts
 
         # negative tests
         # instances is not a dict
-        self.workloadAPI.workload_modify(self.context, workload['id'], workload)
+        self.workloadAPI.workload_modify(
+            self.context, workload['id'], workload)
 
-        self.assertEqual(len(self.db.workload_vms_get(self.context, workload['id'])), 1)
-        self.assertEqual(self.db.workload_get(self.context, workload['id']).id, workload['id'])
+        self.assertEqual(len(self.db.workload_vms_get(
+            self.context, workload['id'])), 1)
+        self.assertEqual(
+            self.db.workload_get(
+                self.context,
+                workload['id']).id,
+            workload['id'])
         wl2 = self.workloadAPI.workload_show(self.context, workload['id'])
 
     @patch('workloadmgr.workloads.workload_utils.upload_workload_db_entry')
@@ -758,8 +832,8 @@ class BaseWorkloadAPITestCase(test.TestCase):
 
         workload_type_id = str(uuid.uuid4())
         self.workloadAPI.workload_type_create(
-                self.context, workload_type_id, name,
-                description, is_public, metadata)
+            self.context, workload_type_id, name,
+            description, is_public, metadata)
         source_platform = 'openstack'
         name = 'test-workload'
         description = 'test-workload'
@@ -767,39 +841,52 @@ class BaseWorkloadAPITestCase(test.TestCase):
                      {'instance-id': 'a0635eb1-7a88-46d0-8c90-fe5b3a4b0132'}]
 
         for instance in instances:
-            for wl in self.db.workload_vm_get_by_id(self.context, instance['instance-id']):
-                self.db.workload_vms_delete(self.context, wl.vm_id, wl.workload_id)
+            for wl in self.db.workload_vm_get_by_id(
+                    self.context, instance['instance-id']):
+                self.db.workload_vms_delete(
+                    self.context, wl.vm_id, wl.workload_id)
 
-        jobschedule =  {'enabled': True,
-                        'start_date': '06/05/2014',
-                        'end_date': '07/05/2019',
-                        'interval': '1 hr',
-                        'start_time': '2:30 PM',
-                        'fullbackup_interval': -1,
-                        'retention_policy_type': 'Number of Snapshots to Keep',
-                        'retention_policy_value': '30'}
+        jobschedule = {'enabled': True,
+                       'start_date': '06/05/2014',
+                       'end_date': '07/05/2019',
+                       'interval': '1 hr',
+                       'start_time': '2:30 PM',
+                       'fullbackup_interval': -1,
+                       'retention_policy_type': 'Number of Snapshots to Keep',
+                       'retention_policy_value': '30'}
         availability_zone = 'testnova'
         self.context.user_id = str(uuid.uuid4())
         self.context.project_id = '000d038df75743a88cefaacd9b704b94'
         self.context.tenant_id = '000d038df75743a88cefaacd9b704b94'
 
         workload = self.workloadAPI.workload_create(
-                          self.context, name, description,
-                          workload_type_id, source_platform,
-                          instances, jobschedule, metadata,
-                          availability_zone=availability_zone)
+            self.context, name, description,
+            workload_type_id, source_platform,
+            instances, jobschedule, metadata,
+            availability_zone=availability_zone)
 
-        self.assertEqual(len(self.db.workload_vms_get(self.context, workload.id)), 2)
-        self.assertEqual(self.db.workload_get(self.context, workload.id).id, workload.id)
+        self.assertEqual(
+            len(self.db.workload_vms_get(self.context, workload.id)), 2)
+        self.assertEqual(
+            self.db.workload_get(
+                self.context,
+                workload.id).id,
+            workload.id)
         workload = self.workloadAPI.workload_show(self.context, workload.id)
 
         workload['name'] = 'changed name'
         workload['description'] = 'changed description'
         workload.pop('instances')
-        self.workloadAPI.workload_modify(self.context, workload['id'], workload)
+        self.workloadAPI.workload_modify(
+            self.context, workload['id'], workload)
 
-        self.assertEqual(len(self.db.workload_vms_get(self.context, workload['id'])), 2)
-        self.assertEqual(self.db.workload_get(self.context, workload['id']).id, workload['id'])
+        self.assertEqual(len(self.db.workload_vms_get(
+            self.context, workload['id'])), 2)
+        self.assertEqual(
+            self.db.workload_get(
+                self.context,
+                workload['id']).id,
+            workload['id'])
         wl2 = self.workloadAPI.workload_show(self.context, workload['id'])
         self.assertEqual(wl2['display_name'], 'changed name')
         self.assertEqual(wl2['display_description'], 'changed description')
@@ -828,8 +915,8 @@ class BaseWorkloadAPITestCase(test.TestCase):
 
         workload_type_id = str(uuid.uuid4())
         self.workloadAPI.workload_type_create(
-                self.context, workload_type_id, name,
-                description, is_public, metadata)
+            self.context, workload_type_id, name,
+            description, is_public, metadata)
         source_platform = 'openstack'
         name = 'test-workload'
         description = 'test-workload'
@@ -837,33 +924,40 @@ class BaseWorkloadAPITestCase(test.TestCase):
                      {'instance-id': 'a0635eb1-7a88-46d0-8c90-fe5b3a4b0132'}]
 
         for instance in instances:
-            for wl in self.db.workload_vm_get_by_id(self.context, instance['instance-id']):
-                self.db.workload_vms_delete(self.context, wl.vm_id, wl.workload_id)
+            for wl in self.db.workload_vm_get_by_id(
+                    self.context, instance['instance-id']):
+                self.db.workload_vms_delete(
+                    self.context, wl.vm_id, wl.workload_id)
 
-        jobschedule =  {'enabled': True,
-                        'start_date': '06/05/2014',
-                        'end_date': '07/05/2019',
-                        'interval': '1 hr',
-                        'start_time': '2:30 PM',
-                        'fullbackup_interval': -1,
-                        'retention_policy_type': 'Number of Snapshots to Keep',
-                        'retention_policy_value': '30'}
+        jobschedule = {'enabled': True,
+                       'start_date': '06/05/2014',
+                       'end_date': '07/05/2019',
+                       'interval': '1 hr',
+                       'start_time': '2:30 PM',
+                       'fullbackup_interval': -1,
+                       'retention_policy_type': 'Number of Snapshots to Keep',
+                       'retention_policy_value': '30'}
         availability_zone = 'testnova'
         self.context.user_id = str(uuid.uuid4())
         self.context.project_id = '000d038df75743a88cefaacd9b704b94'
         self.context.tenant_id = '000d038df75743a88cefaacd9b704b94'
 
         workload = self.workloadAPI.workload_create(
-                          self.context, name, description,
-                          workload_type_id, source_platform,
-                          instances, jobschedule, metadata,
-                          availability_zone=availability_zone)
+            self.context, name, description,
+            workload_type_id, source_platform,
+            instances, jobschedule, metadata,
+            availability_zone=availability_zone)
 
         self.db.workload_update(self.context, workload.id,
-                                {'status': 'available',})
+                                {'status': 'available', })
 
-        self.assertEqual(len(self.db.workload_vms_get(self.context, workload.id)), 2)
-        self.assertEqual(self.db.workload_get(self.context, workload.id).id, workload.id)
+        self.assertEqual(
+            len(self.db.workload_vms_get(self.context, workload.id)), 2)
+        self.assertEqual(
+            self.db.workload_get(
+                self.context,
+                workload.id).id,
+            workload.id)
         workload = self.workloadAPI.workload_show(self.context, workload.id)
 
         self.workloadAPI.workload_reset(self.context, workload['id'])

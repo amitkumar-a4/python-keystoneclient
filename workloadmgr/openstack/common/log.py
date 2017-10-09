@@ -277,7 +277,7 @@ class ContextAdapter(BaseLoggerAdapter):
         msg = str(id(greenthread.getcurrent())) + ' ' + str(msg)
         return msg, kwargs
 
-        
+
 class JSONFormatter(logging.Formatter):
     def __init__(self, fmt=None, datefmt=None):
         # NOTE(jkoelker) we ignore the fmt argument, but its still there
@@ -364,8 +364,7 @@ def setup(product_name):
 
 def set_defaults(logging_context_format_string):
     cfg.set_defaults(log_opts,
-                     logging_context_format_string=
-                     logging_context_format_string)
+                     logging_context_format_string=logging_context_format_string)
 
 
 def _find_facility_from_conf():
@@ -449,12 +448,13 @@ def _setup_logging_from_conf():
         logger = logging.getLogger(mod)
         logger.setLevel(level)
 
+
 _loggers = {}
 
-       
+
 def getLogger(name='unknown', version='unknown'):
     if name not in _loggers:
-        _loggers[name] = ContextAdapter(logging.getLogger(name),name,version)
+        _loggers[name] = ContextAdapter(logging.getLogger(name), name, version)
     return _loggers[name]
 
 

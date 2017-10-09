@@ -26,6 +26,7 @@ CONF = cfg.CONF
 global_old_tenant_id = [str(uuid.uuid4())]
 global_new_tenant_id = [str(uuid.uuid4())]
 
+
 def _return_tenant_list(*argv, **kwargs):
     tenant_list = []
     for tid in global_old_tenant_id + global_new_tenant_id:
@@ -33,8 +34,10 @@ def _return_tenant_list(*argv, **kwargs):
 
     return tenant_list
 
+
 def _user_in_tenant(*argv, **kwargs):
     return not 'fake' in argv
+
 
 class BaseReassignAPITestCase(test.TestCase):
     """Test Case for Reassign API ."""
@@ -49,15 +52,23 @@ class BaseReassignAPITestCase(test.TestCase):
         self.stderr_patch = patch('sys.stderr')
         self.stderr_patch.start()
 
-        self.is_online_patch = patch('workloadmgr.vault.vault.NfsTrilioVaultBackupTarget.is_online')
+        self.is_online_patch = patch(
+            'workloadmgr.vault.vault.NfsTrilioVaultBackupTarget.is_online')
         self.subprocess_patch = patch('subprocess.check_call')
-        self.keystone_client = patch('workloadmgr.common.workloadmgr_keystoneclient.KeystoneClient')
-        self.project_list_for_import = patch('workloadmgr.common.workloadmgr_keystoneclient.KeystoneClientV2.get_project_list_for_import')
-        self.user_exist_in_tenant = patch('workloadmgr.common.workloadmgr_keystoneclient.KeystoneClientV2.user_exist_in_tenant')
-        self.user_role = patch('workloadmgr.common.workloadmgr_keystoneclient.KeystoneClientV2.check_user_role')
-        self.project_list_for_importV3 = patch('workloadmgr.common.workloadmgr_keystoneclient.KeystoneClientV3.get_project_list_for_import')
-        self.user_exist_in_tenantV3 = patch('workloadmgr.common.workloadmgr_keystoneclient.KeystoneClientV3.user_exist_in_tenant')
-        self.user_roleV3 = patch('workloadmgr.common.workloadmgr_keystoneclient.KeystoneClientV3.check_user_role')
+        self.keystone_client = patch(
+            'workloadmgr.common.workloadmgr_keystoneclient.KeystoneClient')
+        self.project_list_for_import = patch(
+            'workloadmgr.common.workloadmgr_keystoneclient.KeystoneClientV2.get_project_list_for_import')
+        self.user_exist_in_tenant = patch(
+            'workloadmgr.common.workloadmgr_keystoneclient.KeystoneClientV2.user_exist_in_tenant')
+        self.user_role = patch(
+            'workloadmgr.common.workloadmgr_keystoneclient.KeystoneClientV2.check_user_role')
+        self.project_list_for_importV3 = patch(
+            'workloadmgr.common.workloadmgr_keystoneclient.KeystoneClientV3.get_project_list_for_import')
+        self.user_exist_in_tenantV3 = patch(
+            'workloadmgr.common.workloadmgr_keystoneclient.KeystoneClientV3.user_exist_in_tenant')
+        self.user_roleV3 = patch(
+            'workloadmgr.common.workloadmgr_keystoneclient.KeystoneClientV3.check_user_role')
 
         self.KeystoneClient = self.keystone_client.start()
         self.MockMethod = self.is_online_patch.start()
@@ -95,22 +106,24 @@ class BaseReassignAPITestCase(test.TestCase):
 
     def tearDown(self):
 
-        #Delete all workloads and snapshots from database
+        # Delete all workloads and snapshots from database
         for workload in self.db.workload_get_all(self.context):
-            snapshots = self.db.snapshot_get_all_by_workload(self.context, workload['id'])
+            snapshots = self.db.snapshot_get_all_by_workload(
+                self.context, workload['id'])
             for snapshot in snapshots:
                 self.db.snapshot_delete(self.context, snapshot['id'])
             self.db.workload_delete(self.context, workload['id'])
 
-        for share in ['server1:nfsshare1', 'server2:nfsshare2', 'server3:nfsshare3']:
+        for share in ['server1:nfsshare1',
+                      'server2:nfsshare2', 'server3:nfsshare3']:
             backup_target = vault.get_backup_target(share)
             shutil.rmtree(backup_target.mount_path)
             fileutils.ensure_tree(backup_target.mount_path)
 
         self.is_online_patch.stop()
         self.subprocess_patch.stop()
-        #self.project_list_for_import.stop()
-        #self.user_exist_in_tenant.stop()
+        # self.project_list_for_import.stop()
+        # self.user_exist_in_tenant.stop()
         self.user_role.stop()
         self.project_list_for_importV3.stop()
         self.user_exist_in_tenantV3.stop()
@@ -122,33 +135,39 @@ class BaseReassignAPITestCase(test.TestCase):
 
     @patch('workloadmgr.vault.vault.NfsTrilioVaultBackupTarget.get_total_capacity')
     def create_workload(self, capacity_mock):
-        values = [{'server1:nfsshare1': [1099511627776, 0],}.values()[0],
-                  {'server2:nfsshare2': [1099511627776, 0],}.values()[0],
-                  {'server3:nfsshare3': [1099511627776, 0],}.values()[0], ]
+        values = [{'server1:nfsshare1': [1099511627776, 0], }.values()[0],
+                  {'server2:nfsshare2': [1099511627776, 0], }.values()[0],
+                  {'server3:nfsshare3': [1099511627776, 0], }.values()[0], ]
 
         capacity_mock.return_value = None
         capacity_mock.side_effect = values
         type_id = tests_utils.create_workload_type(self.context)
-        jobschedule =  pickle.dumps({
-                            'enabled': True,
-                            'start_date': '06/05/2014',
-                            'end_date': '07/05/2015',
-                            'interval': '1 hr',
-                            'start_time': '2:30 PM',
-                            'fullbackup_interval': -1,
-                            'retention_policy_type': 'Number of Snapshots to Keep',
-                            'retention_policy_value': '30'})
-        workload = tests_utils.create_workload(self.context, workload_type_id=type_id.id, jobschedule=jobschedule)
+        jobschedule = pickle.dumps({
+            'enabled': True,
+            'start_date': '06/05/2014',
+            'end_date': '07/05/2015',
+            'interval': '1 hr',
+            'start_time': '2:30 PM',
+            'fullbackup_interval': -1,
+            'retention_policy_type': 'Number of Snapshots to Keep',
+            'retention_policy_value': '30'})
+        workload = tests_utils.create_workload(
+            self.context,
+            workload_type_id=type_id.id,
+            jobschedule=jobschedule)
         workload = workload.__dict__
         workload.pop('_sa_instance_state')
         workload.pop('created_at')
         workload['workload_id'] = workload['id']
         backup_endpoint = vault.get_nfs_share_for_workload_by_free_overcommit(self.context,
-                                                                                                workload)
+                                                                              workload)
         # write json here
         backup_target = vault.get_backup_target(backup_endpoint)
-        workload['metadata'] = [{'key': 'backup_media_target', 'value': backup_target.mount_path}]
-        workload_path = os.path.join(backup_target.mount_path, "workload_" + workload['id'])
+        workload['metadata'] = [
+            {'key': 'backup_media_target', 'value': backup_target.mount_path}]
+        workload_path = os.path.join(
+            backup_target.mount_path,
+            "workload_" + workload['id'])
         os.mkdir(workload_path)
         workload_json_file = os.path.join(workload_path, "workload_db")
         with open(workload_json_file, "w") as f:
@@ -164,7 +183,8 @@ class BaseReassignAPITestCase(test.TestCase):
         for meta in workload['metadata']:
             if meta['key'] == 'backup_media_target':
                 backup_target = meta['value']
-        workload_path = os.path.join(backup_target, "workload_" + workload['id'])
+        workload_path = os.path.join(
+            backup_target, "workload_" + workload['id'])
         snap_path = os.path.join(workload_path, "snapshot_" + snapshot['id'])
         fileutils.ensure_tree(snap_path)
         with open(os.path.join(snap_path, 'snapshot_db'), "w") as f:
@@ -205,7 +225,11 @@ class BaseReassignAPITestCase(test.TestCase):
                     raise wlm_exceptions.DBError('DB crashed.')
 
             bulk_update.side_effect = side_effect
-            self.assertRaises(wlm_exceptions.DBError, self.workloadAPI.workloads_reassign, self.context, tenant_map)
+            self.assertRaises(
+                wlm_exceptions.DBError,
+                self.workloadAPI.workloads_reassign,
+                self.context,
+                tenant_map)
 
         self.workloadAPI.workloads_reassign(self.context, tenant_map)
         workloads_in_db = self.db.workload_get_all(self.context)
@@ -216,14 +240,23 @@ class BaseReassignAPITestCase(test.TestCase):
             for meta in workload['metadata']:
                 if meta['key'] == 'backup_media_target':
                     backup_target = meta['value']
-            workload_path = os.path.join(backup_target, "workload_" + workload['id'])
+            workload_path = os.path.join(
+                backup_target, "workload_" + workload['id'])
 
             for path, subdirs, files in os.walk(workload_path):
                 for name in files:
-                    if name.endswith("snapshot_db") or name.endswith("workload_db"):
-                        db_values = json.loads(open(os.path.join(path, name), 'r').read())
-                        self.assertEqual(db_values.get('project_id', None), new_tenant_id)
-                        self.assertEqual(db_values.get('user_id', None), user_id)
+                    if name.endswith("snapshot_db") or name.endswith(
+                            "workload_db"):
+                        db_values = json.loads(
+                            open(os.path.join(path, name), 'r').read())
+                        self.assertEqual(
+                            db_values.get(
+                                'project_id',
+                                None),
+                            new_tenant_id)
+                        self.assertEqual(
+                            db_values.get(
+                                'user_id', None), user_id)
 
     def test_reassign_for_idempotent_with_migrate(self):
         global global_new_tenant_id
@@ -258,8 +291,13 @@ class BaseReassignAPITestCase(test.TestCase):
         ]
 
         with patch('workloadmgr.workloads.api.API.import_workloads') as import_workload_mock:
-            import_workload_mock.side_effect = wlm_exceptions.DBError('DB crashed.')
-            self.assertRaises(wlm_exceptions.DBError, self.workloadAPI.workloads_reassign, self.context, tenant_map)
+            import_workload_mock.side_effect = wlm_exceptions.DBError(
+                'DB crashed.')
+            self.assertRaises(
+                wlm_exceptions.DBError,
+                self.workloadAPI.workloads_reassign,
+                self.context,
+                tenant_map)
 
         self.workloadAPI.workloads_reassign(self.context, tenant_map)
         workloads_in_db = self.db.workload_get_all(self.context)
@@ -270,14 +308,23 @@ class BaseReassignAPITestCase(test.TestCase):
             for meta in workload['metadata']:
                 if meta['key'] == 'backup_media_target':
                     backup_target = meta['value']
-            workload_path = os.path.join(backup_target, "workload_" + workload['id'])
+            workload_path = os.path.join(
+                backup_target, "workload_" + workload['id'])
 
             for path, subdirs, files in os.walk(workload_path):
                 for name in files:
-                    if name.endswith("snapshot_db") or name.endswith("workload_db"):
-                        db_values = json.loads(open(os.path.join(path, name), 'r').read())
-                        self.assertEqual(db_values.get('project_id', None), new_tenant_id)
-                        self.assertEqual(db_values.get('user_id', None), user_id)
+                    if name.endswith("snapshot_db") or name.endswith(
+                            "workload_db"):
+                        db_values = json.loads(
+                            open(os.path.join(path, name), 'r').read())
+                        self.assertEqual(
+                            db_values.get(
+                                'project_id',
+                                None),
+                            new_tenant_id)
+                        self.assertEqual(
+                            db_values.get(
+                                'user_id', None), user_id)
 
     def test_reassign_with_single_old_tenant(self):
         global global_new_tenant_id
@@ -315,14 +362,23 @@ class BaseReassignAPITestCase(test.TestCase):
             for meta in workload['metadata']:
                 if meta['key'] == 'backup_media_target':
                     backup_target = meta['value']
-            workload_path = os.path.join(backup_target, "workload_" + workload['id'])
+            workload_path = os.path.join(
+                backup_target, "workload_" + workload['id'])
 
             for path, subdirs, files in os.walk(workload_path):
                 for name in files:
-                    if name.endswith("snapshot_db") or name.endswith("workload_db"):
-                        db_values = json.loads(open(os.path.join(path, name), 'r').read())
-                        self.assertEqual(db_values.get('project_id', None), new_tenant_id)
-                        self.assertEqual(db_values.get('user_id', None), user_id)
+                    if name.endswith("snapshot_db") or name.endswith(
+                            "workload_db"):
+                        db_values = json.loads(
+                            open(os.path.join(path, name), 'r').read())
+                        self.assertEqual(
+                            db_values.get(
+                                'project_id',
+                                None),
+                            new_tenant_id)
+                        self.assertEqual(
+                            db_values.get(
+                                'user_id', None), user_id)
 
     def test_reassign_with_multiple_old_tenant(self):
         global global_new_tenant_id
@@ -362,14 +418,23 @@ class BaseReassignAPITestCase(test.TestCase):
             for meta in workload['metadata']:
                 if meta['key'] == 'backup_media_target':
                     backup_target = meta['value']
-            workload_path = os.path.join(backup_target, "workload_" + workload['id'])
+            workload_path = os.path.join(
+                backup_target, "workload_" + workload['id'])
 
             for path, subdirs, files in os.walk(workload_path):
                 for name in files:
-                    if name.endswith("snapshot_db") or name.endswith("workload_db"):
-                        db_values = json.loads(open(os.path.join(path, name), 'r').read())
-                        self.assertEqual(db_values.get('project_id', None), new_tenant_id)
-                        self.assertEqual(db_values.get('user_id', None), user_id)
+                    if name.endswith("snapshot_db") or name.endswith(
+                            "workload_db"):
+                        db_values = json.loads(
+                            open(os.path.join(path, name), 'r').read())
+                        self.assertEqual(
+                            db_values.get(
+                                'project_id',
+                                None),
+                            new_tenant_id)
+                        self.assertEqual(
+                            db_values.get(
+                                'user_id', None), user_id)
 
     def test_reassign_with_non_existing_old_tenant(self):
 
@@ -398,7 +463,11 @@ class BaseReassignAPITestCase(test.TestCase):
              'migrate_cloud': False
              }
         ]
-        self.assertRaises(wlm_exceptions.ProjectNotFound, self.workloadAPI.workloads_reassign, self.context, tenant_map)
+        self.assertRaises(
+            wlm_exceptions.ProjectNotFound,
+            self.workloadAPI.workloads_reassign,
+            self.context,
+            tenant_map)
 
     def test_reassign_with_existing_new_tenant_and_user_id(self):
 
@@ -437,14 +506,23 @@ class BaseReassignAPITestCase(test.TestCase):
             for meta in workload['metadata']:
                 if meta['key'] == 'backup_media_target':
                     backup_target = meta['value']
-            workload_path = os.path.join(backup_target, "workload_" + workload['id'])
+            workload_path = os.path.join(
+                backup_target, "workload_" + workload['id'])
 
             for path, subdirs, files in os.walk(workload_path):
                 for name in files:
-                    if name.endswith("snapshot_db") or name.endswith("workload_db"):
-                        db_values = json.loads(open(os.path.join(path, name), 'r').read())
-                        self.assertEqual(db_values.get('project_id', None), new_tenant_id)
-                        self.assertEqual(db_values.get('user_id', None), user_id)
+                    if name.endswith("snapshot_db") or name.endswith(
+                            "workload_db"):
+                        db_values = json.loads(
+                            open(os.path.join(path, name), 'r').read())
+                        self.assertEqual(
+                            db_values.get(
+                                'project_id',
+                                None),
+                            new_tenant_id)
+                        self.assertEqual(
+                            db_values.get(
+                                'user_id', None), user_id)
 
     def test_reassign_with_non_existing_new_tenant(self):
 
@@ -474,7 +552,9 @@ class BaseReassignAPITestCase(test.TestCase):
              'migrate_cloud': False
              }
         ]
-        self.assertEqual(self.workloadAPI.workloads_reassign(self.context, tenant_map), [])
+        self.assertEqual(
+            self.workloadAPI.workloads_reassign(
+                self.context, tenant_map), [])
 
     def test_reassign_with_non_existing_user_id(self):
         global global_new_tenant_id
@@ -504,7 +584,11 @@ class BaseReassignAPITestCase(test.TestCase):
              'migrate_cloud': False
              }
         ]
-        self.assertRaises(wlm_exceptions.UserNotFound, self.workloadAPI.workloads_reassign, self.context, tenant_map)
+        self.assertRaises(
+            wlm_exceptions.UserNotFound,
+            self.workloadAPI.workloads_reassign,
+            self.context,
+            tenant_map)
 
     def test_reassign_with_single_workload(self):
         global global_new_tenant_id
@@ -537,14 +621,23 @@ class BaseReassignAPITestCase(test.TestCase):
             for meta in workload['metadata']:
                 if meta['key'] == 'backup_media_target':
                     backup_target = meta['value']
-            workload_path = os.path.join(backup_target, "workload_" + workload['id'])
+            workload_path = os.path.join(
+                backup_target, "workload_" + workload['id'])
 
             for path, subdirs, files in os.walk(workload_path):
                 for name in files:
-                    if name.endswith("snapshot_db") or name.endswith("workload_db"):
-                        db_values = json.loads(open(os.path.join(path, name), 'r').read())
-                        self.assertEqual(db_values.get('project_id', None), new_tenant_id)
-                        self.assertEqual(db_values.get('user_id', None), user_id)
+                    if name.endswith("snapshot_db") or name.endswith(
+                            "workload_db"):
+                        db_values = json.loads(
+                            open(os.path.join(path, name), 'r').read())
+                        self.assertEqual(
+                            db_values.get(
+                                'project_id',
+                                None),
+                            new_tenant_id)
+                        self.assertEqual(
+                            db_values.get(
+                                'user_id', None), user_id)
 
     def test_reassign_with_multiple_workload(self):
         global global_new_tenant_id
@@ -583,14 +676,23 @@ class BaseReassignAPITestCase(test.TestCase):
             for meta in workload['metadata']:
                 if meta['key'] == 'backup_media_target':
                     backup_target = meta['value']
-            workload_path = os.path.join(backup_target, "workload_" + workload['id'])
+            workload_path = os.path.join(
+                backup_target, "workload_" + workload['id'])
 
             for path, subdirs, files in os.walk(workload_path):
                 for name in files:
-                    if name.endswith("snapshot_db") or name.endswith("workload_db"):
-                        db_values = json.loads(open(os.path.join(path, name), 'r').read())
-                        self.assertEqual(db_values.get('project_id', None), new_tenant_id)
-                        self.assertEqual(db_values.get('user_id', None), user_id)
+                    if name.endswith("snapshot_db") or name.endswith(
+                            "workload_db"):
+                        db_values = json.loads(
+                            open(os.path.join(path, name), 'r').read())
+                        self.assertEqual(
+                            db_values.get(
+                                'project_id',
+                                None),
+                            new_tenant_id)
+                        self.assertEqual(
+                            db_values.get(
+                                'user_id', None), user_id)
 
     def test_reassign_with_existing_project_id_and_migrate_cloud(self):
 
@@ -631,14 +733,23 @@ class BaseReassignAPITestCase(test.TestCase):
             for meta in workload['metadata']:
                 if meta['key'] == 'backup_media_target':
                     backup_target = meta['value']
-            workload_path = os.path.join(backup_target, "workload_" + workload['id'])
+            workload_path = os.path.join(
+                backup_target, "workload_" + workload['id'])
 
             for path, subdirs, files in os.walk(workload_path):
                 for name in files:
-                    if name.endswith("snapshot_db") or name.endswith("workload_db"):
-                        db_values = json.loads(open(os.path.join(path, name), 'r').read())
-                        self.assertEqual(db_values.get('project_id', None), new_tenant_id)
-                        self.assertEqual(db_values.get('user_id', None), user_id)
+                    if name.endswith("snapshot_db") or name.endswith(
+                            "workload_db"):
+                        db_values = json.loads(
+                            open(os.path.join(path, name), 'r').read())
+                        self.assertEqual(
+                            db_values.get(
+                                'project_id',
+                                None),
+                            new_tenant_id)
+                        self.assertEqual(
+                            db_values.get(
+                                'user_id', None), user_id)
 
     def test_reassign_with_non_existing_project_id_and_migrate_cloud(self):
 
@@ -672,7 +783,9 @@ class BaseReassignAPITestCase(test.TestCase):
              'migrate_cloud': True
              }
         ]
-        self.assertEqual(self.workloadAPI.workloads_reassign(self.context, tenant_map), [])
+        self.assertEqual(
+            self.workloadAPI.workloads_reassign(
+                self.context, tenant_map), [])
 
     def test_reassign_with_existing_user_id_and_migrate_cloud(self):
 
@@ -713,14 +826,23 @@ class BaseReassignAPITestCase(test.TestCase):
             for meta in workload['metadata']:
                 if meta['key'] == 'backup_media_target':
                     backup_target = meta['value']
-            workload_path = os.path.join(backup_target, "workload_" + workload['id'])
+            workload_path = os.path.join(
+                backup_target, "workload_" + workload['id'])
 
             for path, subdirs, files in os.walk(workload_path):
                 for name in files:
-                    if name.endswith("snapshot_db") or name.endswith("workload_db"):
-                        db_values = json.loads(open(os.path.join(path, name), 'r').read())
-                        self.assertEqual(db_values.get('project_id', None), new_tenant_id)
-                        self.assertEqual(db_values.get('user_id', None), user_id)
+                    if name.endswith("snapshot_db") or name.endswith(
+                            "workload_db"):
+                        db_values = json.loads(
+                            open(os.path.join(path, name), 'r').read())
+                        self.assertEqual(
+                            db_values.get(
+                                'project_id',
+                                None),
+                            new_tenant_id)
+                        self.assertEqual(
+                            db_values.get(
+                                'user_id', None), user_id)
 
     def test_reassign_with_non_existing_user_id_and_migrate_cloud(self):
         global global_new_tenant_id
@@ -743,7 +865,7 @@ class BaseReassignAPITestCase(test.TestCase):
                 self.db.snapshot_delete(self.context, snapshot['id'])
             self.db.workload_delete(self.context, workload['id'])
 
-        user_id = 'fake' #self.context.user_id
+        user_id = 'fake'  # self.context.user_id
         tenant_map = [
             {'old_tenant_ids': [old_tenant_id],
              'new_tenant_id': new_tenant_id,
@@ -752,4 +874,8 @@ class BaseReassignAPITestCase(test.TestCase):
              'migrate_cloud': True
              }
         ]
-        self.assertRaises(wlm_exceptions.UserNotFound, self.workloadAPI.workloads_reassign, self.context, tenant_map)
+        self.assertRaises(
+            wlm_exceptions.UserNotFound,
+            self.workloadAPI.workloads_reassign,
+            self.context,
+            tenant_map)

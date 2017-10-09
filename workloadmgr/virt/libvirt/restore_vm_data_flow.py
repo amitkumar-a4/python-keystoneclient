@@ -53,7 +53,8 @@ Logger = autolog.Logger(LOG)
 
 FLAGS = flags.FLAGS
 CONF = cfg.CONF
- 
+
+
 class CopyBackupImageToVolume(task.Task):
     """
        If the volume is SAN volume, initiate copy of backup data
@@ -66,11 +67,11 @@ class CopyBackupImageToVolume(task.Task):
                 restored_file_path,
                 progress_tracking_file_path,
                 image_overlay_file_path,
-                volume_id = None, volume_type = None,
-                image_id = None, image_type = None):
-        return self.execute_with_log(context, restored_instance_id, 
+                volume_id=None, volume_type=None,
+                image_id=None, image_type=None):
+        return self.execute_with_log(context, restored_instance_id,
                                      volume_id, volume_type,
-                                     image_id, image_type, 
+                                     image_id, image_type,
                                      restore_id, restore_type,
                                      restored_file_path,
                                      image_overlay_file_path,
@@ -80,14 +81,14 @@ class CopyBackupImageToVolume(task.Task):
         return self.revert_with_log(*args, **kwargs)
 
     @autolog.log_method(Logger, 'CopyBackupImageToVolume.execute')
-    def execute_with_log(self, context, restored_instance_id, 
+    def execute_with_log(self, context, restored_instance_id,
                          volume_id, volume_type,
-                         image_id, image_type, 
+                         image_id, image_type,
                          restore_id, restore_type,
-                         restored_file_path, 
+                         restored_file_path,
                          image_overlay_file_path,
                          progress_tracking_file_path):
- 
+
         # Call into contego to copy the data from backend to volume
         compute_service = nova.API(production=True)
         db = WorkloadMgrDB().db
@@ -96,13 +97,15 @@ class CopyBackupImageToVolume(task.Task):
         cntx = amqp.RpcContext.from_dict(context)
         cntx = nova._get_tenant_context(cntx)
         vast_params = {'volume_id': volume_id, 'volume_type': volume_type,
-                       'image_id': image_id, 'image_type' : image_type,
+                       'image_id': image_id, 'image_type': image_type,
                        'backup_image_file_path': restored_file_path,
                        'image_overlay_file_path': image_overlay_file_path,
                        'progress_tracking_file_path': progress_tracking_file_path}
-        compute_service.copy_backup_image_to_volume(cntx, restored_instance_id, vast_params)
+        compute_service.copy_backup_image_to_volume(
+            cntx, restored_instance_id, vast_params)
 
-        image_info = qemuimages.qemu_img_info(restored_file_path or image_overlay_file_path)
+        image_info = qemuimages.qemu_img_info(
+            restored_file_path or image_overlay_file_path)
         prev_copied_size_incremental = 0
 
         basestat = os.stat(progress_tracking_file_path)
@@ -114,7 +117,8 @@ class CopyBackupImageToVolume(task.Task):
                 if progress_tracking_file_path:
                     try:
                         with open(progress_tracking_file_path, 'r') as progress_tracking_file:
-                            async_task_status['status'] = progress_tracking_file.readlines()
+                            async_task_status['status'] = progress_tracking_file.readlines(
+                            )
                     except Exception as ex:
                         LOG.exception(ex)
 
@@ -129,35 +133,36 @@ class CopyBackupImageToVolume(task.Task):
                         basetime = time.time()
                     elif time.time() - basetime > 600:
                         raise Exception("No update to %s modified time for last 10 minutes. "
-                                        "Contego may have errored. Aborting Operation" % 
+                                        "Contego may have errored. Aborting Operation" %
                                         progress_tracking_file_path)
                 else:
                     # For swift based backup media
-                    async_task_status = compute_service.vast_async_task_status(cntx, 
-                                                  instance['vm_id'],
-                                                  {'metadata': progress_tracker_metadata})
+                    async_task_status = compute_service.vast_async_task_status(cntx,
+                                                                               instance['vm_id'],
+                                                                               {'metadata': progress_tracker_metadata})
                 data_transfer_completed = False
-                percentage="0.0"
+                percentage = "0.0"
                 if async_task_status and 'status' in async_task_status and \
                         len(async_task_status['status']):
                     for line in async_task_status['status']:
                         if 'percentage complete' in line:
                             percentage = re.search(r'\d+\.\d+', line).group(0)
                         if 'Error' in line:
-                            raise Exception("Data transfer failed - Contego Exception:" + line)
+                            raise Exception(
+                                "Data transfer failed - Contego Exception:" + line)
                         if 'Completed' in line:
                             data_transfer_completed = True
-                            percentage="100.0"
-                            break;
+                            percentage = "100.0"
+                            break
 
-                copied_size_incremental = int(float(percentage) * \
-                                                   image_info.virtual_size/100)
+                copied_size_incremental = int(float(percentage) *
+                                              image_info.virtual_size / 100)
                 restore_obj = db.restore_update(cntx, restore_id,
-                                           {'uploaded_size_incremental': copied_size_incremental - \
-                                                                   prev_copied_size_incremental})
+                                                {'uploaded_size_incremental': copied_size_incremental -
+                                                 prev_copied_size_incremental})
                 prev_copied_size_incremental = copied_size_incremental
                 if data_transfer_completed:
-                    break;
+                    break
             except nova_unauthorized as ex:
                 LOG.exception(ex)
                 # recreate the token here
@@ -180,13 +185,15 @@ class PrepareBackupImage(task.Task):
     """
 
     def execute(self, context, restore_id, vm_resource_id, volume_type):
-        return self.execute_with_log(context, restore_id, vm_resource_id, volume_type)
-    
+        return self.execute_with_log(
+            context, restore_id, vm_resource_id, volume_type)
+
     def revert(self, *args, **kwargs):
         return self.revert_with_log(*args, **kwargs)
 
     @autolog.log_method(Logger, 'PrepareBackupImage.execute')
-    def execute_with_log(self, context, restore_id, vm_resource_id, volume_type):
+    def execute_with_log(self, context, restore_id,
+                         vm_resource_id, volume_type):
         db = WorkloadMgrDB().db
         self.cntx = amqp.RpcContext.from_dict(context)
 
@@ -199,14 +206,16 @@ class PrepareBackupImage(task.Task):
 
         backup_target = vault.get_backup_target(backup_endpoint)
 
-        snapshot_vm_resource = db.snapshot_vm_resource_get(self.cntx, vm_resource_id)
-        vm_disk_resource_snap = db.vm_disk_resource_snap_get_top(self.cntx, snapshot_vm_resource.id) 
+        snapshot_vm_resource = db.snapshot_vm_resource_get(
+            self.cntx, vm_resource_id)
+        vm_disk_resource_snap = db.vm_disk_resource_snap_get_top(
+            self.cntx, snapshot_vm_resource.id)
         resource_snap_path = os.path.join(backup_target.mount_path,
                                           vm_disk_resource_snap.vault_url.strip(os.sep))
         image_info = qemuimages.qemu_img_info(resource_snap_path)
 
         if snapshot_vm_resource.resource_name == 'vda' and \
-            db.get_metadata_value(snapshot_vm_resource.metadata, 'image_id') is not None:
+                db.get_metadata_value(snapshot_vm_resource.metadata, 'image_id') is not None:
             # upload the bottom of the chain to glance
             while image_info.backing_file:
                 image_info = qemuimages.qemu_img_info(image_info.backing_file)
@@ -232,33 +241,45 @@ def CopyBackupImagesToVolumes(context, instance, snapshot_obj, restore_id,
     flow = lf.Flow("copybackupimagestovolumeslf")
     db = WorkloadMgrDB().db
     snapshot_vm_resources = db.snapshot_vm_resources_get(context,
-                                         instance['vm_id'], snapshot_obj.id)
+                                                         instance['vm_id'], snapshot_obj.id)
 
     for snapshot_vm_resource in snapshot_vm_resources:
         if snapshot_vm_resource.resource_type != 'disk':
             continue
-  
-        volume_id = db.get_metadata_value(snapshot_vm_resource.metadata, 'volume_id')
-        image_id = db.get_metadata_value(snapshot_vm_resource.metadata, 'image_id')
+
+        volume_id = db.get_metadata_value(
+            snapshot_vm_resource.metadata, 'volume_id')
+        image_id = db.get_metadata_value(
+            snapshot_vm_resource.metadata, 'image_id')
 
         if volume_id and volume_id in volumes_to_restore:
             flow.add(CopyBackupImageToVolume("CopyBackupImageToVolume" + snapshot_vm_resource.id,
-                                  rebind=dict(volume_id='volume_id_' + str(snapshot_vm_resource.id),
-                                              volume_type='volume_type_'+str(snapshot_vm_resource.id),
-                                              restored_file_path='restore_file_path_' + str(snapshot_vm_resource.id),
-                                              progress_tracking_file_path='progress_tracking_file_path_'+str(snapshot_vm_resource.id),
-                                              image_overlay_file_path='image_overlay_file_path_' + str(snapshot_vm_resource.id),
-                                              )))
-        if db.get_metadata_value(snapshot_vm_resource.metadata, 'image_id') and restore_boot_disk:
+                                             rebind=dict(volume_id='volume_id_' + str(snapshot_vm_resource.id),
+                                                         volume_type='volume_type_' +
+                                                         str(snapshot_vm_resource.id),
+                                                         restored_file_path='restore_file_path_' +
+                                                         str(snapshot_vm_resource.id),
+                                                         progress_tracking_file_path='progress_tracking_file_path_' +
+                                                         str(snapshot_vm_resource.id),
+                                                         image_overlay_file_path='image_overlay_file_path_' +
+                                                         str(snapshot_vm_resource.id),
+                                                         )))
+        if db.get_metadata_value(
+                snapshot_vm_resource.metadata, 'image_id') and restore_boot_disk:
             flow.add(CopyBackupImageToVolume("CopyBackupImageToVolume" + snapshot_vm_resource.id,
-                                  rebind=dict(image_id='image_id_' + str(snapshot_vm_resource.id),
-                                              image_type='image_type_'+str(snapshot_vm_resource.id),
-                                              restored_file_path='restore_file_path_' + str(snapshot_vm_resource.id),
-                                              progress_tracking_file_path='progress_tracking_file_path_'+str(snapshot_vm_resource.id),
-                                              image_overlay_file_path='image_overlay_file_path_' + str(snapshot_vm_resource.id),
-                                              )))
+                                             rebind=dict(image_id='image_id_' + str(snapshot_vm_resource.id),
+                                                         image_type='image_type_' +
+                                                         str(snapshot_vm_resource.id),
+                                                         restored_file_path='restore_file_path_' +
+                                                         str(snapshot_vm_resource.id),
+                                                         progress_tracking_file_path='progress_tracking_file_path_' +
+                                                         str(snapshot_vm_resource.id),
+                                                         image_overlay_file_path='image_overlay_file_path_' +
+                                                         str(snapshot_vm_resource.id),
+                                                         )))
 
     return flow
+
 
 class CinderSnapshot(task.Task):
     """
@@ -266,8 +287,9 @@ class CinderSnapshot(task.Task):
     """
 
     def execute(self, context, restore_id, vm_resource_id, volume_id):
-        return self.execute_with_log(context, restore_id, vm_resource_id, volume_id)
-    
+        return self.execute_with_log(
+            context, restore_id, vm_resource_id, volume_id)
+
     def revert(self, *args, **kwargs):
         return self.revert_with_log(*args, **kwargs)
 
@@ -280,7 +302,7 @@ class CinderSnapshot(task.Task):
         snapshot_obj = db.snapshot_get(self.cntx, restore_obj.snapshot_id)
 
         volume_service = cinder.API()
-        
+
         volume = volume_service.get(self.cntx, volume_id)
         if not volume:
             raise exception.VolumeNotFound(volume_id=volume_id)
@@ -299,18 +321,20 @@ def LinearCinderSnapshots(context, instance, instance_options, snapshotobj, rest
     flow = lf.Flow("createsnapshotslf")
     db = WorkloadMgrDB().db
     snapshot_vm_resources = db.snapshot_vm_resources_get(context,
-                                         instance['vm_id'], snapshotobj.id)
+                                                         instance['vm_id'], snapshotobj.id)
     for snapshot_vm_resource in snapshot_vm_resources:
         if snapshot_vm_resource.resource_type != 'disk':
             continue
 
-        volume_id = db.get_metadata_value(snapshot_vm_resource.metadata, 'volume_id')
-        image_id = db.get_metadata_value(snapshot_vm_resource.metadata, 'image_id')
+        volume_id = db.get_metadata_value(
+            snapshot_vm_resource.metadata, 'volume_id')
+        image_id = db.get_metadata_value(
+            snapshot_vm_resource.metadata, 'image_id')
 
         if volume_id and volume_id in volumes_to_restore:
             flow.add(CinderSnapshot("CinderSnapshot" + snapshot_vm_resource.id,
                                     rebind=dict(vm_resource_id=snapshot_vm_resource.id,
-                                                volume_id='volume_id_'+snapshot_vm_resource.id)))
+                                                volume_id='volume_id_' + snapshot_vm_resource.id)))
 
     return flow
 
@@ -320,21 +344,24 @@ def LinearPrepareBackupImages(context, instance, instance_options, snapshotobj, 
     flow = lf.Flow("processbackupimageslf")
     db = WorkloadMgrDB().db
     snapshot_vm_resources = db.snapshot_vm_resources_get(context,
-                                         instance['vm_id'], snapshotobj.id)
+                                                         instance['vm_id'], snapshotobj.id)
     for snapshot_vm_resource in snapshot_vm_resources:
         if snapshot_vm_resource.resource_type != 'disk':
             continue
 
-        volume_id = db.get_metadata_value(snapshot_vm_resource.metadata, 'volume_id')
-        image_id = db.get_metadata_value(snapshot_vm_resource.metadata, 'image_id')
+        volume_id = db.get_metadata_value(
+            snapshot_vm_resource.metadata, 'volume_id')
+        image_id = db.get_metadata_value(
+            snapshot_vm_resource.metadata, 'image_id')
 
         if (volume_id and volume_id in volumes_to_restore) or \
-            image_id and restore_boot_disk:
+                image_id and restore_boot_disk:
             flow.add(PrepareBackupImage("PrepareBackupImage" + snapshot_vm_resource.id,
                                         rebind=dict(vm_resource_id=snapshot_vm_resource.id,
-                                                    volume_type='volume_type_'+snapshot_vm_resource.id),
+                                                    volume_type='volume_type_' + snapshot_vm_resource.id),
                                         provides=('restore_file_path_' + str(snapshot_vm_resource.id),
-                                                  'image_overlay_file_path_' + str(snapshot_vm_resource.id),
+                                                  'image_overlay_file_path_' +
+                                                  str(snapshot_vm_resource.id),
                                                   'image_virtual_size_' + str(snapshot_vm_resource.id))))
 
     return flow
@@ -347,16 +374,18 @@ def PowerOnInstanceFlow(context):
 
     return flow
 
+
 def FreezeNThawFlow(context):
 
     flow = lf.Flow("freezenthawlf")
 
     flow.add(FreezeVM("FreezeVM", rebind={'instance': 'restored_instance_id', 'snapshot': 'restored_instance_id',
-                 'source_platform': 'restored_instance_id', 'restored_instance_id': 'restored_instance_id'}))
+                                          'source_platform': 'restored_instance_id', 'restored_instance_id': 'restored_instance_id'}))
     flow.add(ThawVM("ThawVM", rebind={'instance': 'restored_instance_id', 'snapshot': 'restored_instance_id',
-                  'source_platform': 'restored_instance_id', 'restored_instance_id': 'restored_instance_id'}))
+                                      'source_platform': 'restored_instance_id', 'restored_instance_id': 'restored_instance_id'}))
 
     return flow
+
 
 def restore_vm_data(cntx, db, instance, restore, instance_options):
 
@@ -371,14 +400,14 @@ def restore_vm_data(cntx, db, instance, restore, instance_options):
 
     msg = 'Replaces VM "' + instance['vm_id'] + \
           '" data from snapshot ' + snapshot_obj.id
-    db.restore_update(cntx,  restore_obj.id, {'progress_msg': msg})
+    db.restore_update(cntx, restore_obj.id, {'progress_msg': msg})
 
     # refresh the token so we are attempting each VM restore with a new token
     cntx = nova._get_tenant_context(cntx)
 
     context_dict = dict([('%s' % key, value)
-                          for (key, value) in cntx.to_dict().iteritems()])            
-    context_dict['conf'] =  None # RpcContext object looks for this during init
+                         for (key, value) in cntx.to_dict().iteritems()])
+    context_dict['conf'] = None  # RpcContext object looks for this during init
 
     snapshot_vm_resources = db.snapshot_vm_resources_get(cntx, instance['vm_id'],
                                                          snapshot_obj.id)
@@ -395,45 +424,50 @@ def restore_vm_data(cntx, db, instance, restore, instance_options):
     restore_dict.pop('created_at')
     restore_dict.pop('updated_at')
     store = {
-                'connection': FLAGS.sql_connection,
-                'context': context_dict,
-                'restore': restore_dict,
-                'restore_id': restore['id'],
-                'vmid': instance['vm_id'],
-                'restored_instance_id': instance['vm_id'],
-                'vmname': instance['vm_name'],
-                'keyname': 'keyname' in instance and instance['keyname'] or None,
-                'snapshot_id': snapshot_obj.id,
-                'restore_type': restore['restore_type'],
-                'instance_options': instance_options,
-            }
+        'connection': FLAGS.sql_connection,
+        'context': context_dict,
+        'restore': restore_dict,
+        'restore_id': restore['id'],
+        'vmid': instance['vm_id'],
+        'restored_instance_id': instance['vm_id'],
+        'vmname': instance['vm_name'],
+        'keyname': 'keyname' in instance and instance['keyname'] or None,
+        'snapshot_id': snapshot_obj.id,
+        'restore_type': restore['restore_type'],
+        'instance_options': instance_options,
+    }
 
     for snapshot_vm_resource in snapshot_vm_resources:
         store[snapshot_vm_resource.id] = snapshot_vm_resource.id
-        store['devname_'+snapshot_vm_resource.id] = snapshot_vm_resource.resource_name
+        store['devname_' + snapshot_vm_resource.id] = snapshot_vm_resource.resource_name
         if snapshot_vm_resource.resource_type != 'disk':
             continue
 
-        volume_id = db.get_metadata_value(snapshot_vm_resource.metadata, 'volume_id')
-        image_id = db.get_metadata_value(snapshot_vm_resource.metadata, 'image_id')
-        volume_type = db.get_metadata_value(snapshot_vm_resource.metadata, 'volume_type')
+        volume_id = db.get_metadata_value(
+            snapshot_vm_resource.metadata, 'volume_id')
+        image_id = db.get_metadata_value(
+            snapshot_vm_resource.metadata, 'image_id')
+        volume_type = db.get_metadata_value(
+            snapshot_vm_resource.metadata, 'volume_type')
 
         progress_tracker_metadata = {'snapshot_id': snapshot_obj.id,
-                                     'resource_id' : snapshot_vm_resource.id}
+                                     'resource_id': snapshot_vm_resource.id}
 
-        progress_tracking_file_path = backup_target.get_progress_tracker_path(progress_tracker_metadata)
+        progress_tracking_file_path = backup_target.get_progress_tracker_path(
+            progress_tracker_metadata)
         if volume_id in volumes_to_restore:
 
-            store['progress_tracking_file_path_'+snapshot_vm_resource.id] = progress_tracking_file_path
-            store['volume_id_'+snapshot_vm_resource.id] = volume_id
-            store['volume_type_'+snapshot_vm_resource.id] = volume_type
+            store['progress_tracking_file_path_' +
+                  snapshot_vm_resource.id] = progress_tracking_file_path
+            store['volume_id_' + snapshot_vm_resource.id] = volume_id
+            store['volume_type_' + snapshot_vm_resource.id] = volume_type
 
         if image_id and restore_boot_disk:
-            store['progress_tracking_file_path_'+snapshot_vm_resource.id] = progress_tracking_file_path
-            store['image_id_'+snapshot_vm_resource.id] = image_id
-            store['image_type_'+snapshot_vm_resource.id] = 'qcow2'
-            store['volume_type_'+snapshot_vm_resource.id] = None
-
+            store['progress_tracking_file_path_' +
+                  snapshot_vm_resource.id] = progress_tracking_file_path
+            store['image_id_' + snapshot_vm_resource.id] = image_id
+            store['image_type_' + snapshot_vm_resource.id] = 'qcow2'
+            store['volume_type_' + snapshot_vm_resource.id] = None
 
     LOG.info(_('Processing disks'))
     _restorevmflow = lf.Flow(instance['vm_id'] + "RestoreInstance")
@@ -468,7 +502,7 @@ def restore_vm_data(cntx, db, instance, restore, instance_options):
         _restorevmflow.add(childflow)
 
     result = engines.run(_restorevmflow, engine_conf='serial',
-                         backend={'connection': store['connection'] }, store=store)
+                         backend={'connection': store['connection']}, store=store)
 
     if result and 'restored_instance_id' in result:
         restored_instance_id = result['restored_instance_id']
@@ -477,20 +511,20 @@ def restore_vm_data(cntx, db, instance, restore, instance_options):
             cntx, restored_instance_id)
 
         restored_vm_values = {'vm_id': restored_instance_id,
-                              'vm_name':  restored_instance.name,    
+                              'vm_name': restored_instance.name,
                               'restore_id': restore['id'],
-                              'metadata' : {'instance_id':instance['vm_id']},
+                              'metadata': {'instance_id': instance['vm_id']},
                               'status': 'available'
-                             }
-        restored_vm = db.restored_vm_create(cntx, restored_vm_values)    
+                              }
+        restored_vm = db.restored_vm_create(cntx, restored_vm_values)
 
         LOG.debug(_("VM Data Restore Completed"))
 
-        db.restore_update(cntx, restore_obj.id, 
-                          {'progress_msg': 'Restored VM "' + instance['vm_id'] + \
+        db.restore_update(cntx, restore_obj.id,
+                          {'progress_msg': 'Restored VM "' + instance['vm_id'] +
                                            '" data from snapshot ' + snapshot_obj.id,
                            'status': 'executing'
-                          })
+                           })
         db.restore_update(cntx, restore_obj.id,
                           {'progress_msg': 'Restored VM:' + restored_vm['vm_id'],
                            'status': 'executing'})

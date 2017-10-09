@@ -50,12 +50,12 @@ class BaseWorkloadTypeTestCase(test.TestCase):
     def test_create_delete_workload_type(self):
         """Test workload can be created and deleted."""
 
-        workload_type = self.workloadAPI.workload_type_create(self.context, 
+        workload_type = self.workloadAPI.workload_type_create(self.context,
                             'test_workload',
                             'this is a test workload_type',
                             False, {})
         workload_type_id = workload_type['id']
-        self.assertEqual(workload_type_id, 
+        self.assertEqual(workload_type_id,
                          self.db.workload_type_get(self.context,
                                                    workload_type_id).id)
 
@@ -76,7 +76,7 @@ class BaseWorkloadTypeTestCase(test.TestCase):
     def test_create_workload_type_invalid_metadata(self):
         """Test workloadtype with invalid metadata"""
 
-        workload_type = self.workloadAPI.workload_type_create(self.context, 
+        workload_type = self.workloadAPI.workload_type_create(self.context,
                             'test_workload',
                             'this is a test workload_type',
                             False, {})
@@ -92,7 +92,7 @@ class BaseWorkloadTypeTestCase(test.TestCase):
             'is_public': True,
             'metadata': {},
         }
-        self.assertEqual(workload_type_id, 
+        self.assertEqual(workload_type_id,
                          self.db.workload_type_get(self.context,
                                                    workload_type_id).id)
 
@@ -108,14 +108,14 @@ class BaseWorkloadTypeTestCase(test.TestCase):
     def test_create_workload_type_with_metadata(self):
         """Test workloadtype with invalid metadata"""
 
-        metadata  = {"key1": "value1", 
+        metadata  = {"key1": "value1",
                      "key2": "value2"}
-        workload_type = self.workloadAPI.workload_type_create(self.context, 
+        workload_type = self.workloadAPI.workload_type_create(self.context,
                             'test_workload',
                             'this is a test workload_type',
                             False, metadata)
         workload_type_id = workload_type['id']
-        self.assertEqual(workload_type_id, 
+        self.assertEqual(workload_type_id,
                          self.db.workload_type_get(self.context,
                                                    workload_type_id).id)
         workload_type = self.db.workload_type_get(self.context, workload_type_id)
@@ -128,4 +128,3 @@ class BaseWorkloadTypeTestCase(test.TestCase):
         workload_type = db.workload_type_get(self.context, workload_type_id)
         self.assertEqual(workload_type['status'], 'deleted')
 '''
-

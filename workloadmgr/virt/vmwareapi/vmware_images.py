@@ -20,8 +20,8 @@ QUEUE_BUFFER_SIZE = 10
 
 
 def start_transfer(context, read_file_handle, data_size,
-        write_file_handle=None, image_service=None, image_id=None,
-        image_meta=None):
+                   write_file_handle=None, image_service=None, image_id=None,
+                   image_meta=None):
     """Start the data transfer from the reader to the writer.
     Reader writes to the pipe and the writer reads from the pipe. This means
     that the total transfer time boils down to the slower of the read/write
@@ -50,7 +50,7 @@ def start_transfer(context, read_file_handle, data_size,
     # The GlanceWriteThread handles the same for us.
     elif image_service and image_id:
         write_thread = io_util.GlanceWriteThread(context, thread_safe_pipe,
-                image_service, image_id, image_meta)
+                                                 image_service, image_id, image_meta)
     # Start the read and write threads.
     read_event = read_thread.start()
     write_event = write_thread.start()
@@ -111,12 +111,12 @@ def fetch_image(context, image, instance, **kwargs):
     read_iter = image_service.download(context, image_id)
     read_file_handle = read_write_util.GlanceFileRead(read_iter)
     write_file_handle = read_write_util.VMwareHTTPWriteFile(
-                                kwargs.get("host"),
-                                kwargs.get("data_center_name"),
-                                kwargs.get("datastore_name"),
-                                kwargs.get("cookies"),
-                                kwargs.get("file_path"),
-                                file_size)
+        kwargs.get("host"),
+        kwargs.get("data_center_name"),
+        kwargs.get("datastore_name"),
+        kwargs.get("cookies"),
+        kwargs.get("file_path"),
+        file_size)
     start_transfer(context, read_file_handle, file_size,
                    write_file_handle=write_file_handle)
     LOG.debug(_("Downloaded image %s from glance image server") % image,
@@ -128,11 +128,11 @@ def upload_image(context, image, instance, **kwargs):
     LOG.debug(_("Uploading image %s to the Glance image server") % image,
               instance=instance)
     read_file_handle = read_write_util.VMwareHTTPReadFile(
-                                kwargs.get("host"),
-                                kwargs.get("data_center_name"),
-                                kwargs.get("datastore_name"),
-                                kwargs.get("cookies"),
-                                kwargs.get("file_path"))
+        kwargs.get("host"),
+        kwargs.get("data_center_name"),
+        kwargs.get("datastore_name"),
+        kwargs.get("cookies"),
+        kwargs.get("file_path"))
     file_size = read_file_handle.get_size()
     (image_service, image_id) = glance.get_remote_image_service(context, image)
     metadata = image_service.show(context, image_id)
@@ -145,10 +145,10 @@ def upload_image(context, image, instance, **kwargs):
                       "container_format": "bare",
                       "size": file_size,
                       "properties": {"vmware_adaptertype":
-                                            kwargs.get("adapter_type"),
+                                     kwargs.get("adapter_type"),
                                      "vmware_ostype": kwargs.get("os_type"),
                                      "vmware_image_version":
-                                            kwargs.get("image_version"),
+                                     kwargs.get("image_version"),
                                      "owner_id": instance['project_id']}}
     start_transfer(context, read_file_handle, file_size,
                    image_service=image_service,

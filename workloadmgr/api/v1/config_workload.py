@@ -36,7 +36,7 @@ class ConfigWorkloadController(wsgi.Controller):
         """Update config workload"""
         try:
             if not self.is_valid_body(body, 'jobschedule') or \
-                            self.is_valid_body(body, 'config_data') is False:
+                    self.is_valid_body(body, 'config_data') is False:
                 raise exc.HTTPBadRequest()
 
             context = req.environ['workloadmgr.context']
@@ -47,15 +47,18 @@ class ConfigWorkloadController(wsgi.Controller):
             # Validate database creds
             if config_data.get('databases', None) is not None:
                 try:
-                    for database, database_config in config_data.get('databases').iteritems():
-                        #Validate existance of required keys and their values
+                    for database, database_config in config_data.get(
+                            'databases').iteritems():
+                        # Validate existance of required keys and their values
                         for required_key in ['host', 'user', 'password']:
                             if required_key not in database_config:
                                 raise wlm_exceptions.ErrorOccurred(reason="Database"
-                                      "credentials should have host, user and password.")
-                            if str(database_config[required_key]).lower() == 'none':
-                                raise wlm_exceptions.ErrorOccurred(reason="Database " + required_key + " can not be None.")
-                except Exception as  ex:
+                                                                   "credentials should have host, user and password.")
+                            if str(
+                                    database_config[required_key]).lower() == 'none':
+                                raise wlm_exceptions.ErrorOccurred(
+                                    reason="Database " + required_key + " can not be None.")
+                except Exception as ex:
                     raise ex
 
             if config_data.get('authorized_key', None) is not None:
@@ -63,20 +66,22 @@ class ConfigWorkloadController(wsgi.Controller):
 
             existing_jobschedule = None
             try:
-                existing_config_workload = self.workload_api.get_config_workload(context)
+                existing_config_workload = self.workload_api.get_config_workload(
+                    context)
                 existing_jobschedule = existing_config_workload['jobschedule']
             except wlm_exceptions.ConfigWorkloadNotFound:
                 existing_config_workload = None
 
-            if jobschedule.get('interval', None) != None:
+            if jobschedule.get('interval', None) is not None:
                 interval = int(jobschedule.get('interval').split('hr')[0])
                 if interval < 1:
                     message = "interval should be minimum 1 hr"
                     raise wlm_exceptions.ErrorOccurred(reason=message)
 
-            if jobschedule.get('start_time', None) != None:
+            if jobschedule.get('start_time', None) is not None:
                 try:
-                    parse(datetime.now().strftime("%m/%d/%Y") + ' ' + jobschedule.get('start_time'))
+                    parse(datetime.now().strftime("%m/%d/%Y") +
+                          ' ' + jobschedule.get('start_time'))
                 except Exception as ex:
                     message = "Time should be in 'HH:MM AM/PM' or 'HH:MM' format. For ex: '09:00 PM' or '23:45'"
                     raise wlm_exceptions.ErrorOccurred(reason=message)
@@ -132,6 +137,7 @@ class ConfigWorkloadController(wsgi.Controller):
             raise error
         except Exception as error:
             raise exc.HTTPServerError(explanation=unicode(error))
+
 
 def create_resource(ext_mgr):
     return wsgi.Resource(ConfigWorkloadController(ext_mgr))

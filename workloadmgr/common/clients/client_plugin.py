@@ -61,7 +61,7 @@ default_clients_opts = [
                 help=_('Subset of trustor roles to be delegated to heat.'
                        ' If left unset, all roles of a user will be'
                        ' delegated to heat when creating a stack.')),
-    ]
+]
 
 clients_opts = [
     cfg.StrOpt('endpoint_type',
@@ -100,7 +100,7 @@ clients_opts = [
                 help=_('Subset of trustor roles to be delegated to heat.'
                        ' If left unset, all roles of a user will be'
                        ' delegated to heat when creating a stack.')),
-    ]
+]
 
 keystone_client_opts = [
     cfg.StrOpt('auth_uri',
@@ -112,7 +112,7 @@ service_opts = [
     cfg.StrOpt('region_name_for_services',
                default='RegionOne',
                help=_('Default region name used to get services endpoints.')),
-    ]
+]
 
 client_http_log_debug_opts = [
     cfg.BoolOpt('http_log_debug',

@@ -122,6 +122,7 @@ def install(domain, lazy=False):
 
 class Message(_userString.UserString, object):
     """Class used to encapsulate translatable messages."""
+
     def __init__(self, msg, domain):
         # _msg is the gettext msgid and should never change
         self._msg = msg
@@ -307,9 +308,10 @@ def get_available_languages(domain):
         return copy.copy(_AVAILABLE_LANGUAGES[domain])
 
     localedir = '%s_LOCALEDIR' % domain.upper()
-    find = lambda x: gettext.find(domain,
-                                  localedir=os.environ.get(localedir),
-                                  languages=[x])
+
+    def find(x): return gettext.find(domain,
+                                     localedir=os.environ.get(localedir),
+                                     languages=[x])
 
     # NOTE(mrodden): en_US should always be available (and first in case
     # order matters) since our in-line message strings are en_US

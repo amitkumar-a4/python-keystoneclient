@@ -164,6 +164,7 @@ class Connection(object):
     An instance of this class should never be created by users of the rpc API.
     Use rpc.create_connection() instead.
     """
+
     def close(self):
         """Close the connection.
 
@@ -279,7 +280,7 @@ def _safe_log(log_func, msg, msg_data):
                 for elem in arg[:-1]:
                     d = d[elem]
                 d[arg[-1]] = '<SANITIZED>'
-            except KeyError, e:
+            except KeyError as e:
                 LOG.info(_('Failed to sanitize %(item)s. Key error %(err)s'),
                          {'item': arg,
                           'err': e})
@@ -294,7 +295,6 @@ def _safe_log(log_func, msg, msg_data):
         return log_func(msg, '<SANITIZED>')
     else:
         return log_func(msg, msg_data)
-
 
 
 def serialize_remote_exception(failure_info, log_failure=True):
@@ -351,7 +351,8 @@ def deserialize_remote_exception(conf, data):
         return RemoteError(name, failure.get('message'), trace)
 
     ex_type = type(failure)
-    str_override = lambda self: message
+
+    def str_override(self): return message
     new_ex_type = type(ex_type.__name__ + "_Remote", (ex_type,),
                        {'__str__': str_override, '__unicode__': str_override})
     try:
@@ -419,6 +420,7 @@ class ClientException(Exception):
     hit by an RPC proxy object. Merely instantiating it records the
     current exception information, which will be passed back to the
     RPC client without exceptional logging."""
+
     def __init__(self):
         self._exc_info = sys.exc_info()
 
@@ -426,7 +428,7 @@ class ClientException(Exception):
 def catch_client_exception(exceptions, func, *args, **kwargs):
     try:
         return func(*args, **kwargs)
-    except Exception, e:
+    except Exception as e:
         if type(e) in exceptions:
             raise ClientException()
         else:

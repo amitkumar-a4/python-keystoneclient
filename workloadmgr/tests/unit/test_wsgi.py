@@ -35,15 +35,16 @@ from workloadmgr import utils
 import workloadmgr.wsgi
 
 try:
-     from oslo.config import cfg
+    from oslo.config import cfg
 except ImportError:
-     from oslo_config import cfg
+    from oslo_config import cfg
 
 
 CONF = cfg.CONF
 
 TEST_VAR_DIR = os.path.abspath(os.path.join(os.path.dirname(__file__),
-                               'var'))
+                                            'var'))
+
 
 class TestLoaderNothingExists(test.TestCase):
     """Loader tests where os.path.exists always returns False."""
@@ -91,6 +92,7 @@ document_root = /tmp
         url_parser = self.loader.load_app("test_app")
         self.assertEqual("/tmp", url_parser.directory)
 
+
 class TestWSGIServer(test.TestCase):
     """WSGI server tests."""
     def _ipv6_configured():
@@ -106,7 +108,8 @@ class TestWSGIServer(test.TestCase):
         self.assertEqual("test_app", server.name)
 
     def test_start_random_port(self):
-        server = workloadmgr.wsgi.Server("test_random_port", None, host="127.0.0.1")
+        server = workloadmgr.wsgi.Server(
+            "test_random_port", None, host="127.0.0.1")
         self.assertEqual(0, server.port)
         server.start()
         self.assertNotEqual(0, server.port)
@@ -117,8 +120,8 @@ class TestWSGIServer(test.TestCase):
                       "Test requires an IPV6 configured interface")
     def test_start_random_port_with_ipv6(self):
         server = workloadmgr.wsgi.Server("test_random_port",
-                                    None,
-                                    host="::1")
+                                         None,
+                                         host="::1")
         server.start()
         self.assertEqual("::1", server.host)
         self.assertNotEqual(0, server.port)
@@ -179,9 +182,9 @@ class TestWSGIServer(test.TestCase):
             return greetings
 
         server = workloadmgr.wsgi.Server("test_app",
-                                    hello_world,
-                                    host="::1",
-                                    port=0)
+                                         hello_world,
+                                         host="::1",
+                                         port=0)
         server.start()
 
         response = urllib2.urlopen('https://[::1]:%d/' % server.port)
@@ -225,6 +228,7 @@ class ExceptionTest(test.TestCase):
     def test_unsafe_exceptions_are_not_described_in_faults(self):
         self._do_test_exception_safety_reflected_in_faults(False)
     '''
+
     def _do_test_exception_mapping(self, exception_type, msg):
         @webob.dec.wsgify
         def fail(req):
@@ -271,7 +275,8 @@ class ExceptionTest(test.TestCase):
         resp = webob.Request.blank('/').get_response(api)
         self.assertEqual(500, resp.status_int)
 
-    @mock.patch('workloadmgr.openstack.common.gettextutils.get_localized_message')
+    @mock.patch(
+        'workloadmgr.openstack.common.gettextutils.get_localized_message')
     def test_workloadmgr_exception_with_localized_explanation(self, mock_t9n):
         msg = 'MyWorkloadNotFound'
         msg_translation = 'Mi No Encontrado'

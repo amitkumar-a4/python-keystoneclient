@@ -68,7 +68,7 @@ class Request(webob.Request):
                 content_type = self.accept.best_match(SUPPORTED_CONTENT_TYPES)
 
             self.environ['workloadmgr.best_content_type'] = (content_type or
-                                                        'application/json')
+                                                             'application/json')
 
         return self.environ['workloadmgr.best_content_type']
 
@@ -256,7 +256,7 @@ class XMLDictSerializer(DictSerializer):
         self._add_xmlns(node, has_atom)
         return node.toxml('UTF-8')
 
-    #NOTE (ameade): the has_atom should be removed after all of the
+    # NOTE (ameade): the has_atom should be removed after all of the
     # xml serializers and view builders have been updated to the current
     # spec that required all responses include the xmlns:atom, the has_atom
     # flag is to prevent current tests from breaking
@@ -276,7 +276,7 @@ class XMLDictSerializer(DictSerializer):
         if xmlns:
             result.setAttribute('xmlns', xmlns)
 
-        #TODO(bcwaldon): accomplish this without a type-check
+        # TODO(bcwaldon): accomplish this without a type-check
         if isinstance(data, list):
             collections = metadata.get('list_collections', {})
             if nodename in collections:
@@ -295,7 +295,7 @@ class XMLDictSerializer(DictSerializer):
             for item in data:
                 node = self._to_xml_node(doc, metadata, singular, item)
                 result.appendChild(node)
-        #TODO(bcwaldon): accomplish this without a type-check
+        # TODO(bcwaldon): accomplish this without a type-check
         elif isinstance(data, dict):
             collections = metadata.get('dict_collections', {})
             if nodename in collections:
@@ -842,7 +842,7 @@ class Resource(wsgi.Application):
             # No exceptions; convert action_result into a
             # ResponseObject
             resp_obj = None
-            if type(action_result) is dict or action_result is None:
+            if isinstance(action_result, dict) or action_result is None:
                 resp_obj = ResponseObject(action_result)
             elif isinstance(action_result, ResponseObject):
                 resp_obj = action_result
@@ -870,7 +870,7 @@ class Resource(wsgi.Application):
         try:
             msg_dict = dict(url=request.url, status=response.status_int)
             msg = _("%(url)s returned with HTTP %(status)d") % msg_dict
-        except AttributeError, e:
+        except AttributeError as e:
             msg_dict = dict(url=request.url, e=e)
             msg = _("%(url)s returned a fault: %(e)s") % msg_dict
 

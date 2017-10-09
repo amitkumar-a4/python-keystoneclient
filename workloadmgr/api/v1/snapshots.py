@@ -37,7 +37,6 @@ def make_snapshot(elem):
     elem.set('created_at')
     elem.set('name')
     elem.set('description')
-    
 
 
 class SnapshotTemplate(xmlutil.TemplateBuilder):
@@ -55,9 +54,11 @@ class SnapshotsTemplate(xmlutil.TemplateBuilder):
         make_snapshot(elem)
         return xmlutil.MasterTemplate(root, 1)
 
+
 def make_snapshot_restore(elem):
     elem.set('snapshot_id')
-    
+
+
 class SnapshotRestoreTemplate(xmlutil.TemplateBuilder):
     def construct(self):
         root = xmlutil.TemplateElement('restore', selector='restore')
@@ -65,6 +66,7 @@ class SnapshotRestoreTemplate(xmlutil.TemplateBuilder):
         alias = Snapshots.alias
         namespace = Snapshots.namespace
         return xmlutil.MasterTemplate(root, 1, nsmap={alias: namespace})
+
 
 class RestoreDeserializer(wsgi.MetadataXMLDeserializer):
     def default(self, string):
@@ -86,7 +88,7 @@ class SnapshotsController(wsgi.Controller):
     _view_builder_class = snapshot_views.ViewBuilder
     restore_view_builder = restore_views.ViewBuilder()
     testbubble_view_builder = testbubble_views.ViewBuilder()
-    
+
     def __init__(self, ext_mgr=None):
         self.workload_api = workloadAPI.API()
         self.ext_mgr = ext_mgr
@@ -114,8 +116,7 @@ class SnapshotsController(wsgi.Controller):
         except Exception as error:
             LOG.exception(error)
             raise exc.HTTPServerError(explanation=unicode(error))
-          
-        
+
     def delete(self, req, id, workload_id=None):
         """Delete a snapshot."""
         try:
@@ -137,8 +138,8 @@ class SnapshotsController(wsgi.Controller):
             raise error
         except Exception as error:
             LOG.exception(error)
-            raise exc.HTTPServerError(explanation=unicode(error))   
-        
+            raise exc.HTTPServerError(explanation=unicode(error))
+
     @wsgi.serializers(xml=SnapshotsTemplate)
     def index(self, req):
         """Returns a summary list of snapshots."""
@@ -155,8 +156,8 @@ class SnapshotsController(wsgi.Controller):
             raise error
         except Exception as error:
             LOG.exception(error)
-            raise exc.HTTPServerError(explanation=unicode(error))   
-        
+            raise exc.HTTPServerError(explanation=unicode(error))
+
     @wsgi.serializers(xml=SnapshotsTemplate)
     def detail(self, req):
         """Returns a detailed list of snapshots."""
@@ -173,8 +174,8 @@ class SnapshotsController(wsgi.Controller):
             raise error
         except Exception as error:
             LOG.exception(error)
-            raise exc.HTTPServerError(explanation=unicode(error))  
-        
+            raise exc.HTTPServerError(explanation=unicode(error))
+
     def _get_snapshots(self, req, is_detail):
         """Returns a list of snapshots, transformed through view builder."""
         try:
@@ -188,18 +189,19 @@ class SnapshotsController(wsgi.Controller):
             status = req.GET.get('status', None)
             get_instances = bool(req.GET.get('get_instances', False))
 
-            #verify workload exists
+            # verify workload exists
             if workload_id:
-               self.workload_api.workload_get(context, workload_id)
+                self.workload_api.workload_get(context, workload_id)
 
-            search_opts={'workload_id':workload_id,\
-                         'host':host, 'get_all':get_all,\
-                         'date_from':date_from, 'date_to':date_to, 'status':status, \
-                         'get_instances': get_instances}
-            snapshots_all = self.workload_api.snapshot_get_all(context, search_opts)
-   
+            search_opts = {'workload_id': workload_id,
+                           'host': host, 'get_all': get_all,
+                           'date_from': date_from, 'date_to': date_to, 'status': status,
+                           'get_instances': get_instances}
+            snapshots_all = self.workload_api.snapshot_get_all(
+                context, search_opts)
+
             limited_list = common.limited(snapshots_all, req)
-        
+
             if is_detail:
                 snapshots = self._view_builder.detail_list(req, snapshots_all)
             else:
@@ -221,16 +223,17 @@ class SnapshotsController(wsgi.Controller):
             elif (body and 'restore' in body):
                 name = body['restore'].get('name', "") or 'restore'
                 name = name.strip() or "restore"
-                description = body['restore'].get('description', "") or 'no-description'
+                description = body['restore'].get(
+                    'description', "") or 'no-description'
                 description = description.strip() or "no-description"
 
                 options = body['restore'].get('options', {})
             if not options:
-                options = {'type' : 'openstack'}                
-            restore = self.workload_api.snapshot_restore(context, 
-                                                         snapshot_id=id, 
+                options = {'type': 'openstack'}
+            restore = self.workload_api.snapshot_restore(context,
+                                                         snapshot_id=id,
                                                          test=test,
-                                                         name=name, 
+                                                         name=name,
                                                          description=description,
                                                          options=options)
         except exception.InvalidInput as error:
@@ -248,18 +251,19 @@ class SnapshotsController(wsgi.Controller):
     def restore(self, req, id, workload_id=None, body=None):
         try:
             test = None
-            if ('QUERY_STRING' in req.environ) :
-                qs=parse_qs(req.environ['QUERY_STRING'])
+            if ('QUERY_STRING' in req.environ):
+                qs = parse_qs(req.environ['QUERY_STRING'])
                 var = parse_qs(req.environ['QUERY_STRING'])
-                test = var.get('test',[''])[0]
+                test = var.get('test', [''])[0]
                 test = escape(test)
             if(test and test == '1'):
                 test = True
             else:
-                test = False 
-            context = req.environ['workloadmgr.context']                
+                test = False
+            context = req.environ['workloadmgr.context']
             restore = self._restore(context, id, workload_id, body, test)
-            return self.restore_view_builder.detail(req, dict(restore.iteritems()))
+            return self.restore_view_builder.detail(
+                req, dict(restore.iteritems()))
         except exc.HTTPNotFound as error:
             LOG.exception(error)
             raise error
@@ -271,16 +275,18 @@ class SnapshotsController(wsgi.Controller):
             raise error
         except Exception as error:
             LOG.exception(error)
-            raise exc.HTTPServerError(explanation=unicode(error))  
-            
+            raise exc.HTTPServerError(explanation=unicode(error))
+
     @wsgi.response(202)
     @wsgi.serializers(xml=SnapshotRestoreTemplate)
     @wsgi.deserializers(xml=RestoreDeserializer)
     def test_restore(self, req, id, workload_id=None, body=None):
         try:
-            context = req.environ['workloadmgr.context']       
-            test_restore = self._restore(context, id, workload_id, body, test=True)
-            return self.testbubble_view_builder.detail(req, dict(test_restore.iteritems()))
+            context = req.environ['workloadmgr.context']
+            test_restore = self._restore(
+                context, id, workload_id, body, test=True)
+            return self.testbubble_view_builder.detail(
+                req, dict(test_restore.iteritems()))
         except exc.HTTPNotFound as error:
             LOG.exception(error)
             raise error
@@ -292,7 +298,7 @@ class SnapshotsController(wsgi.Controller):
             raise error
         except Exception as error:
             LOG.exception(error)
-            raise exc.HTTPServerError(explanation=unicode(error))          
+            raise exc.HTTPServerError(explanation=unicode(error))
 
     def mount(self, req, id, workload_id=None, body=None):
         try:
@@ -300,7 +306,8 @@ class SnapshotsController(wsgi.Controller):
             mount_vm_id = None
             if 'mount_vm_id' in body['mount']:
                 mount_vm_id = body['mount']['mount_vm_id']
-            mounturl = self.workload_api.snapshot_mount(context, id, mount_vm_id)
+            mounturl = self.workload_api.snapshot_mount(
+                context, id, mount_vm_id)
             return mounturl
         except exc.HTTPNotFound as error:
             LOG.exception(error)
@@ -336,7 +343,7 @@ class SnapshotsController(wsgi.Controller):
         """cancel snapshot"""
         try:
             context = req.environ['workloadmgr.context']
-            self.workload_api.snapshot_cancel(context, id)     
+            self.workload_api.snapshot_cancel(context, id)
         except exc.HTTPNotFound as error:
             LOG.exception(error)
             raise error
@@ -365,7 +372,8 @@ class SnapshotsController(wsgi.Controller):
             raise error
         except Exception as error:
             LOG.exception(error)
-            raise exc.HTTPServerError(explanation=unicode(error))        
+            raise exc.HTTPServerError(explanation=unicode(error))
+
 
 def create_resource(ext_mgr):
     return wsgi.Resource(SnapshotsController(ext_mgr))

@@ -26,6 +26,7 @@ LOG = logging.getLogger(__name__)
 
 class FakeSwiftClient(object):
     """Logs calls instead of executing."""
+
     def __init__(self, *args, **kwargs):
         self.conn = self.Connection()
         pass
@@ -34,12 +35,14 @@ class FakeSwiftClient(object):
     def Connection(self, *args, **kargs):
         LOG.debug("fake FakeSwiftClient Connection")
         return FakeSwiftConnection()
-    
+
     def put_object(self, container, url, json_data):
         pass
 
+
 class FakeSwiftConnection(object):
     """Logging calls instead of executing"""
+
     def __init__(self, *args, **kwargs):
         pass
 
@@ -61,23 +64,24 @@ class FakeSwiftConnection(object):
 
     def get_account(self):
         LOG.debug("fake get_account")
-        workloads = [[{"header":"fake"}], []]
+        workloads = [[{"header": "fake"}], []]
         for dirname, dirnames, filenames in os.walk('.'):
             for subdirname in dirnames:
                 if subdirname.startswith("workload_"):
-                    workloads[1].append({"count": 15, "bytes":103079319237, "name":subdirname})       
+                    workloads[1].append(
+                        {"count": 15, "bytes": 103079319237, "name": subdirname})
         return workloads[0], workloads[1]
 
     def get_container(self, container, **kwargs):
         LOG.debug("fake get_container(%s)" % container)
-        contents = [[{"header":"fake"}], []]
+        contents = [[{"header": "fake"}], []]
         root = os.path.join("workloadmgr/tests/swift", container)
         for dirname, dirnames, filenames in os.walk(root):
             # print path to all subdirectories first.
             for filename in filenames:
                 if dirname.startswith(root):
-                    contents[1].append({"count":15, "bytes":103079319237, 
-                                        "name":os.path.join(dirname, filename).replace("workloadmgr/tests/swift/", "")})
+                    contents[1].append({"count": 15, "bytes": 103079319237,
+                                        "name": os.path.join(dirname, filename).replace("workloadmgr/tests/swift/", "")})
         return contents[0], contents[1]
 
     def head_object(self, container, name):
@@ -100,7 +104,7 @@ class FakeSwiftConnection(object):
         LOG.debug("fake put_object(%s, %s)" % (container, name))
         if container == 'socket_error_on_put':
             raise socket.error(111, 'ECONNREFUSED')
-        #put the file into container/name file system and return md5
+        # put the file into container/name file system and return md5
         return 'fake-md5-sum'
 
     def delete_object(self, container, name):
@@ -108,4 +112,3 @@ class FakeSwiftConnection(object):
         if container == 'socket_error_on_delete':
             raise socket.error(111, 'ECONNREFUSED')
         pass
-
