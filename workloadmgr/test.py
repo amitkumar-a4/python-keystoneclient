@@ -40,7 +40,7 @@ import sqlalchemy as sa
 from taskflow.persistence.backends import impl_sqlalchemy
 from oslo.config import cfg
 
-#from workloadmgr.common import config  # Need to register global_opts
+# from workloadmgr.common import config  # Need to register global_opts
 from workloadmgr.db import migration
 from workloadmgr.openstack.common.db.sqlalchemy import session
 from workloadmgr.openstack.common import log as logging
@@ -81,7 +81,7 @@ class Database(fixtures.Fixture):
         self.engine.dispose()
         conn = self.engine.connect()
         if sql_connection == "sqlite://":
-            if db_migrate.db_version() > 1: #db_migrate.INIT_VERSION:
+            if db_migrate.db_version() > 1:  # db_migrate.INIT_VERSION:
                 return
         else:
             testdb = os.path.join(CONF.state_path, sqlite_db)

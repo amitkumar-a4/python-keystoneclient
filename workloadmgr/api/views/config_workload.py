@@ -61,12 +61,13 @@ class ViewBuilder(common.ViewBuilder):
                 'retention_policy': joschedule.get('retention_policy_value'),
                 'scheduler_interval': joschedule.get('interval'),
                 'start_time': joschedule.get('start_time'),
-                }
+            }
         }
 
     def _list_view(self, func, request, workloads):
         """Provide a view for a list of openstack workloads."""
-        workloads_list = [func(request, workload)['workload'] for workload in workloads]
+        workloads_list = [func(request, workload)['workload']
+                          for workload in workloads]
         workloads_dict = dict(config_workloads=workloads_list)
 
         return workloads_dict

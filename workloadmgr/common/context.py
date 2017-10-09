@@ -174,12 +174,12 @@ class RequestContext(context.RequestContext):
         try:
             cfg.CONF.import_group('keystone_authtoken',
                                   'keystonemiddleware.auth_token')
-        except:
+        except BaseException:
             pass
 
         trustee_user_domain = 'default'
         if 'triliovault_user_domain_id' in cfg.CONF:
-           trustee_user_domain = cfg.CONF.triliovault_user_domain_id
+            trustee_user_domain = cfg.CONF.triliovault_user_domain_id
 
         if 'user_domain_id' in cfg.CONF.keystone_authtoken:
             trustee_user_domain = cfg.CONF.keystone_authtoken.user_domain_id

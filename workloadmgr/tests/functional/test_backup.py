@@ -6,7 +6,7 @@ class BackupTestCase(test.TestCase):
     """Unit test for Workload backups."""
 
     def setup(self):
-        pass 
+        pass
 
     def test_backup(self):
         pass

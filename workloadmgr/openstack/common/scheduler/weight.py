@@ -24,6 +24,7 @@ from stevedore import extension
 
 class WeighedObject(object):
     """Object with weight information."""
+
     def __init__(self, obj, weight):
         self.obj = obj
         self.weight = weight
@@ -34,6 +35,7 @@ class WeighedObject(object):
 
 class BaseWeigher(object):
     """Base class for pluggable weighers."""
+
     def _weight_multiplier(self):
         """How weighted this weigher should be.  Normally this would
         be overriden in a subclass based on a config value.

@@ -25,6 +25,7 @@ LOG = logging.getLogger(__name__)
 
 class BaseHostFilter(filter.BaseFilter):
     """Base class for host filters."""
+
     def _filter_one(self, obj, filter_properties):
         """Return True if the object passes the filter, otherwise False."""
         return self.host_passes(obj, filter_properties)

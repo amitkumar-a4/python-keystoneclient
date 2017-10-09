@@ -17,12 +17,14 @@ from workloadmgr import autolog
 LOG = logging.getLogger(__name__)
 Logger = autolog.Logger(LOG)
 
-@autolog.log_method(Logger, log_retval = False)
+
+@autolog.log_method(Logger, log_retval=False)
 def build_datastore_path(datastore_name, path):
     """Build the datastore compliant path."""
     return "[%s] %s" % (datastore_name, path)
 
-@autolog.log_method(Logger, log_retval = False)
+
+@autolog.log_method(Logger, log_retval=False)
 def split_datastore_path(datastore_path):
     """
     Split the VMware style datastore path to get the Datastore
@@ -36,7 +38,8 @@ def split_datastore_path(datastore_path):
         datastore_url, path = spl
     return datastore_url, path.strip()
 
-@autolog.log_method(Logger, log_retval = False)
+
+@autolog.log_method(Logger, log_retval=False)
 def get_vm_create_spec(client_factory, instance, data_store_name,
                        vif_infos, os_type="otherGuest"):
     """Builds the VM Create spec."""
@@ -92,7 +95,8 @@ def get_vm_create_spec(client_factory, instance, data_store_name,
 
     return config_spec
 
-@autolog.log_method(Logger, log_retval = False)
+
+@autolog.log_method(Logger, log_retval=False)
 def create_controller_spec(client_factory, key, adapter_type="lsiLogic"):
     """
     Builds a Config Spec for the LSI or Bus Logic Controller's addition
@@ -101,24 +105,25 @@ def create_controller_spec(client_factory, key, adapter_type="lsiLogic"):
     """
     # Create a controller for the Virtual Hard Disk
     virtual_device_config = client_factory.create(
-                            'ns0:VirtualDeviceConfigSpec')
+        'ns0:VirtualDeviceConfigSpec')
     virtual_device_config.operation = "add"
     if adapter_type == "busLogic":
         virtual_controller = client_factory.create(
-                                'ns0:VirtualBusLogicController')
+            'ns0:VirtualBusLogicController')
     elif adapter_type == "lsiLogicsas":
         virtual_controller = client_factory.create(
-                                'ns0:VirtualLsiLogicSASController')
+            'ns0:VirtualLsiLogicSASController')
     else:
         virtual_controller = client_factory.create(
-                                'ns0:VirtualLsiLogicController')
+            'ns0:VirtualLsiLogicController')
     virtual_controller.key = key
     virtual_controller.busNumber = 0
     virtual_controller.sharedBus = "noSharing"
     virtual_device_config.device = virtual_controller
     return virtual_device_config
 
-@autolog.log_method(Logger, log_retval = False)
+
+@autolog.log_method(Logger, log_retval=False)
 def create_network_spec(client_factory, vif_info):
     """
     Builds a config spec for the addition of a new network
@@ -153,13 +158,13 @@ def create_network_spec(client_factory, vif_info):
                                 'VirtualPortBackingInfo'])
         backing = client_factory.create(backing_name)
         portgroup = client_factory.create(
-                    'ns0:DistributedVirtualSwitchPortConnection')
+            'ns0:DistributedVirtualSwitchPortConnection')
         portgroup.switchUuid = network_ref['dvsw']
         portgroup.portgroupKey = network_ref['dvpg']
         backing.port = portgroup
     else:
         backing = client_factory.create(
-                  'ns0:VirtualEthernetCardNetworkBackingInfo')
+            'ns0:VirtualEthernetCardNetworkBackingInfo')
         backing.deviceName = network_name
 
     connectable_spec = client_factory.create('ns0:VirtualDeviceConnectInfo')
@@ -181,7 +186,8 @@ def create_network_spec(client_factory, vif_info):
     network_spec.device = net_device
     return network_spec
 
-@autolog.log_method(Logger, log_retval = False)
+
+@autolog.log_method(Logger, log_retval=False)
 def get_vmdk_attach_config_spec(client_factory,
                                 adapter_type="lsiLogic",
                                 disk_type="preallocated",
@@ -208,17 +214,23 @@ def get_vmdk_attach_config_spec(client_factory,
                                                      controller_key,
                                                      adapter_type)
             device_config_spec.append(controller_spec)
-    virtual_device_config_spec = create_virtual_disk_spec(client_factory,
-                                controller_key, disk_type, file_path,
-                                disk_size, linked_clone,
-                                unit_number, device_name)
+    virtual_device_config_spec = create_virtual_disk_spec(
+        client_factory,
+        controller_key,
+        disk_type,
+        file_path,
+        disk_size,
+        linked_clone,
+        unit_number,
+        device_name)
 
     device_config_spec.append(virtual_device_config_spec)
 
     config_spec.deviceChange = device_config_spec
     return config_spec
 
-@autolog.log_method(Logger, log_retval = False)
+
+@autolog.log_method(Logger, log_retval=False)
 def get_cdrom_attach_config_spec(client_factory,
                                  datastore,
                                  file_path,
@@ -241,7 +253,8 @@ def get_cdrom_attach_config_spec(client_factory,
     config_spec.deviceChange = device_config_spec
     return config_spec
 
-@autolog.log_method(Logger, log_retval = False)
+
+@autolog.log_method(Logger, log_retval=False)
 def get_vmdk_detach_config_spec(client_factory, device,
                                 destroy_disk=False):
     """Builds the vmdk detach config spec."""
@@ -257,7 +270,8 @@ def get_vmdk_detach_config_spec(client_factory, device,
     config_spec.deviceChange = device_config_spec
     return config_spec
 
-@autolog.log_method(Logger, log_retval = False)
+
+@autolog.log_method(Logger, log_retval=False)
 def get_vm_extra_config_spec(client_factory, extra_opts):
     """Builds extra spec fields from a dictionary."""
     config_spec = client_factory.create('ns0:VirtualMachineConfigSpec')
@@ -271,7 +285,8 @@ def get_vm_extra_config_spec(client_factory, extra_opts):
         config_spec.extraConfig = extra_config
     return config_spec
 
-@autolog.log_method(Logger, log_retval = False)
+
+@autolog.log_method(Logger, log_retval=False)
 def get_vmdk_path_and_adapter_type(hardware_devices):
     """Gets the vmdk file path and the storage adapter type."""
     if hardware_devices.__class__.__name__ == "ArrayOfVirtualDevice":
@@ -311,7 +326,8 @@ def get_vmdk_path_and_adapter_type(hardware_devices):
     return (vmdk_file_path, vmdk_controler_key, adapter_type,
             disk_type, unit_number)
 
-@autolog.log_method(Logger, log_retval = False)
+
+@autolog.log_method(Logger, log_retval=False)
 def get_disks(hardware_devices):
     """Gets ALL the vmdk file paths and the storage adapter types."""
     if hardware_devices.__class__.__name__ == "ArrayOfVirtualDevice":
@@ -327,7 +343,7 @@ def get_disks(hardware_devices):
             adapter_type_dict[device.key] = "ide"
         elif device.__class__.__name__ == "VirtualLsiLogicSASController":
             adapter_type_dict[device.key] = "lsiLogicsas"
-    
+
     disks = []
     for device in hardware_devices:
         if device.__class__.__name__ == "VirtualDisk":
@@ -339,12 +355,13 @@ def get_disks(hardware_devices):
             else:
                 device['capacityInBytes'] = device.capacityInBytes
 
-            backings = [] # using list as a stack for the disk backings            
+            backings = []  # using list as a stack for the disk backings
             if device.backing.__class__.__name__ == "VirtualDiskFlatVer2BackingInfo" or \
                device.backing.__class__.__name__ == "VirtualDiskSparseVer2BackingInfo":
                 disk['datastore_ref'] = device.backing.datastore
                 disk['vmdk_file_path'] = device.backing.fileName
-                disk['datastore_name'] = split_datastore_path(device.backing.fileName)[0]
+                disk['datastore_name'] = split_datastore_path(
+                    device.backing.fileName)[0]
                 disk['vmdk_controler_key'] = device.controllerKey
                 if getattr(device.backing, 'thinProvisioned', False):
                     disk['disk_type'] = "thin"
@@ -353,33 +370,36 @@ def get_disks(hardware_devices):
                         disk['disk_type'] = "eagerZeroedThick"
                     else:
                         disk['disk_type'] = "preallocated"
-                    
+
                 if hasattr(device.backing, 'parent'):
                     parent = device.backing.parent
                 else:
-                    parent = None                
-     
-                while (parent != None):
+                    parent = None
+
+                while (parent is not None):
                     if parent.__class__.__name__ == "VirtualDiskFlatVer2BackingInfo":
                         backing = {}
                         backing['datastore_ref'] = parent.datastore
                         backing['vmdk_file_path'] = parent.fileName
-                        backing['datastore_name'] = split_datastore_path(parent.fileName)[0]
+                        backing['datastore_name'] = split_datastore_path(parent.fileName)[
+                            0]
                         backings.append(backing)
                         if hasattr(parent, 'parent'):
                             parent = parent.parent
                         else:
-                            parent = None        
+                            parent = None
                     else:
                         break
-            disk['backings'] = backings                     
+            disk['backings'] = backings
             disk['unit_number'] = device.unitNumber
-            disk['adapter_type'] = adapter_type_dict.get(disk['vmdk_controler_key'], "")
+            disk['adapter_type'] = adapter_type_dict.get(
+                disk['vmdk_controler_key'], "")
             disks.append(disk)
 
     return disks
 
-@autolog.log_method(Logger, log_retval = False)
+
+@autolog.log_method(Logger, log_retval=False)
 def get_rdm_disk(hardware_devices, uuid):
     """Gets the RDM disk key."""
     if hardware_devices.__class__.__name__ == "ArrayOfVirtualDevice":
@@ -392,7 +412,8 @@ def get_rdm_disk(hardware_devices, uuid):
                 device.backing.lunUuid == uuid):
             return device
 
-@autolog.log_method(Logger, log_retval = False)
+
+@autolog.log_method(Logger, log_retval=False)
 def get_copy_virtual_disk_spec(client_factory, adapter_type="lsiLogic",
                                disk_type="preallocated"):
     """Builds the Virtual Disk copy spec."""
@@ -401,7 +422,8 @@ def get_copy_virtual_disk_spec(client_factory, adapter_type="lsiLogic",
     dest_spec.diskType = disk_type
     return dest_spec
 
-@autolog.log_method(Logger, log_retval = False)
+
+@autolog.log_method(Logger, log_retval=False)
 def get_vmdk_create_spec(client_factory, size_in_kb, adapter_type="lsiLogic",
                          disk_type="preallocated"):
     """Builds the virtual disk create spec."""
@@ -411,7 +433,8 @@ def get_vmdk_create_spec(client_factory, size_in_kb, adapter_type="lsiLogic",
     create_vmdk_spec.capacityKb = size_in_kb
     return create_vmdk_spec
 
-@autolog.log_method(Logger, log_retval = False)
+
+@autolog.log_method(Logger, log_retval=False)
 def get_rdm_create_spec(client_factory, device, adapter_type="lsiLogic",
                         disk_type="rdmp"):
     """Builds the RDM virtual disk create spec."""
@@ -421,7 +444,8 @@ def get_rdm_create_spec(client_factory, device, adapter_type="lsiLogic",
     create_vmdk_spec.device = device
     return create_vmdk_spec
 
-@autolog.log_method(Logger, log_retval = False)
+
+@autolog.log_method(Logger, log_retval=False)
 def create_virtual_cdrom_spec(client_factory,
                               datastore,
                               controller_key,
@@ -454,7 +478,8 @@ def create_virtual_cdrom_spec(client_factory,
     config_spec.device = cdrom
     return config_spec
 
-@autolog.log_method(Logger, log_retval = False)
+
+@autolog.log_method(Logger, log_retval=False)
 def create_virtual_disk_spec(client_factory, controller_key,
                              disk_type="preallocated",
                              file_path=None,
@@ -467,7 +492,7 @@ def create_virtual_disk_spec(client_factory, controller_key,
     Virtual Disk to the VM.
     """
     virtual_device_config = client_factory.create(
-                            'ns0:VirtualDeviceConfigSpec')
+        'ns0:VirtualDeviceConfigSpec')
     virtual_device_config.operation = "add"
     if (file_path is None) or linked_clone:
         virtual_device_config.fileOperation = "create"
@@ -476,14 +501,14 @@ def create_virtual_disk_spec(client_factory, controller_key,
 
     if disk_type == "rdm" or disk_type == "rdmp":
         disk_file_backing = client_factory.create(
-                            'ns0:VirtualDiskRawDiskMappingVer1BackingInfo')
+            'ns0:VirtualDiskRawDiskMappingVer1BackingInfo')
         disk_file_backing.compatibilityMode = "virtualMode" \
             if disk_type == "rdm" else "physicalMode"
         disk_file_backing.diskMode = "independent_persistent"
         disk_file_backing.deviceName = device_name or ""
     else:
         disk_file_backing = client_factory.create(
-                            'ns0:VirtualDiskFlatVer2BackingInfo')
+            'ns0:VirtualDiskFlatVer2BackingInfo')
         disk_file_backing.diskMode = "persistent"
         if disk_type == "thin":
             disk_file_backing.thinProvisioned = True
@@ -517,13 +542,14 @@ def create_virtual_disk_spec(client_factory, controller_key,
 
     return virtual_device_config
 
-@autolog.log_method(Logger, log_retval = False)
+
+@autolog.log_method(Logger, log_retval=False)
 def detach_virtual_disk_spec(client_factory, device, destroy_disk=False):
     """
     Builds spec for the detach of an already existing Virtual Disk from VM.
     """
     virtual_device_config = client_factory.create(
-                            'ns0:VirtualDeviceConfigSpec')
+        'ns0:VirtualDeviceConfigSpec')
     virtual_device_config.operation = "remove"
     if destroy_disk:
         virtual_device_config.fileOperation = "destroy"
@@ -531,7 +557,8 @@ def detach_virtual_disk_spec(client_factory, device, destroy_disk=False):
 
     return virtual_device_config
 
-@autolog.log_method(Logger, log_retval = False)
+
+@autolog.log_method(Logger, log_retval=False)
 def clone_vm_spec(client_factory, location,
                   power_on=False, snapshot=None, template=False):
     """Builds the VM clone spec."""
@@ -542,7 +569,8 @@ def clone_vm_spec(client_factory, location,
     clone_spec.template = template
     return clone_spec
 
-@autolog.log_method(Logger, log_retval = False)
+
+@autolog.log_method(Logger, log_retval=False)
 def relocate_vm_spec(client_factory, datastore=None, host=None,
                      disk_move_type="moveAllDiskBackingsAndAllowSharing"):
     """Builds the VM relocation spec."""
@@ -552,7 +580,8 @@ def relocate_vm_spec(client_factory, datastore=None, host=None,
     rel_spec.host = host
     return rel_spec
 
-@autolog.log_method(Logger, log_retval = False)
+
+@autolog.log_method(Logger, log_retval=False)
 def get_dummy_vm_create_spec(client_factory, name, data_store_name):
     """Builds the dummy VM create spec."""
     config_spec = client_factory.create('ns0:VirtualMachineConfigSpec')
@@ -584,11 +613,12 @@ def get_dummy_vm_create_spec(client_factory, name, data_store_name):
     config_spec.deviceChange = device_config_spec
     return config_spec
 
-@autolog.log_method(Logger, log_retval = False)
+
+@autolog.log_method(Logger, log_retval=False)
 def get_machine_id_change_spec(client_factory, machine_id_str):
     """Builds the machine id change config spec."""
     virtual_machine_config_spec = client_factory.create(
-                                  'ns0:VirtualMachineConfigSpec')
+        'ns0:VirtualMachineConfigSpec')
 
     opt = client_factory.create('ns0:OptionValue')
     opt.key = "machine.id"
@@ -596,7 +626,8 @@ def get_machine_id_change_spec(client_factory, machine_id_str):
     virtual_machine_config_spec.extraConfig = [opt]
     return virtual_machine_config_spec
 
-@autolog.log_method(Logger, log_retval = False)
+
+@autolog.log_method(Logger, log_retval=False)
 def get_add_vswitch_port_group_spec(client_factory, vswitch_name,
                                     port_group_name, vlan_id):
     """Builds the virtual switch port group add spec."""
@@ -615,11 +646,12 @@ def get_add_vswitch_port_group_spec(client_factory, vswitch_name,
     vswitch_port_group_spec.policy = policy
     return vswitch_port_group_spec
 
-@autolog.log_method(Logger, log_retval = False)
+
+@autolog.log_method(Logger, log_retval=False)
 def get_vnc_config_spec(client_factory, port, password):
     """Builds the vnc config spec."""
     virtual_machine_config_spec = client_factory.create(
-                                    'ns0:VirtualMachineConfigSpec')
+        'ns0:VirtualMachineConfigSpec')
 
     opt_enabled = client_factory.create('ns0:OptionValue')
     opt_enabled.key = "RemoteDisplay.vnc.enabled"
@@ -640,31 +672,36 @@ def get_vnc_config_spec(client_factory, port, password):
     virtual_machine_config_spec.extraConfig = extras
     return virtual_machine_config_spec
 
-@autolog.log_method(Logger, log_retval = False)
+
+@autolog.log_method(Logger, log_retval=False)
 def search_datastore_spec(client_factory, file_name):
     """Builds the datastore search spec."""
     search_spec = client_factory.create('ns0:HostDatastoreBrowserSearchSpec')
     search_spec.matchPattern = [file_name]
     return search_spec
 
-@autolog.log_method(Logger, log_retval = False)
+
+@autolog.log_method(Logger, log_retval=False)
 def _get_token(results):
     """Get the token from the property results."""
     return getattr(results, 'token', None)
 
-@autolog.log_method(Logger, log_retval = False)
+
+@autolog.log_method(Logger, log_retval=False)
 def _get_reference_for_value(results, value):
     for object in results.objects:
         if object.obj.value == value:
             return object
 
-@autolog.log_method(Logger, log_retval = False)
+
+@autolog.log_method(Logger, log_retval=False)
 def _get_object_for_value(results, value):
     for object in results.objects:
         if object.propSet[0].val == value:
             return object.obj
 
-@autolog.log_method(Logger, log_retval = False)
+
+@autolog.log_method(Logger, log_retval=False)
 def _get_object_from_results(session, results, value, func):
     while results:
         token = _get_token(results)
@@ -683,7 +720,8 @@ def _get_object_from_results(session, results, value, func):
         else:
             return None
 
-@autolog.log_method(Logger, log_retval = False)
+
+@autolog.log_method(Logger, log_retval=False)
 def _cancel_retrieve_if_necessary(session, results):
     token = _get_token(results)
     if token:
@@ -691,28 +729,31 @@ def _cancel_retrieve_if_necessary(session, results):
                                        "cancel_retrieve",
                                        token)
 
-@autolog.log_method(Logger, log_retval = False)
+
+@autolog.log_method(Logger, log_retval=False)
 def get_vm_ref_from_name(session, vm_name):
     """Get reference to the VM with the name specified."""
     vms = session._call_method(vim_util, "get_objects",
-                "VirtualMachine", ["name"])
+                               "VirtualMachine", ["name"])
     return _get_object_from_results(session, vms, vm_name,
                                     _get_object_for_value)
 
-@autolog.log_method(Logger, log_retval = False)
+
+@autolog.log_method(Logger, log_retval=False)
 def get_vm_ref_from_uuid(session, instance_uuid):
     """Get reference to the VM with the uuid specified."""
     vms = session._call_method(vim_util, "get_objects",
-                "VirtualMachine", ["config.uuid"])
+                               "VirtualMachine", ["config.uuid"])
     return _get_object_from_results(session, vms, instance_uuid,
                                     _get_object_for_value)
 
-@autolog.log_method(Logger, log_retval = False)
+
+@autolog.log_method(Logger, log_retval=False)
 def get_vm_ref_from_vmware_uuid(session, vmware_uuid):
     """Get reference to the VM with the vmware_uuid specified."""
     vm_ref = None
     vms = session._call_method(vim_util, "get_objects",
-                "VirtualMachine", ["name", "config"])
+                               "VirtualMachine", ["name", "config"])
     while vms:
         token = _get_token(vms)
         for obj_content in vms.objects:
@@ -722,12 +763,12 @@ def get_vm_ref_from_vmware_uuid(session, vmware_uuid):
             propdict = propset_dict(obj_content.propSet)
             if 'name' in propdict:
                 vm_name = propdict['name']
-            if 'config' in propdict:    
+            if 'config' in propdict:
                 vm_config = propdict['config']
                 if vm_config.instanceUuid == vmware_uuid:
                     vm_ref = obj_content.obj
                     break
-            
+
         if vm_ref:
             if token:
                 session._call_method(vim_util,
@@ -735,12 +776,14 @@ def get_vm_ref_from_vmware_uuid(session, vmware_uuid):
                                      token)
             return vm_ref
         if token:
-            vms = session._call_method(vim_util, "continue_to_get_objects", token)
+            vms = session._call_method(
+                vim_util, "continue_to_get_objects", token)
         else:
-            raise exception.VMNotFound()    
+            raise exception.VMNotFound()
     return vm_ref
 
-@autolog.log_method(Logger, log_retval = False)
+
+@autolog.log_method(Logger, log_retval=False)
 def get_vm_ref(session, instance):
     """Get reference to the VM through uuid or vm name."""
     vm_ref = get_vm_ref_from_vmware_uuid(session, instance['vmware_uuid'])
@@ -752,31 +795,34 @@ def get_vm_ref(session, instance):
         raise exception.InstanceNotFound(instance_id=instance['uuid'])
     return vm_ref
 
-@autolog.log_method(Logger, log_retval = False)
+
+@autolog.log_method(Logger, log_retval=False)
 def _get_objects_from_results(session, results, value):
     found_objects = []
     while results:
         token = _get_token(results)
         for object in results.objects:
             if object.propSet[0].val == value:
-                found_objects.append(object.obj)            
+                found_objects.append(object.obj)
         if token:
             results = session._call_method(vim_util,
                                            "continue_to_get_objects",
                                            token)
         else:
             return found_objects
-        
-    return found_objects  
-            
-@autolog.log_method(Logger, log_retval = False)
+
+    return found_objects
+
+
+@autolog.log_method(Logger, log_retval=False)
 def get_vms_ref_from_name(session, vm_name):
     """Get reference to 'ALL' the VMs with the name specified."""
     vms = session._call_method(vim_util, "get_objects",
-                "VirtualMachine", ["name"])
-    return _get_objects_from_results(session, vms, vm_name)  
+                               "VirtualMachine", ["name"])
+    return _get_objects_from_results(session, vms, vm_name)
 
-@autolog.log_method(Logger, log_retval = False)
+
+@autolog.log_method(Logger, log_retval=False)
 def get_host_ref_from_id(session, host_id, property_list=None):
     """Get a host reference object for a host_id string."""
 
@@ -784,13 +830,13 @@ def get_host_ref_from_id(session, host_id, property_list=None):
         property_list = ['name']
 
     host_refs = session._call_method(
-                    vim_util, "get_objects",
-                    "HostSystem", property_list)
+        vim_util, "get_objects",
+        "HostSystem", property_list)
     return _get_object_from_results(session, host_refs, host_id,
                                     _get_reference_for_value)
 
 
-@autolog.log_method(Logger, log_retval = False)
+@autolog.log_method(Logger, log_retval=False)
 def get_host_id_from_vm_ref(session, vm_ref):
     """
     This method allows you to find the managed object
@@ -812,8 +858,8 @@ def get_host_id_from_vm_ref(session, vm_ref):
     # property_set here, is a local representation of the
     # properties we are querying for.
     property_set = session._call_method(
-            vim_util, "get_object_properties",
-            None, vm_ref, vm_ref._type, [property_name])
+        vim_util, "get_object_properties",
+        None, vm_ref, vm_ref._type, [property_name])
 
     prop = property_from_property_set(
         property_name, property_set)
@@ -828,7 +874,8 @@ def get_host_id_from_vm_ref(session, vm_ref):
 
     return prop
 
-@autolog.log_method(Logger, log_retval = False)
+
+@autolog.log_method(Logger, log_retval=False)
 def property_from_property_set(property_name, property_set):
     '''
     Use this method to filter property collector results.
@@ -854,13 +901,15 @@ def property_from_property_set(property_name, property_set):
         if p is not None:
             return p
 
-@autolog.log_method(Logger, log_retval = False)
+
+@autolog.log_method(Logger, log_retval=False)
 def _property_from_propSet(propSet, name='name'):
     for p in propSet:
         if p.name == name:
             return p
 
-@autolog.log_method(Logger, log_retval = False)
+
+@autolog.log_method(Logger, log_retval=False)
 def get_host_ref_for_vm(session, instance, props):
     """Get the ESXi host running a VM by its name."""
 
@@ -868,26 +917,34 @@ def get_host_ref_for_vm(session, instance, props):
     host_id = get_host_id_from_vm_ref(session, vm_ref)
     return get_host_ref_from_id(session, host_id, props)
 
-@autolog.log_method(Logger, log_retval = False)
+
+@autolog.log_method(Logger, log_retval=False)
 def get_host_name_for_vm(session, instance):
     """Get the ESXi host running a VM by its name."""
     host_ref = get_host_ref_for_vm(session, instance, ['name'])
     return get_host_name_from_host_ref(host_ref)
 
-@autolog.log_method(Logger, log_retval = False)
+
+@autolog.log_method(Logger, log_retval=False)
 def get_host_name_from_host_ref(host_ref):
     p = _property_from_propSet(host_ref.propSet)
     if p is not None:
         return p.val
 
-@autolog.log_method(Logger, log_retval = False)
+
+@autolog.log_method(Logger, log_retval=False)
 def get_vm_state_from_name(session, vm_name):
     vm_ref = get_vm_ref_from_name(session, vm_name)
-    vm_state = session._call_method(vim_util, "get_dynamic_property",
-                vm_ref, "VirtualMachine", "runtime.powerState")
+    vm_state = session._call_method(
+        vim_util,
+        "get_dynamic_property",
+        vm_ref,
+        "VirtualMachine",
+        "runtime.powerState")
     return vm_state
 
-@autolog.log_method(Logger, log_retval = False)
+
+@autolog.log_method(Logger, log_retval=False)
 def get_stats_from_cluster(session, cluster):
     """Get the aggregate resource stats of a cluster."""
     cpu_info = {'vcpus': 0, 'cores': 0, 'vendor': [], 'model': []}
@@ -900,9 +957,12 @@ def get_stats_from_cluster(session, cluster):
         host_ret = prop_dict.get('host')
         if host_ret:
             host_mors = host_ret.ManagedObjectReference
-            result = session._call_method(vim_util,
-                         "get_properties_for_a_collection_of_objects",
-                         "HostSystem", host_mors, ["summary.hardware"])
+            result = session._call_method(
+                vim_util,
+                "get_properties_for_a_collection_of_objects",
+                "HostSystem",
+                host_mors,
+                ["summary.hardware"])
             for obj in result.objects:
                 hardware_summary = obj.propSet[0].val
                 # Total vcpus is the sum of all pCPUs of individual hosts
@@ -914,8 +974,12 @@ def get_stats_from_cluster(session, cluster):
 
         res_mor = prop_dict.get('resourcePool')
         if res_mor:
-            res_usage = session._call_method(vim_util, "get_dynamic_property",
-                            res_mor, "ResourcePool", "summary.runtime.memory")
+            res_usage = session._call_method(
+                vim_util,
+                "get_dynamic_property",
+                res_mor,
+                "ResourcePool",
+                "summary.runtime.memory")
             if res_usage:
                 # maxUsage is the memory limit of the cluster available to VM's
                 mem_info['total'] = int(res_usage.maxUsage / (1024 * 1024))
@@ -925,7 +989,8 @@ def get_stats_from_cluster(session, cluster):
     stats = {'cpu': cpu_info, 'mem': mem_info}
     return stats
 
-@autolog.log_method(Logger, log_retval = False)
+
+@autolog.log_method(Logger, log_retval=False)
 def get_cluster_ref_from_name(session, cluster_name):
     """Get reference to the cluster with the name specified."""
     cls = session._call_method(vim_util, "get_objects",
@@ -933,7 +998,8 @@ def get_cluster_ref_from_name(session, cluster_name):
     return _get_object_from_results(session, cls, cluster_name,
                                     _get_object_for_value)
 
-@autolog.log_method(Logger, log_retval = False)
+
+@autolog.log_method(Logger, log_retval=False)
 def get_host_ref(session, cluster=None):
     """Get reference to a host within the cluster specified."""
     if cluster is None:
@@ -953,6 +1019,7 @@ def get_host_ref(session, cluster=None):
 
     return host_mor
 
+
 def propset_dict(propset):
     """Turn a propset list into a dictionary
 
@@ -970,12 +1037,14 @@ def propset_dict(propset):
     if propset is None:
         return {}
 
-    #TODO(hartsocks): once support for Python 2.6 is dropped
+    # TODO(hartsocks): once support for Python 2.6 is dropped
     # change to {[(prop.name, prop.val) for prop in propset]}
     return dict([(prop.name, prop.val) for prop in propset])
 
-@autolog.log_method(Logger, log_retval = False)
-def _get_datastore_ref_and_name(data_stores, datastore_regex=None, datastore_moid=None):
+
+@autolog.log_method(Logger, log_retval=False)
+def _get_datastore_ref_and_name(
+        data_stores, datastore_regex=None, datastore_moid=None):
     # selects the datastore with the most freespace
     """Find a usable datastore in a given RetrieveResult object.
 
@@ -1004,8 +1073,8 @@ def _get_datastore_ref_and_name(data_stores, datastore_regex=None, datastore_moi
         ds_name = propdict['summary.name']
         if ((ds_type == 'VMFS' or ds_type == 'NFS') and
                 propdict['summary.accessible']):
-            if (datastore_moid and datastore_moid == obj_content.obj.value ) or \
-               (datastore_moid is None and (datastore_regex is None or datastore_regex.match(ds_name))):
+            if (datastore_moid and datastore_moid == obj_content.obj.value) or (
+                    datastore_moid is None and (datastore_regex is None or datastore_regex.match(ds_name))):
                 new_ds = DSRecord(
                     datastore=obj_content.obj,
                     name=ds_name,
@@ -1015,46 +1084,52 @@ def _get_datastore_ref_and_name(data_stores, datastore_regex=None, datastore_moi
                 if new_ds.freespace > found_ds.freespace:
                     found_ds = new_ds
 
-    #TODO(hartsocks): refactor driver to use DSRecord namedtuple
+    # TODO(hartsocks): refactor driver to use DSRecord namedtuple
     # using DSRecord through out will help keep related information
     # together and improve readability and organisation of the code.
     if found_ds.datastore is not None:
         return (found_ds.datastore, found_ds.name,
-                    found_ds.capacity, found_ds.freespace)
+                found_ds.capacity, found_ds.freespace)
 
-@autolog.log_method(Logger, log_retval = False)
+
+@autolog.log_method(Logger, log_retval=False)
 def get_datastore_ref_and_name(session, cluster=None, host=None,
                                datastore_regex=None, datastore_moid=None):
     """Get the datastore list and choose the first local storage."""
     if cluster is None and host is None:
-        data_stores = session._call_method(vim_util, "get_objects",
-                    "Datastore", ["summary.type", "summary.name",
-                                  "summary.capacity", "summary.freeSpace",
-                                  "summary.accessible"])
+        data_stores = session._call_method(vim_util,
+                                           "get_objects",
+                                           "Datastore",
+                                           ["summary.type",
+                                            "summary.name",
+                                            "summary.capacity",
+                                            "summary.freeSpace",
+                                            "summary.accessible"])
     else:
         if cluster is not None:
             datastore_ret = session._call_method(
-                                        vim_util,
-                                        "get_dynamic_property", cluster,
-                                        "ClusterComputeResource", "datastore")
+                vim_util,
+                "get_dynamic_property", cluster,
+                "ClusterComputeResource", "datastore")
         else:
             datastore_ret = session._call_method(
-                                        vim_util,
-                                        "get_dynamic_property", host,
-                                        "HostSystem", "datastore")
+                vim_util,
+                "get_dynamic_property", host,
+                "HostSystem", "datastore")
 
         if datastore_ret is None:
             raise exception.DatastoreNotFound()
         data_store_mors = datastore_ret.ManagedObjectReference
         data_stores = session._call_method(vim_util,
-                                "get_properties_for_a_collection_of_objects",
-                                "Datastore", data_store_mors,
-                                ["summary.type", "summary.name",
-                                 "summary.capacity", "summary.freeSpace",
-                                 "summary.accessible"])
+                                           "get_properties_for_a_collection_of_objects",
+                                           "Datastore", data_store_mors,
+                                           ["summary.type", "summary.name",
+                                            "summary.capacity", "summary.freeSpace",
+                                            "summary.accessible"])
     while data_stores:
         token = _get_token(data_stores)
-        results = _get_datastore_ref_and_name(data_stores, datastore_regex, datastore_moid)
+        results = _get_datastore_ref_and_name(
+            data_stores, datastore_regex, datastore_moid)
         if results:
             if token:
                 session._call_method(vim_util,
@@ -1068,13 +1143,14 @@ def get_datastore_ref_and_name(session, cluster=None, host=None,
         else:
             if datastore_regex:
                 raise exception.DatastoreNotFound(
-                _("Datastore regex %s did not match any datastores")
-                % datastore_regex.pattern)
+                    _("Datastore regex %s did not match any datastores")
+                    % datastore_regex.pattern)
             else:
                 raise exception.DatastoreNotFound()
     raise exception.DatastoreNotFound()
 
-@autolog.log_method(Logger, log_retval = False)
+
+@autolog.log_method(Logger, log_retval=False)
 def get_vmdk_backed_disk_uuid(hardware_devices, volume_uuid):
     if hardware_devices.__class__.__name__ == "ArrayOfVirtualDevice":
         hardware_devices = hardware_devices.VirtualDevice
@@ -1086,7 +1162,8 @@ def get_vmdk_backed_disk_uuid(hardware_devices, volume_uuid):
                 volume_uuid in device.backing.fileName):
             return device.backing.uuid
 
-@autolog.log_method(Logger, log_retval = False)
+
+@autolog.log_method(Logger, log_retval=False)
 def get_vmdk_backed_disk_device(hardware_devices, uuid):
     if hardware_devices.__class__.__name__ == "ArrayOfVirtualDevice":
         hardware_devices = hardware_devices.VirtualDevice
@@ -1098,7 +1175,8 @@ def get_vmdk_backed_disk_device(hardware_devices, uuid):
                 device.backing.uuid == uuid):
             return device
 
-@autolog.log_method(Logger, log_retval = False)
+
+@autolog.log_method(Logger, log_retval=False)
 def get_vmdk_volume_disk(hardware_devices):
     if hardware_devices.__class__.__name__ == "ArrayOfVirtualDevice":
         hardware_devices = hardware_devices.VirtualDevice
@@ -1107,7 +1185,8 @@ def get_vmdk_volume_disk(hardware_devices):
         if (device.__class__.__name__ == "VirtualDisk"):
             return device
 
-@autolog.log_method(Logger, log_retval = False)
+
+@autolog.log_method(Logger, log_retval=False)
 def get_res_pool_ref(session, cluster, node_mo_id):
     """Get the resource pool."""
     if cluster is None:
@@ -1122,50 +1201,55 @@ def get_res_pool_ref(session, cluster, node_mo_id):
         if cluster.value == node_mo_id:
             # Get the root resource pool of the cluster
             res_pool_ref = session._call_method(vim_util,
-                                                  "get_dynamic_property",
-                                                  cluster,
-                                                  "ClusterComputeResource",
-                                                  "resourcePool")
+                                                "get_dynamic_property",
+                                                cluster,
+                                                "ClusterComputeResource",
+                                                "resourcePool")
 
     return res_pool_ref
 
-@autolog.log_method(Logger, log_retval = False)
+
+@autolog.log_method(Logger, log_retval=False)
 def get_all_cluster_mors(session):
     """Get all the clusters in the vCenter."""
     try:
         results = session._call_method(vim_util, "get_objects",
-                                        "ClusterComputeResource", ["name"])
+                                       "ClusterComputeResource", ["name"])
         _cancel_retrieve_if_necessary(session, results)
         return results.objects
 
     except Exception as excep:
         LOG.warn(_("Failed to get cluster references %s") % excep)
 
-@autolog.log_method(Logger, log_retval = False)
+
+@autolog.log_method(Logger, log_retval=False)
 def get_all_res_pool_mors(session):
     """Get all the resource pools in the vCenter."""
     try:
         results = session._call_method(vim_util, "get_objects",
-                                             "ResourcePool")
+                                       "ResourcePool")
 
         _cancel_retrieve_if_necessary(session, results)
         return results.objects
     except Exception as excep:
         LOG.warn(_("Failed to get resource pool references " "%s") % excep)
 
-@autolog.log_method(Logger, log_retval = False)
+
+@autolog.log_method(Logger, log_retval=False)
 def get_dynamic_property_mor(session, mor_ref, attribute):
     """Get the value of an attribute for a given managed object."""
     return session._call_method(vim_util, "get_dynamic_property",
                                 mor_ref, mor_ref._type, attribute)
 
-@autolog.log_method(Logger, log_retval = False)
+
+@autolog.log_method(Logger, log_retval=False)
 def find_entity_mor(entity_list, entity_name):
     """Returns managed object ref for given cluster or resource pool name."""
     return [mor for mor in entity_list if (hasattr(mor, 'propSet') and
                                            mor.propSet[0].val == entity_name)]
 
-@autolog.log_method(Logger, log_retval = False)
+
+@autolog.log_method(Logger, log_retval=False)
 def get_all_cluster_refs_by_name(session, path_list):
     """Get reference to the Cluster, ResourcePool with the path specified.
 
@@ -1189,7 +1273,8 @@ def get_all_cluster_refs_by_name(session, path_list):
             list_obj.append((mor.obj, mor.propSet[0].val))
     return get_dict_mor(session, list_obj)
 
-@autolog.log_method(Logger, log_retval = False)
+
+@autolog.log_method(Logger, log_retval=False)
 def get_dict_mor(session, list_obj):
     """The input is a list of objects in the form
     (manage_object,display_name)
@@ -1225,7 +1310,8 @@ def get_dict_mor(session, list_obj):
                                         }
     return dict_mors
 
-@autolog.log_method(Logger, log_retval = False)
+
+@autolog.log_method(Logger, log_retval=False)
 def get_mo_id_from_instance(instance):
     """Return the managed object ID from the instance.
 
@@ -1237,7 +1323,8 @@ def get_mo_id_from_instance(instance):
     """
     return instance['node'].partition('(')[0]
 
-@autolog.log_method(Logger, log_retval = False)
+
+@autolog.log_method(Logger, log_retval=False)
 def get_vmdk_adapter_type(adapter_type):
     """Return the adapter type to be used in vmdk descriptor.
 

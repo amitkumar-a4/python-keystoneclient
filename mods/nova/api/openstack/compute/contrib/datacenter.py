@@ -38,7 +38,7 @@ def make_datacenter(elem):
 
     dcsElem = xmlutil.SubTemplateElement(elem, 'datastores', selector=1)
     dcElem = xmlutil.SubTemplateElement(elem, 'datastore',
-                                         selector=xmlutil.get_items)
+                                        selector=xmlutil.get_items)
     dcElem.set('name', 0)
 
     networksElem = xmlutil.SubTemplateElement(elem, 'networks', selector=1)
@@ -50,6 +50,7 @@ def make_datacenter(elem):
     svcStateElem.set('active')
     svcStateElem.set('updated_at')
 
+
 class DatacentersTemplate(xmlutil.TemplateBuilder):
     def construct(self):
         root = xmlutil.TemplateElement('Datacenters')
@@ -57,7 +58,7 @@ class DatacentersTemplate(xmlutil.TemplateBuilder):
                                                     selector='DatacenterInfo')
         make_datacenter(datacenterElem)
         return xmlutil.MasterTemplate(root, 1, nsmap={
-                                       Datacenter.alias: Datacenter.namespace})
+            Datacenter.alias: Datacenter.namespace})
 
 
 class DatacenterController(wsgi.Controller):
@@ -87,8 +88,8 @@ class DatacenterController(wsgi.Controller):
                 for service in host_services[zone + host]:
                     alive = self.servicegroup_api.service_is_up(service)
                     hosts[host][service['binary']] = {'available': alive,
-                                      'active': True != service['disabled'],
-                                      'updated_at': service['updated_at']}
+                                                      'active': True != service['disabled'],
+                                                      'updated_at': service['updated_at']}
             result.append({'zoneName': zone,
                            'zoneState': {'available': True},
                            "hosts": hosts})
@@ -115,6 +116,7 @@ class DatacenterController(wsgi.Controller):
 
         return self._describe_datacenters_verbose(context)
 
+
 class Datacenter(extensions.ExtensionDescriptor):
     """VMware Datacenter ."""
     name = "Datacenter"
@@ -126,9 +128,11 @@ class Datacenter(extensions.ExtensionDescriptor):
     def get_resources(self):
         resources = []
 
-        res = extensions.ResourceExtension('os-datacenters',
-                                       DatacenterController(),
-                                       collection_actions={'detail': 'GET'})
+        res = extensions.ResourceExtension(
+            'os-datacenters',
+            DatacenterController(),
+            collection_actions={
+                'detail': 'GET'})
         resources.append(res)
 
         return resources

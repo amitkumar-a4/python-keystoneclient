@@ -25,16 +25,16 @@ LOG = logging.getLogger(__name__)
 
 FLAGS = flags.FLAGS
 
+
 class TasksController(wsgi.Controller):
     """The tasks API controller for the workload manager API."""
 
     _view_builder_class = task_views.ViewBuilder
-    
+
     def __init__(self, ext_mgr=None):
         self.workload_api = workloadAPI.API()
         self.ext_mgr = ext_mgr
         super(TasksController, self).__init__()
- 
 
     def index(self, req, id):
         try:
@@ -55,16 +55,21 @@ class TasksController(wsgi.Controller):
             if ('QUERY_STRING' in req.environ):
                 var = parse_qs(req.environ['QUERY_STRING'])
 
-            #function to get values from query string if it's available
-            #else it will assign None
-            get_value =  lambda value: var.get(value,[None])[0] if var else None
+            # function to get values from query string if it's available
+            # else it will assign None
+            def get_value(value): return var.get(
+                value, [None])[0] if var else None
 
-            time_in_minutes = get_value(value = 'time_in_minutes')
-            status =  get_value(value = 'status')
-            page =  get_value(value = 'page')
-            size =  get_value(value = 'size')
-            tasks = self.workload_api.tasks_get(context, status=status, page=page,\
-                         size=size, time_in_minutes=time_in_minutes)
+            time_in_minutes = get_value(value='time_in_minutes')
+            status = get_value(value='status')
+            page = get_value(value='page')
+            size = get_value(value='size')
+            tasks = self.workload_api.tasks_get(
+                context,
+                status=status,
+                page=page,
+                size=size,
+                time_in_minutes=time_in_minutes)
             return self._view_builder.detail_list(req, tasks)
         except exception.TaskNotFound as error:
             LOG.exception(error)
@@ -75,4 +80,4 @@ class TasksController(wsgi.Controller):
 
 
 def create_resource(ext_mgr):
-    return wsgi.Resource(TasksController(ext_mgr)) 
+    return wsgi.Resource(TasksController(ext_mgr))

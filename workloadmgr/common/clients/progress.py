@@ -50,6 +50,7 @@ class ServerUpdateProgress(ServerCreateProgress):
     as empty tuple/dict respectively.
     Defaults are interpreted as both ``args`` and ``kwargs`` being empty.
     """
+
     def __init__(self, server_id, handler, complete=False, called=False,
                  handler_extra=None, checker_extra=None):
         super(ServerUpdateProgress, self).__init__(server_id, complete)

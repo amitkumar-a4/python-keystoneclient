@@ -251,7 +251,7 @@ class BaseWorkloadTypeCassandraTestCase(test.TestCase):
     def test_cassandra_getcassandranodes(self):
         client = paramiko.SSHClient()
         self.mox.StubOutWithMock(client, 'exec_command')
-  
+
 
         client.exec_command("nodetool status").\
             AndReturn((sys.stdin, self.statusio, sys.stderr))
@@ -277,7 +277,7 @@ class BaseWorkloadTypeCassandraTestCase(test.TestCase):
 
         self.mox.StubOutClassWithMocks(nova, 'API')
         compute_service = nova.API(production=True)
-  
+
         cassandraworkflow.connect_server(self.store['CassandraNode'],
                                          self.store['SSHPort'],
                                          self.store['Username'],
@@ -316,7 +316,7 @@ class BaseWorkloadTypeCassandraTestCase(test.TestCase):
 
         self.mox.StubOutClassWithMocks(nova, 'API')
         compute_service = nova.API(production=True)
-  
+
         cassandraworkflow.connect_server(self.store['CassandraNode'],
                                          int(self.store['SSHPort']),
                                          self.store['Username'],
@@ -349,7 +349,7 @@ class BaseWorkloadTypeCassandraTestCase(test.TestCase):
 
         self.mox.StubOutClassWithMocks(nova, 'API')
         compute_service = nova.API(production=True)
-  
+
         cassandraworkflow.connect_server(self.store['CassandraNode'],
                                          int(self.store['SSHPort']),
                                          self.store['Username'],
@@ -383,7 +383,7 @@ class BaseWorkloadTypeCassandraTestCase(test.TestCase):
         self.mox.StubOutClassWithMocks(nova, 'API')
         compute_service = nova.API(production=True)
         compute_service1 = nova.API(production=True)
-  
+
         cassandraworkflow.connect_server(self.store['CassandraNode'],
                                          int(self.store['SSHPort']),
                                          self.store['Username'],
@@ -469,12 +469,12 @@ class BaseWorkloadTypeCassandraTestCase(test.TestCase):
 
         self.mox.StubOutClassWithMocks(nova, 'API')
         compute_service = nova.API(production=True)
-        
+
         self.store['snapshot'] = tests_utils.create_snapshot(self.context,
                                       'd296c248-d206-4837-b719-0abed920281d').__dict__
         self.store['snapshot'].pop('_sa_instance_state')
         self.store['context']['read_deleted']=self.store['context']['_read_deleted']
-  
+
         cassandraworkflow.connect_server(self.store['CassandraNode'],
                                          int(self.store['SSHPort']),
                                          self.store['Username'],
@@ -539,7 +539,7 @@ class BaseWorkloadTypeCassandraTestCase(test.TestCase):
         # mock snapshot_data_size
         for inst in instances:
             vmtasks_openstack.get_snapshot_data_size(IsA(amqp.RpcContext),
-                                                     self.db, 
+                                                     self.db,
                                                      IsA(dict),
                                                      IsA(dict),
                                                      IgnoreArg()).\
@@ -551,14 +551,14 @@ class BaseWorkloadTypeCassandraTestCase(test.TestCase):
             vmtasks_openstack.upload_snapshot(IsA(amqp.RpcContext), self.db,
                                               IsA(dict), IsA(dict),
                                               IgnoreArg()).\
-                                              InAnyOrder() 
+                                              InAnyOrder()
 
         # mock post snapshot
         for inst in instances:
-            vmtasks_openstack.post_snapshot(IsA(amqp.RpcContext), self.db, 
+            vmtasks_openstack.post_snapshot(IsA(amqp.RpcContext), self.db,
                                               IsA(dict), IsA(dict),
                                               IgnoreArg()).\
-                                              InAnyOrder() 
+                                              InAnyOrder()
 
         self.mox.ReplayAll()
 
@@ -570,7 +570,7 @@ class BaseWorkloadTypeCassandraTestCase(test.TestCase):
         client = paramiko.SSHClient()
         self.mox.StubOutWithMock(client, 'exec_command')
         self.mox.StubOutWithMock(cassandraworkflow, 'connect_server')
-  
+
         cassandraworkflow.connect_server(self.store['CassandraNode'],
                                          int(self.store['SSHPort']),
                                          self.store['Username'],
@@ -590,7 +590,7 @@ class BaseWorkloadTypeCassandraTestCase(test.TestCase):
         client = paramiko.SSHClient()
         snaptask.client = client
         self.mox.StubOutWithMock(client, 'exec_command')
-  
+
         client.exec_command("nodetool clearsnapshot").\
             AndReturn((sys.stdin, self.snapshotio, sys.stderr))
 
@@ -602,7 +602,7 @@ class BaseWorkloadTypeCassandraTestCase(test.TestCase):
         snaptask = cassandraworkflow.ClearSnapshot()
         self.mox.StubOutWithMock(client, 'exec_command')
         self.mox.StubOutWithMock(cassandraworkflow, 'connect_server')
-  
+
         cassandraworkflow.connect_server(self.store['CassandraNode'],
                                          int(self.store['SSHPort']),
                                          self.store['Username'],
@@ -617,4 +617,3 @@ class BaseWorkloadTypeCassandraTestCase(test.TestCase):
                                      self.store['Username'],
                                      self.store['Password'])
 '''
-

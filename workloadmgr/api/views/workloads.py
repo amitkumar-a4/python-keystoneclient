@@ -42,7 +42,7 @@ class ViewBuilder(common.ViewBuilder):
                 'status': workload['status'],
                 'created_at': workload.get('created_at'),
                 'updated_at': workload.get('updated_at'),
-                #'storage_usage': workload['storage_usage'], 
+                #'storage_usage': workload['storage_usage'],
                 #'instances': workload['instances'],
                 'links': self._get_links(request, workload['id']),
             },
@@ -61,7 +61,7 @@ class ViewBuilder(common.ViewBuilder):
         """Detailed view of a single workload."""
         context = request.environ['workloadmgr.context']
         if api is not None:
-           workload = api.workload_show(context, workload_id=workload.id)
+            workload = api.workload_show(context, workload_id=workload.id)
         return {
             'workload': {
                 'created_at': workload.get('created_at'),
@@ -74,10 +74,10 @@ class ViewBuilder(common.ViewBuilder):
                 'name': workload.get('display_name'),
                 'description': workload.get('display_description'),
                 'interval': workload.get('hours'),
-                'storage_usage': workload.get('storage_usage'), 
+                'storage_usage': workload.get('storage_usage'),
                 'instances': workload.get('instances'),
-                'metadata' : workload.get('metadata'),                
-                'jobschedule' : workload.get('jobschedule'),                
+                'metadata': workload.get('metadata'),
+                'jobschedule': workload.get('jobschedule'),
                 'status': workload.get('status'),
                 'error_msg': workload.get('error_msg'),
                 'links': self._get_links(request, workload['id'])
@@ -86,10 +86,11 @@ class ViewBuilder(common.ViewBuilder):
 
     def _list_view(self, func, request, workloads, api=None):
         """Provide a view for a list of workloads."""
-        workloads_list = [func(request, workload, api)['workload'] for workload in workloads]
+        workloads_list = [func(request, workload, api)['workload']
+                          for workload in workloads]
         workloads_links = self._get_collection_links(request,
-                                                   workloads,
-                                                   self._collection_name)
+                                                     workloads,
+                                                     self._collection_name)
         workloads_dict = dict(workloads=workloads_list)
 
         if workloads_links:
