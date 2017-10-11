@@ -136,7 +136,7 @@ class VMwareHTTPWriteFile(VMwareHTTPFile):
             self.conn.getresponse()
         except Exception as excep:
             LOG.info(_("Exception during HTTP connection close in "
-                      "VMwareHTTPWrite. Exception is %s") % excep)
+                       "VMwareHTTPWrite. Exception is %s") % excep)
             super(VMwareHTTPWriteFile, self).close()
             raise
         super(VMwareHTTPWriteFile, self).close()
@@ -169,7 +169,7 @@ class VMwareHTTPReadFile(VMwareHTTPFile):
                         break
         finally:
             self.close()
-            
+
     def read(self, chunk_size):
         """Read a chunk of data."""
         # We are ignoring the chunk size passed for we want the pipe to hold

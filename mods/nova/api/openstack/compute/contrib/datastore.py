@@ -22,6 +22,7 @@ CONF = cfg.CONF
 
 authorize_show = extensions.extension_authorizer('compute', 'datastore:show')
 
+
 def make_datastore(elem):
     elem.set('name', 'datastore')
 
@@ -34,7 +35,7 @@ def make_datastore(elem):
 
     dcsElem = xmlutil.SubTemplateElement(elem, 'datastores', selector=1)
     dcElem = xmlutil.SubTemplateElement(elem, 'datastore',
-                                         selector=xmlutil.get_items)
+                                        selector=xmlutil.get_items)
     dcElem.set('name', 0)
 
     networksElem = xmlutil.SubTemplateElement(elem, 'networks', selector=1)
@@ -46,14 +47,15 @@ def make_datastore(elem):
     svcStateElem.set('active')
     svcStateElem.set('updated_at')
 
+
 class datastoreTemplate(xmlutil.TemplateBuilder):
     def construct(self):
         root = xmlutil.TemplateElement('datastore')
         datastoreElem = xmlutil.SubTemplateElement(root, 'datastore',
-                                                    selector='datastoreInfo')
+                                                   selector='datastoreInfo')
         make_datastore(datastoreElem)
         return xmlutil.MasterTemplate(root, 1, nsmap={
-                                       datastore.alias: datastore.namespace})
+            datastore.alias: datastore.namespace})
 
 
 class datastoreController(wsgi.Controller):
@@ -98,7 +100,7 @@ class Datastore(extensions.ExtensionDescriptor):
         resources = []
 
         res = extensions.ResourceExtension('os-datastore',
-                                       datastoreController())
+                                           datastoreController())
         resources.append(res)
 
         return resources

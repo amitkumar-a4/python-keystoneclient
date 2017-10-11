@@ -39,6 +39,7 @@ keystone_opts = [
 cfg.CONF.register_opts(keystone_opts)
 CONF = cfg.CONF
 
+
 class KeystoneClientBase(object):
     """Wrap keystone client so we can encapsulate logic used in resources.
     Note this is intended to be initialized from a resource on a per-session
@@ -72,16 +73,16 @@ class KeystoneClientBase(object):
         self.session = session.Session.construct(self._ssl_options())
         try:
             self.v3_endpoint = self.context.keystone_v3_endpoint
-        except:
-                self.v3_endpoint = None
+        except BaseException:
+            self.v3_endpoint = None
 
         try:
             if self.context.trust_id:
-               # Create a client with the specified trust_id, this
-               # populates self.context.auth_token with a trust-scoped token
-               self._client = self._v3_client_init()
-        except:
-               self._client = self._v3_client_init()
+                # Create a client with the specified trust_id, this
+                # populates self.context.auth_token with a trust-scoped token
+                self._client = self._v3_client_init()
+        except BaseException:
+            self._client = self._v3_client_init()
 
     @property
     def client(self):
@@ -100,59 +101,60 @@ class KeystoneClientBase(object):
     @property
     def nova_client(self):
         if not self._nova_client:
-           self._nova_client = self._common_client_init(nova_client=True)
+            self._nova_client = self._common_client_init(nova_client=True)
         return self._nova_client
 
     def _common_client_init(self, nova_client=False):
         try:
-            username=CONF.get('keystone_authtoken').username 
-        except:
-               username=CONF.get('keystone_authtoken').admin_user
+            username = CONF.get('keystone_authtoken').username
+        except BaseException:
+            username = CONF.get('keystone_authtoken').admin_user
         try:
-            password=CONF.get('keystone_authtoken').password 
-        except:
-               password=CONF.get('keystone_authtoken').admin_password
+            password = CONF.get('keystone_authtoken').password
+        except BaseException:
+            password = CONF.get('keystone_authtoken').admin_password
         try:
-            tenant_name=CONF.get('keystone_authtoken').admin_tenant_name
-        except:
-               project_id = context.project_id
-               context.project_id = 'Configurator'
-               tenant_name=WorkloadMgrDB().db.setting_get(context, 'service_tenant_name', get_hidden=True).value
-               context.project_id = project_id
-        auth_url=CONF.keystone_endpoint_url
-        if auth_url.find('v3') != -1:
-           username=CONF.get('nova_admin_username')
-           password=CONF.get('nova_admin_password')
-           if username == 'triliovault':
-              domain_id=CONF.get('triliovault_user_domain_id')
-           else:
-                domain_id=CONF.get('domain_name')
+            tenant_name = CONF.get('keystone_authtoken').admin_tenant_name
+        except BaseException:
+            project_id = context.project_id
+            context.project_id = 'Configurator'
+            tenant_name = WorkloadMgrDB().db.setting_get(
+                context, 'service_tenant_name', get_hidden=True).value
+            context.project_id = project_id
+        auth_url = CONF.keystone_endpoint_url
+        if CONF.keystone_auth_version == '3':
+            username = CONF.get('nova_admin_username')
+            password = CONF.get('nova_admin_password')
+            if username == 'triliovault':
+                domain_id = CONF.get('triliovault_user_domain_id')
+            else:
+                domain_id = CONF.get('domain_name')
 
-           cloud_admin_project = CONF.get('neutron_admin_tenant_name',None)
-           if nova_client is True:
-              auth = passMod.Password(auth_url=auth_url,
-                                    username=username,
-                                    password=password,
-                                    user_domain_id=domain_id,
-                                    project_name=cloud_admin_project,
-                                    project_domain_id=domain_id,
-                                    )
-           else: 
-                 auth = passMod.Password(auth_url=auth_url,
-                                    username=username,
-                                    password=password,
-                                    user_domain_id=domain_id,
-                                    domain_id=domain_id,
-                                    )
+            cloud_admin_project = CONF.get('neutron_admin_tenant_name', None)
+            if nova_client is True:
+                auth = passMod.Password(auth_url=auth_url,
+                                        username=username,
+                                        password=password,
+                                        user_domain_id=domain_id,
+                                        project_name=cloud_admin_project,
+                                        project_domain_id=domain_id,
+                                        )
+            else:
+                auth = passMod.Password(auth_url=auth_url,
+                                        username=username,
+                                        password=password,
+                                        user_domain_id=domain_id,
+                                        domain_id=domain_id,
+                                        )
         else:
-             auth = passMod.Password(auth_url=auth_url,
+            auth = passMod.Password(auth_url=auth_url,
                                     username=username,
                                     password=password,
                                     project_name=tenant_name,
                                     )
         sess = session.Session(auth=auth, verify=False)
         if nova_client is True:
-           return novaclient.Client("2", session=sess)
+            return novaclient.Client("2", session=sess)
         return client.Client(session=sess, auth_url=auth_url, insecure=True)
 
     def _v3_client_init(self):
@@ -261,20 +263,22 @@ class KeystoneClientBase(object):
     def auth_ref(self):
         return self.context.auth_plugin.get_access(self.session)
 
+
 class KeystoneClientV3(KeystoneClientBase):
 
     def __init__(self, context):
-       super(KeystoneClientV3, self).__init__(context)
+        super(KeystoneClientV3, self).__init__(context)
 
     def user_exist_in_tenant(self, project_id, user_id):
         try:
             user = self.client_instance.users.get(user_id)
             project = self.client_instance.projects.get(project_id)
-            output = self.client_instance.role_assignments.list(user=user, project=project)
+            output = self.client_instance.role_assignments.list(
+                user=user, project=project)
             if len(output) > 0:
-               return True
+                return True
             else:
-                 return False
+                return False
             #projects = self.client_instance.projects.list(user=user)
             #project_list = [project.id for project in projects]
         except Exception:
@@ -282,7 +286,8 @@ class KeystoneClientV3(KeystoneClientBase):
 
     def check_user_role(self, project_id, user_id):
         try:
-            roles = self.client_instance.roles.list(user=user_id, project=project_id)
+            roles = self.client_instance.roles.list(
+                user=user_id, project=project_id)
             trustee_role = CONF.trustee_role
             for role in roles:
                 if (trustee_role == role.name) or (role.name == 'admin'):
@@ -300,7 +305,8 @@ class KeystoneClientV3(KeystoneClientBase):
                 #user = self.client_instance.users.get(context.user_id)
                 #projects = self.client_instance.projects.list(user=user)
                 user = self.client_instance.users.get(context.user_id)
-                project_list = self.client_instance.role_assignments.list(user=user)
+                project_list = self.client_instance.role_assignments.list(
+                    user=user)
                 for proj in project_list:
                     if 'project' in proj.__dict__['scope'].keys():
                         project_id = proj.__dict__['scope']['project']['id']
@@ -314,7 +320,7 @@ class KeystoneClientV3(KeystoneClientBase):
 class KeystoneClientV2(KeystoneClientBase):
 
     def __init__(self, context):
-       super(KeystoneClientV2, self).__init__(context)
+        super(KeystoneClientV2, self).__init__(context)
 
     def user_exist_in_tenant(self, project_id, user_id):
         try:
@@ -329,7 +335,8 @@ class KeystoneClientV2(KeystoneClientBase):
 
     def check_user_role(self, project_id, user_id):
         try:
-            roles = self.client_instance.tenants.role_manager.roles_for_user(user_id, project_id)
+            roles = self.client_instance.tenants.role_manager.roles_for_user(
+                user_id, project_id)
             trustee_role = CONF.trustee_role
             for role in roles:
                 if (trustee_role == role.name) or (role.name == 'admin'):
@@ -345,6 +352,7 @@ class KeystoneClientV2(KeystoneClientBase):
         except Exception as ex:
             LOG.exception(ex)
 
+
 class KeystoneClient(object):
     """Keystone Auth Client.
     """
@@ -357,8 +365,8 @@ class KeystoneClient(object):
         return class_._instance
 
     def __init__(self, context):
-        auth_url = CONF.keystone_endpoint_url
-        if auth_url.find('v3') != -1:
+        keystone_version = CONF.keystone_auth_version
+        if keystone_version == '3':
             self.client = KeystoneClientV3(context)
         else:
             self.client = KeystoneClientV2(context)
@@ -375,7 +383,9 @@ class KeystoneClient(object):
 
     def create_flavor(self, name, ram, vcpus, disk, ephemeral=0, swap=0):
         nova = self.client.nova_client
-        return nova.flavors.create(name, ram, vcpus, disk, ephemeral=ephemeral, swap=swap)
+        return nova.flavors.create(
+            name, ram, vcpus, disk, ephemeral=ephemeral, swap=swap)
+
 
 def list_opts():
     yield None, keystone_opts

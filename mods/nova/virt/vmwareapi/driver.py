@@ -67,9 +67,9 @@ vmwareapi_opts = [
                     'vmwareapi.VMwareESXDriver or vmwareapi.VMwareVCDriver.',
                secret=True),
     cfg.MultiStrOpt('cluster_name',
-               deprecated_name='vmwareapi_cluster_name',
-               deprecated_group='DEFAULT',
-               help='Name of a VMware Cluster ComputeResource. Used only if '
+                    deprecated_name='vmwareapi_cluster_name',
+                    deprecated_group='DEFAULT',
+                    help='Name of a VMware Cluster ComputeResource. Used only if '
                     'compute_driver is vmwareapi.VMwareVCDriver.'),
     cfg.StrOpt('datastore_regex',
                help='Regex to match the name of a datastore. '
@@ -80,9 +80,9 @@ vmwareapi_opts = [
                  deprecated_name='vmwareapi_task_poll_interval',
                  deprecated_group='DEFAULT',
                  help='The interval used for polling of remote tasks. '
-                       'Used only if compute_driver is '
-                       'vmwareapi.VMwareESXDriver or '
-                       'vmwareapi.VMwareVCDriver.'),
+                 'Used only if compute_driver is '
+                 'vmwareapi.VMwareESXDriver or '
+                 'vmwareapi.VMwareVCDriver.'),
     cfg.IntOpt('session_poll_interval',
                default=300,
                help='Interval in seconds for keeping the session active'),
@@ -118,7 +118,7 @@ vmwareapi_opts = [
                 deprecated_name='use_linked_clone',
                 deprecated_group='DEFAULT',
                 help='Whether to use linked clone'),
-    ]
+]
 
 CONF = cfg.CONF
 CONF.register_opts(vmwareapi_opts, 'vmware')
@@ -149,7 +149,7 @@ class VMwareESXDriver(driver.ComputeDriver):
         super(VMwareESXDriver, self).__init__(virtapi)
         self._host_ip = CONF.vmware.host_ip
         if not (self._host_ip or CONF.vmware.host_username is None or
-                        CONF.vmware.host_password is None):
+                CONF.vmware.host_password is None):
             raise Exception(_("Must specify host_ip, "
                               "host_username "
                               "and host_password to use "
@@ -163,7 +163,7 @@ class VMwareESXDriver(driver.ComputeDriver):
         self._host = host.Host(self._session)
         self._host_state = None
 
-        #TODO(hartsocks): back-off into a configuration test module.
+        # TODO(hartsocks): back-off into a configuration test module.
         if CONF.vmware.use_linked_clone is None:
             raise error_util.UseLinkedCloneConfigurationFault()
 
@@ -216,7 +216,7 @@ class VMwareESXDriver(driver.ComputeDriver):
                     return
         """Create VM instance."""
         self._vmops.spawn(context, instance, image_meta, injected_files,
-              admin_password, network_info, block_device_info)
+                          admin_password, network_info, block_device_info)
 
     def snapshot(self, context, instance, name, update_task_state):
         """Create snapshot from a running VM instance."""
@@ -279,10 +279,10 @@ class VMwareESXDriver(driver.ComputeDriver):
         instances = self.list_instances()
         if instance['uuid'] not in instances:
             LOG.warn(_('Instance cannot be found in host, or in an unknown'
-                'state.'), instance=instance)
+                       'state.'), instance=instance)
         else:
             state = vm_util.get_vm_state_from_name(self._session,
-                instance['uuid'])
+                                                   instance['uuid'])
             ignored_states = ['poweredon', 'suspended']
 
             if state.lower() in ignored_states:
@@ -291,7 +291,7 @@ class VMwareESXDriver(driver.ComputeDriver):
         # Be as absolute as possible about getting it back into
         # a known and running state.
         self.reboot(context, instance, network_info, 'hard',
-            block_device_info)
+                    block_device_info)
 
     def poll_rebooting_instances(self, timeout, instances):
         """Poll for rebooting instances."""
@@ -347,19 +347,19 @@ class VMwareESXDriver(driver.ComputeDriver):
 
     def _get_available_resources(self, host_stats):
         return {'vcpus': host_stats['vcpus'],
-               'memory_mb': host_stats['host_memory_total'],
-               'local_gb': host_stats['disk_total'],
-               'vcpus_used': 0,
-               'memory_mb_used': host_stats['host_memory_total'] -
-                                 host_stats['host_memory_free'],
-               'local_gb_used': host_stats['disk_used'],
-               'hypervisor_type': host_stats['hypervisor_type'],
-               'hypervisor_version': host_stats['hypervisor_version'],
-               'hypervisor_hostname': host_stats['hypervisor_hostname'],
-               'cpu_info': jsonutils.dumps(host_stats['cpu_info']),
-               'supported_instances': jsonutils.dumps(
-                   host_stats['supported_instances']),
-               }
+                'memory_mb': host_stats['host_memory_total'],
+                'local_gb': host_stats['disk_total'],
+                'vcpus_used': 0,
+                'memory_mb_used': host_stats['host_memory_total'] -
+                host_stats['host_memory_free'],
+                'local_gb_used': host_stats['disk_used'],
+                'hypervisor_type': host_stats['hypervisor_type'],
+                'hypervisor_version': host_stats['hypervisor_version'],
+                'hypervisor_hostname': host_stats['hypervisor_hostname'],
+                'cpu_info': jsonutils.dumps(host_stats['cpu_info']),
+                'supported_instances': jsonutils.dumps(
+            host_stats['supported_instances']),
+        }
 
     def get_available_resource(self, nodename):
         """Retrieve resource information.
@@ -439,8 +439,8 @@ class VMwareVCDriver(VMwareESXDriver):
 
         # Get the list of clusters to be used
         self._cluster_names = CONF.vmware.cluster_name
-        self.dict_mors = vm_util.get_all_cluster_refs_by_name(self._session,
-                                          self._cluster_names)
+        self.dict_mors = vm_util.get_all_cluster_refs_by_name(
+            self._session, self._cluster_names)
         if not self.dict_mors:
             raise exception.NotFound(_("All clusters specified %s were not"
                                        " found in the vCenter")
@@ -452,16 +452,16 @@ class VMwareVCDriver(VMwareESXDriver):
         missing_clusters = set(self._cluster_names) - set(clusters_found)
         if missing_clusters:
             LOG.warn(_("The following clusters could not be found in the"
-                " vCenter %s") % list(missing_clusters))
+                       " vCenter %s") % list(missing_clusters))
 
         self._datastore_regex = None
         if CONF.vmware.datastore_regex:
             try:
                 self._datastore_regex = re.compile(CONF.vmware.datastore_regex)
             except re.error:
-                raise exception.InvalidInput(reason=
-                _("Invalid Regular Expression %s")
-                % CONF.vmware.datastore_regex)
+                raise exception.InvalidInput(
+                    reason=_("Invalid Regular Expression %s") %
+                    CONF.vmware.datastore_regex)
         # The _resources is used to maintain the vmops, volumeops and vcstate
         # objects per cluster
         self._resources = {}
@@ -543,13 +543,12 @@ class VMwareVCDriver(VMwareESXDriver):
         """
         added_nodes = set(self.dict_mors.keys()) - set(self._resource_keys)
         for node in added_nodes:
-            _volumeops = volumeops.VMwareVolumeOps(self._session,
-                                        self.dict_mors[node]['cluster_mor'],
-                                        vc_support=True)
+            _volumeops = volumeops.VMwareVolumeOps(
+                self._session, self.dict_mors[node]['cluster_mor'], vc_support=True)
             _vmops = vmops.VMwareVCVMOps(self._session, self._virtapi,
-                                       _volumeops,
-                                       self.dict_mors[node]['cluster_mor'],
-                                       datastore_regex=self._datastore_regex)
+                                         _volumeops,
+                                         self.dict_mors[node]['cluster_mor'],
+                                         datastore_regex=self._datastore_regex)
             name = self.dict_mors.get(node)['name']
             nodename = self._create_nodename(node, name)
             _vc_state = host.VCState(self._session, nodename,
@@ -558,11 +557,11 @@ class VMwareVCDriver(VMwareESXDriver):
                                          'volumeops': _volumeops,
                                          'vcstate': _vc_state,
                                          'name': name,
-                                     }
+                                         }
             self._resource_keys.add(node)
 
         deleted_nodes = (set(self._resource_keys) -
-                            set(self.dict_mors.keys()))
+                         set(self.dict_mors.keys()))
         for node in deleted_nodes:
             name = self.dict_mors.get(node)['name']
             nodename = self._create_nodename(node, name)
@@ -642,20 +641,21 @@ class VMwareVCDriver(VMwareESXDriver):
         [hypervisor_hostname].
         """
         self.dict_mors = vm_util.get_all_cluster_refs_by_name(
-                                self._session,
-                                CONF.vmware.cluster_name)
+            self._session,
+            CONF.vmware.cluster_name)
         nodes = self.dict_mors.keys()
         node_list = []
         self._update_resources()
         for node in self.dict_mors.keys():
             nodename = self._create_nodename(node,
-                                          self.dict_mors.get(node)['name'])
+                                             self.dict_mors.get(node)['name'])
             node_list.append(nodename)
         LOG.debug(_("The available nodes are: %s") % node_list)
         return node_list
 
     def macs_for_instance(self, instance):
-        # discover the mac addresses for instance and return those mac addresses
+        # discover the mac addresses for instance and return those mac
+        # addresses
         pass
 
     def get_host_stats(self, refresh=True):
@@ -676,23 +676,23 @@ class VMwareVCDriver(VMwareESXDriver):
         """Create VM instance."""
         _vmops = self._get_vmops_for_compute_node(instance['node'])
         _vmops.spawn(context, instance, image_meta, injected_files,
-              admin_password, network_info, block_device_info)
+                     admin_password, network_info, block_device_info)
 
     def attach_volume(self, context, connection_info, instance, mountpoint,
                       encryption=None):
         """Attach volume storage to VM instance."""
         _volumeops = self._get_volumeops_for_compute_node(instance['node'])
         return _volumeops.attach_volume(connection_info,
-                                             instance,
-                                             mountpoint)
+                                        instance,
+                                        mountpoint)
 
     def detach_volume(self, connection_info, instance, mountpoint,
                       encryption=None):
         """Detach volume storage to VM instance."""
         _volumeops = self._get_volumeops_for_compute_node(instance['node'])
         return _volumeops.detach_volume(connection_info,
-                                             instance,
-                                             mountpoint)
+                                        instance,
+                                        mountpoint)
 
     def get_volume_connector(self, instance):
         """Return volume connector information."""
@@ -711,7 +711,7 @@ class VMwareVCDriver(VMwareESXDriver):
         _vmops.reboot(instance, network_info)
 
     def destroy(self, instance, network_info, block_device_info=None,
-                 destroy_disks=True, context=None):
+                destroy_disks=True, context=None):
         # Skip if the instance is being created as part of import
         if 'metadata' in instance:
             for md in instance['metadata']:
@@ -823,23 +823,23 @@ class VMwareAPISession(object):
         """Creates a session with the VC/ESX host."""
 
         delay = 1
-        while True :
+        while True:
             try:
                 # Login and setup the session with the host for making
                 # API calls
                 self.vim = self._get_vim_object()
                 session = self.vim.Login(
-                               self.vim.get_service_content().sessionManager,
-                               userName=self._host_username,
-                               password=self._host_password)
+                    self.vim.get_service_content().sessionManager,
+                    userName=self._host_username,
+                    password=self._host_password)
                 # Terminate the earlier session, if possible ( For the sake of
                 # preserving sessions as there is a limit to the number of
                 # sessions we can have )
                 if self._session:
                     try:
                         self.vim.TerminateSession(
-                                self.vim.get_service_content().sessionManager,
-                                sessionId=[self._session.key])
+                            self.vim.get_service_content().sessionManager,
+                            sessionId=[self._session.key])
                     except Exception as excep:
                         # This exception is something we can live with. It is
                         # just an extra caution on our side. The session may
@@ -851,14 +851,14 @@ class VMwareAPISession(object):
                 return
             except Exception as excep:
                 LOG.critical(_("Unable to connect to server at %(server)s, "
-                    "sleeping for %(seconds)s seconds"),
-                    {'server': self._host_ip, 'seconds': delay})
+                               "sleeping for %(seconds)s seconds"),
+                             {'server': self._host_ip, 'seconds': delay})
                 time.sleep(delay)
                 delay = min(2 * delay, 60)
-                #WLM_MOD:BEGIN correct the infinite loop
+                # WLM_MOD:BEGIN correct the infinite loop
                 if delay > 17:
                     raise
-                #WLM_MOD:END
+                # WLM_MOD:END
 
     def __del__(self):
         """Logs-out the session."""
@@ -881,7 +881,7 @@ class VMwareAPISession(object):
                 break
             except Exception as e:
                 LOG.warning(_("Unable to validate session %s!"),
-                        self._session.key)
+                            self._session.key)
                 self._create_session()
         return active
 
@@ -988,7 +988,7 @@ class VMwareAPISession(object):
         """
         try:
             task_info = self._call_method(vim_util, "get_dynamic_property",
-                            task_ref, "Task", "info")
+                                          task_ref, "Task", "info")
             task_name = task_info.name
             if task_info.state in ['queued', 'running']:
                 return
@@ -1000,7 +1000,7 @@ class VMwareAPISession(object):
             else:
                 error_info = str(task_info.error.localizedMessage)
                 LOG.warn(_("Task [%(task_name)s] %(task_ref)s "
-                          "status: error %(error_info)s"),
+                           "status: error %(error_info)s"),
                          {'task_name': task_name, 'task_ref': task_ref,
                           'error_info': error_info})
                 done.send_exception(exception.NovaException(error_info))

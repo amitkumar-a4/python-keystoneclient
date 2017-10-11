@@ -27,6 +27,7 @@ def _shutdown_all():
         if pool:
             pool.shutdown()
 
+
 atexit.register(_shutdown_all)
 
 
@@ -60,8 +61,8 @@ class ThreadPool(object):
             self._threads_lock.release()
 
     def _add_thread(self, core):
-        threadname = list(set("Thread-%d" % index \
-                          for index in range(self.max_threads)) - \
+        threadname = list(set("Thread-%d" % index
+                              for index in range(self.max_threads)) -
                           set(self._threads))[0]
         t = Thread(target=self._run_jobs, args=(threadname, core,))
         t.setDaemon(True)
@@ -87,7 +88,7 @@ class ThreadPool(object):
 
             try:
                 func(*args, **kwargs)
-            except:
+            except BaseException:
                 logger.exception('Error in worker thread')
 
         self._threads_lock.acquire()

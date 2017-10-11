@@ -65,17 +65,17 @@ neutron_opts = [
                deprecated_name='quantum_ovs_bridge',
                help='Name of Integration Bridge used by Open vSwitch'),
     cfg.IntOpt('neutron_extension_sync_interval',
-                default=600,
-                deprecated_name='quantum_extension_sync_interval',
-                help='Number of seconds before querying neutron for'
-                     ' extensions'),
+               default=600,
+               deprecated_name='quantum_extension_sync_interval',
+               help='Number of seconds before querying neutron for'
+               ' extensions'),
     cfg.StrOpt('neutron_ca_certificates_file',
-                help='Location of ca certificates file to use for '
-                     'neutron client requests.'),
+               help='Location of ca certificates file to use for '
+               'neutron client requests.'),
     cfg.BoolOpt('dhcp_options_enabled',
                 default=False,
                 help='Use per-port DHCP options with Neutron'),
-    ]
+]
 
 CONF = cfg.CONF
 CONF.register_opts(neutron_opts)
@@ -229,8 +229,8 @@ class API(base.Base):
                         raise exception.PortInUse(port_id=port_id)
                     if hypervisor_macs is not None:
                         if port['mac_address'] not in hypervisor_macs:
-                            raise exception.PortNotUsable(port_id=port_id,
-                                instance=instance['display_name'])
+                            raise exception.PortNotUsable(
+                                port_id=port_id, instance=instance['display_name'])
                         else:
                             # Don't try to use this MAC if we need to create a
                             # port on the fly later. Identical MACs may be
@@ -269,7 +269,7 @@ class API(base.Base):
                     if name_match:
                         msg = (_("Multiple security groups found matching"
                                  " '%s'. Use an ID to be more specific."),
-                                 security_group)
+                               security_group)
                         raise exception.NoUniqueMatch(msg)
                     name_match = user_security_group['id']
                 if user_security_group['id'] == security_group:
@@ -316,9 +316,9 @@ class API(base.Base):
                     touched_port_ids.append(port['id'])
                 else:
                     created_port_ids.append(self._create_port(
-                            port_client, instance, network_id,
-                            port_req_body, fixed_ips.get(network_id),
-                            security_group_ids, available_macs, dhcp_opts))
+                        port_client, instance, network_id,
+                        port_req_body, fixed_ips.get(network_id),
+                        security_group_ids, available_macs, dhcp_opts))
             except Exception:
                 with excutils.save_and_reraise_exception():
                     for port_id in touched_port_ids:
@@ -351,7 +351,7 @@ class API(base.Base):
         # method.
         return network_model.NetworkInfo([port for port in nw_info
                                           if port['id'] in created_port_ids +
-                                                           touched_port_ids])
+                                          touched_port_ids])
 
     def _refresh_neutron_extensions_cache(self):
         """Refresh the neutron extensions cache when necessary."""
@@ -407,9 +407,9 @@ class API(base.Base):
                                    network_id=None, requested_ip=None,
                                    conductor_api=None):
         """Allocate a port for the instance."""
-        return self.allocate_for_instance(context, instance,
-                requested_networks=[(network_id, requested_ip, port_id)],
-                conductor_api=conductor_api)
+        return self.allocate_for_instance(
+            context, instance, requested_networks=[
+                (network_id, requested_ip, port_id)], conductor_api=conductor_api)
 
     @refresh_cache
     def deallocate_port_for_instance(self, context, instance, port_id,
@@ -483,7 +483,7 @@ class API(base.Base):
                                     'exception': ex})
 
         raise exception.NetworkNotFoundForInstance(
-                instance_id=instance['uuid'])
+            instance_id=instance['uuid'])
 
     @refresh_cache
     def remove_fixed_ip_from_instance(self, context, instance, address,
@@ -512,7 +512,7 @@ class API(base.Base):
             return
 
         raise exception.FixedIpNotFoundForSpecificInstance(
-                instance_uuid=instance['uuid'], ip=address)
+            instance_uuid=instance['uuid'], ip=address)
 
     def validate_networks(self, context, requested_networks):
         """Validate that the tenant can use the requested networks."""
@@ -526,7 +526,7 @@ class API(base.Base):
                 # make sense, as the order will be arbitrary and the guest OS
                 # won't know which to configure
                 msg = _("Multiple possible networks found, use a Network "
-                         "ID to be more specific.")
+                        "ID to be more specific.")
                 raise exception.NetworkAmbiguous(msg)
             return
 
@@ -552,7 +552,7 @@ class API(base.Base):
 
         # Now check to see if all requested networks exist
         nets = self._get_available_networks(context,
-                                context.project_id, net_ids)
+                                            context.project_id, net_ids)
 
         if len(nets) != len(net_ids):
             requsted_netid_set = set(net_ids)
@@ -947,7 +947,7 @@ class API(base.Base):
             injected=CONF.flat_injected,
             label=network_name,
             tenant_id=net['tenant_id']
-            )
+        )
         network['subnets'] = subnets
         port_profile = port.get('binding:profile')
         if port_profile:
@@ -1022,8 +1022,8 @@ class API(base.Base):
         for subnet in ipam_subnets:
             subnet_dict = {'cidr': subnet['cidr'],
                            'gateway': network_model.IP(
-                                address=subnet['gateway_ip'],
-                                type='gateway'),
+                address=subnet['gateway_ip'],
+                type='gateway'),
             }
 
             # attempt to populate DHCP server field

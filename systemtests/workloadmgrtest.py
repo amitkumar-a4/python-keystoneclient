@@ -35,6 +35,7 @@ DEFAULT_WORKLOADMGR_SERVICE_TYPE = 'workloads'
 
 logger = logging.getLogger(__name__)
 
+
 class WorkloadMgrClientArgumentParser(argparse.ArgumentParser):
 
     def __init__(self, *args, **kwargs):
@@ -47,7 +48,7 @@ class WorkloadMgrClientArgumentParser(argparse.ArgumentParser):
         exits.
         """
         self.print_usage(sys.stderr)
-        #FIXME(lzyeval): if changes occur in argparse.ArgParser._check_value
+        # FIXME(lzyeval): if changes occur in argparse.ArgParser._check_value
         choose_from = ' (choose from'
         progparts = self.prog.partition(' ')
         self.exit(2, "error: %(errmsg)s\nTry '%(mainp)s help %(subp)s'"
@@ -145,28 +146,34 @@ class WorkloadMgrTestShell(object):
         parser.add_argument('--service_name',
                             help=argparse.SUPPRESS)
 
-        parser.add_argument('--workload-service-name',
-                            metavar='<workload-service-name>',
-                            default=utils.env('WORKLOADMGR_VOLUME_SERVICE_NAME'),
-                            help='Defaults to env[WORKLOADMGR_VOLUME_SERVICE_NAME]')
+        parser.add_argument(
+            '--workload-service-name',
+            metavar='<workload-service-name>',
+            default=utils.env('WORKLOADMGR_VOLUME_SERVICE_NAME'),
+            help='Defaults to env[WORKLOADMGR_VOLUME_SERVICE_NAME]')
         parser.add_argument('--workload_service_name',
                             help=argparse.SUPPRESS)
 
-        parser.add_argument('--endpoint-type',
-                            metavar='<endpoint-type>',
-                            default=utils.env('WORKLOADMGR_ENDPOINT_TYPE',
-                            default=DEFAULT_WORKLOADMGR_ENDPOINT_TYPE),
-                            help='Defaults to env[WORKLOADMGR_ENDPOINT_TYPE] or '
-                            + DEFAULT_WORKLOADMGR_ENDPOINT_TYPE + '.')
+        parser.add_argument(
+            '--endpoint-type',
+            metavar='<endpoint-type>',
+            default=utils.env(
+                'WORKLOADMGR_ENDPOINT_TYPE',
+                default=DEFAULT_WORKLOADMGR_ENDPOINT_TYPE),
+            help='Defaults to env[WORKLOADMGR_ENDPOINT_TYPE] or ' +
+            DEFAULT_WORKLOADMGR_ENDPOINT_TYPE +
+            '.')
         parser.add_argument('--endpoint_type',
                             help=argparse.SUPPRESS)
 
-        parser.add_argument('--os-workload-api-version',
-                            metavar='<workload-api-ver>',
-                            default=utils.env('OS_WORKLOAD_API_VERSION',
-                            default=DEFAULT_OS_WORKLOAD_API_VERSION),
-                            help='Accepts 1, defaults '
-                                 'to env[OS_WORKLOAD_API_VERSION].')
+        parser.add_argument(
+            '--os-workload-api-version',
+            metavar='<workload-api-ver>',
+            default=utils.env(
+                'OS_WORKLOAD_API_VERSION',
+                default=DEFAULT_OS_WORKLOAD_API_VERSION),
+            help='Accepts 1, defaults '
+            'to env[OS_WORKLOAD_API_VERSION].')
         parser.add_argument('--os_workload_api_version',
                             help=argparse.SUPPRESS)
 
@@ -245,7 +252,7 @@ class WorkloadMgrTestShell(object):
         for name, module in itertools.chain(
                 self._discover_tests_via_test_path()):
 
-            tests.append({'module':module, 'name':name})
+            tests.append({'module': module, 'name': name})
 
         return tests
 
@@ -366,15 +373,15 @@ class WorkloadMgrTestShell(object):
 
         (os_username, os_password, os_tenant_name, os_auth_url,
          os_region_name, os_tenant_id, endpoint_type, insecure,
-         service_type, service_name, username, apikey, projectid, 
+         service_type, service_name, username, apikey, projectid,
          url, region_name, cacert) = (
-                     args.os_username, args.os_password,
-                     args.os_tenant_name, args.os_auth_url,
-                     args.os_region_name, args.os_tenant_id,
-                     args.endpoint_type, args.insecure,
-                     args.service_type, args.service_name,
-                     args.username, args.apikey, args.projectid,
-                     args.url, args.region_name, args.os_cacert)
+            args.os_username, args.os_password,
+            args.os_tenant_name, args.os_auth_url,
+            args.os_region_name, args.os_tenant_id,
+            args.endpoint_type, args.insecure,
+            args.service_type, args.service_name,
+            args.username, args.apikey, args.projectid,
+            args.url, args.region_name, args.os_cacert)
 
         if not endpoint_type:
             endpoint_type = DEFAULT_WORKLOADMGR_ENDPOINT_TYPE
@@ -383,7 +390,7 @@ class WorkloadMgrTestShell(object):
             service_type = DEFAULT_WORKLOADMGR_SERVICE_TYPE
             service_type = utils.get_service_type(args.func) or service_type
 
-        #FIXME(usrleon): Here should be restrict for project id same as
+        # FIXME(usrleon): Here should be restrict for project id same as
         # for os_username or os_password but for compatibility it is not.
 
         if not utils.isunauthenticated(args.func):
@@ -446,44 +453,45 @@ class WorkloadMgrTestShell(object):
 
         os_compute_api_version = '1.1'
         service_type = 'compute'
-        self.novaclient = novaclient.Client('1.1', # this need to dynamically set 
-                                os_username, os_password, os_tenant_name,
-                                tenant_id=os_tenant_id,
-                                auth_url=os_auth_url, insecure=insecure,
-                                region_name=os_region_name, endpoint_type=endpoint_type,
-                                extensions=self.extensions, service_type=service_type,
-                                service_name=service_name,
-                                http_log_debug=options.debug,
-                                cacert=cacert)
+        self.novaclient = novaclient.Client('1.1',  # this need to dynamically set
+                                            os_username, os_password, os_tenant_name,
+                                            tenant_id=os_tenant_id,
+                                            auth_url=os_auth_url, insecure=insecure,
+                                            region_name=os_region_name, endpoint_type=endpoint_type,
+                                            extensions=self.extensions, service_type=service_type,
+                                            service_name=service_name,
+                                            http_log_debug=options.debug,
+                                            cacert=cacert)
 
         try:
             if not utils.isunauthenticated(args.func):
                 self.cs.authenticate()
         except exc.Unauthorized:
-            raise exc.CommandError("Invalid OpenStack WorkloadMgr credentials.")
+            raise exc.CommandError(
+                "Invalid OpenStack WorkloadMgr credentials.")
         except exc.AuthorizationFailure:
             raise exc.CommandError("Unable to authorize user")
 
         for test in self._discover_tests():
             # Instantiate the test
             if test['name'] != "test61":
-               continue
+                continue
             t = getattr(test['module'], test['name'])(self)
- 
+
             print(t.description)
             try:
-               print("\tPreparing: %s" % test['name'])
-               t.prepare()
-               print("\tRunning: %s" % test['name'])
-               t.run()
-               print("\tVerifying: %s" % test['name'])
-               t.verify()
-               print("SUCCESS: %s" % test['name'])
+                print("\tPreparing: %s" % test['name'])
+                t.prepare()
+                print("\tRunning: %s" % test['name'])
+                t.run()
+                print("\tVerifying: %s" % test['name'])
+                t.verify()
+                print("SUCCESS: %s" % test['name'])
             except Exception as e:
-               print("Error running '%s': %s" % (test['name'], str(e)))
-               print("FAILED: %s" % test['name'])
+                print("Error running '%s': %s" % (test['name'], str(e)))
+                print("FAILED: %s" % test['name'])
             finally:
-               t.cleanup()
+                t.cleanup()
 
     def _run_extension_hooks(self, hook_type, *args, **kwargs):
         """Run hooks for all registered extensions."""
@@ -532,7 +540,8 @@ class OpenStackHelpFormatter(argparse.HelpFormatter):
 
 def main():
     try:
-        WorkloadMgrTestShell().invoke_workloadmgrclient(map(strutils.safe_decode, sys.argv[1:]))
+        WorkloadMgrTestShell().invoke_workloadmgrclient(
+            map(strutils.safe_decode, sys.argv[1:]))
     except KeyboardInterrupt:
         print("... terminating workloadmgr client", file=sys.stderr)
         sys.exit(130)
