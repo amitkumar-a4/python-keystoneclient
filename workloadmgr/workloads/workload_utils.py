@@ -1,4 +1,5 @@
 import os
+import json
 
 from oslo.config import cfg
 
@@ -46,9 +47,25 @@ def upload_settings_db_entry(cntx):
             if 'Password' in kvpair['key'] or 'password' in kvpair['key']:
                 kvpair['value'] = '******'
 
-    settings_jason = jsonutils.dumps(settings_db)
+    settings_json = jsonutils.dumps(settings_db)
     settings_path = os.path.join(str(CONF.cloud_unique_id), "settings_db")
-    backup_target.put_object(settings_path, settings_jason)
+    db_settings = json.loads(settings_json)
+    available_settings = []
+    for setting in db_settings:
+        available_settings.append(setting['type'])
+
+    try:
+        backend_settings = json.loads(backup_target.get_object(settings_path))
+    except Exception as ex:
+        backend_settings = []
+
+    for setting in backend_settings:
+        if setting['type'] in available_settings:
+            backend_settings.remove(setting)
+
+    db_settings.extend(backend_settings)
+    db_settings = json.dumps(db_settings)
+    backup_target.put_object(settings_path, db_settings)
 
 
 def upload_workload_db_entry(cntx, workload_id):
