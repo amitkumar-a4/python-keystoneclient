@@ -43,7 +43,7 @@ class CopyConfigFiles(task.Task):
         compute_service = nova.API(production=True)
         config_workload = db.config_workload_get(cntx)
         backend_endpoint = config_workload.backup_media_target
-        nodes = params.get('nodes',[])
+        nodes = params.get('nodes', [])
         params = copy.deepcopy(params)
         params['host'] = host
         params['target'] = target
@@ -53,11 +53,12 @@ class CopyConfigFiles(task.Task):
         if target == 'controller':
             for i in range(len(nodes)):
                 if nodes[i][1] == host:
-                    params['remote_host']  = {'hostname':nodes[i][0]}
+                    params['remote_host'] = {'hostname': nodes[i][0]}
                     nodes.pop(i)
                     break
             remote_node = params['remote_host']['hostname']
-            target_host_data = 'config_data for remote node: %s' % (remote_node)
+            target_host_data = 'config_data for remote node: %s' % (
+                remote_node)
         elif target == 'database':
             target_host_data = 'database'
 
@@ -70,15 +71,12 @@ class CopyConfigFiles(task.Task):
         params['metadata'] = metadata
 
         virtdriver = driver.load_compute_driver(None, 'libvirt.LibvirtDriver')
-        LOG.info("vast_config_backup called for backup_id: %s" %backup_id)
-        virtdriver._vast_methods_call_by_function(compute_service.vast_config_backup,
-                                                  cntx, backup_id,
-                                                  params)
+        LOG.info("vast_config_backup called for backup_id: %s" % backup_id)
+        virtdriver._vast_methods_call_by_function(
+            compute_service.vast_config_backup, cntx, backup_id, params)
         try:
-            upload_status = virtdriver._wait_for_remote_nova_process(cntx, compute_service,
-                                                                     metadata,
-                                                                     backup_id,
-                                                                     backend_endpoint)
+            upload_status = virtdriver._wait_for_remote_nova_process(
+                cntx, compute_service, metadata, backup_id, backend_endpoint)
             if upload_status is True:
                 upload_status = 'Completed'
         except Exception as ex:
@@ -139,14 +137,15 @@ def UnorderedCopyConfigFiles(backup_id, hosts, target, params):
     return flow
 
 
-def UnorderedCopyConfigFilesFromRemoteHost(backup_id, controller_nodes, target, params):
+def UnorderedCopyConfigFilesFromRemoteHost(
+        backup_id, controller_nodes, target, params):
     """
-    If list of controller nodes is more than compute nodes 
+    If list of controller nodes is more than compute nodes
     then pairing each controller node to compute nodes in  cycle
     For ex:
     cont nodes = node1, node2, node3, node4
     comp_nodes = comp1, comp2
-    In this case pairing would be 
+    In this case pairing would be
     (node1, comp1) (node2, comp2)(node3, comp1)(node4, comp2)
 
     if we have controller nodes less than or equal to
@@ -156,19 +155,24 @@ def UnorderedCopyConfigFilesFromRemoteHost(backup_id, controller_nodes, target, 
     compute_nodes = params['compute_hosts']
     target = 'controller'
 
-    nodes = zip(controller_nodes,cycle(compute_nodes)) \
+    nodes = zip(controller_nodes, cycle(compute_nodes)) \
         if len(controller_nodes) > len(compute_nodes) \
         else zip(controller_nodes, compute_nodes)
 
     params['nodes'] = nodes
     for controller_host, compute_node in nodes:
-        LOG.info("Backing controller node: %s from compute node: %s" %(controller_host,compute_node))
-        flow.add(CopyConfigFiles(name="CopyConfigFileRemoteHost_" + controller_host,
-                                 rebind={'backup_id': 'backup_id',
-                                         'host': compute_node,
-                                         'target': target,
-                                         'params': 'params'
-                                         }))
+        LOG.info(
+            "Backing controller node: %s from compute node: %s" %
+            (controller_host, compute_node))
+        flow.add(
+            CopyConfigFiles(
+                name="CopyConfigFileRemoteHost_" +
+                controller_host,
+                rebind={
+                    'backup_id': 'backup_id',
+                    'host': compute_node,
+                    'target': target,
+                    'params': 'params'}))
     return flow
 
 
@@ -193,10 +197,9 @@ class ApplyRetentionPolicy(task.Task):
 
         if len(backups) > backups_to_keep:
             for backup in backups[backups_to_keep:]:
-                LOG.info("Deleting backup %s" %backup.id)
+                LOG.info("Deleting backup %s" % backup.id)
                 workload_utils.config_backup_delete(cntx, backup.id)
 
     @autolog.log_method(Logger, 'ApplyRetentionPolicy.revert')
     def revert_with_log(self, *args, **kwargs):
         pass
-

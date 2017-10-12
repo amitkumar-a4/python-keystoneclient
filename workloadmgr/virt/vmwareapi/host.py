@@ -18,6 +18,7 @@ class Host(object):
     """
     Implements host related operations.
     """
+
     def __init__(self, session):
         self._session = session
 
@@ -27,19 +28,19 @@ class Host(object):
         LOG.debug(_("%(action)s %(host)s"), {'action': action, 'host': host})
         if action == "reboot":
             host_task = self._session._call_method(
-                                    self._session._get_vim(),
-                                    "RebootHost_Task", host_mor,
-                                    force=False)
+                self._session._get_vim(),
+                "RebootHost_Task", host_mor,
+                force=False)
         elif action == "shutdown":
             host_task = self._session._call_method(
-                                    self._session._get_vim(),
-                                    "ShutdownHost_Task", host_mor,
-                                    force=False)
+                self._session._get_vim(),
+                "ShutdownHost_Task", host_mor,
+                force=False)
         elif action == "startup":
             host_task = self._session._call_method(
-                                    self._session._get_vim(),
-                                    "PowerUpHostFromStandBy_Task", host_mor,
-                                    timeoutSec=60)
+                self._session._get_vim(),
+                "PowerUpHostFromStandBy_Task", host_mor,
+                timeoutSec=60)
         self._session._wait_for_task(host, host_task)
 
     def host_maintenance_mode(self, host, mode):
@@ -51,15 +52,15 @@ class Host(object):
                   {'host': host, 'mode': mode})
         if mode:
             host_task = self._session._call_method(
-                                    self._session._get_vim(),
-                                    "EnterMaintenanceMode_Task",
-                                    host_mor, timeout=0,
-                                    evacuatePoweredOffVms=True)
+                self._session._get_vim(),
+                "EnterMaintenanceMode_Task",
+                host_mor, timeout=0,
+                evacuatePoweredOffVms=True)
         else:
             host_task = self._session._call_method(
-                                    self._session._get_vim(),
-                                    "ExitMaintenanceMode_Task",
-                                    host_mor, timeout=0)
+                self._session._get_vim(),
+                "ExitMaintenanceMode_Task",
+                host_mor, timeout=0)
         self._session._wait_for_task(host, host_task)
 
     def set_host_enabled(self, _host, enabled):
@@ -71,6 +72,7 @@ class HostState(object):
     """Manages information about the ESX host this compute
     node is running on.
     """
+
     def __init__(self, session, host_name):
         super(HostState, self).__init__()
         self._session = session
@@ -107,18 +109,18 @@ class HostState(object):
         data = {}
         data["vcpus"] = summary.hardware.numCpuThreads
         data["cpu_info"] = \
-                {"vendor": summary.hardware.vendor,
-                 "model": summary.hardware.cpuModel,
-                 "topology": {"cores": summary.hardware.numCpuCores,
-                              "sockets": summary.hardware.numCpuPkgs,
-                              "threads": summary.hardware.numCpuThreads}
-                }
+            {"vendor": summary.hardware.vendor,
+             "model": summary.hardware.cpuModel,
+             "topology": {"cores": summary.hardware.numCpuCores,
+                          "sockets": summary.hardware.numCpuPkgs,
+                          "threads": summary.hardware.numCpuThreads}
+             }
         data["disk_total"] = ds[2] / (1024 * 1024 * 1024)
         data["disk_available"] = ds[3] / (1024 * 1024 * 1024)
         data["disk_used"] = data["disk_total"] - data["disk_available"]
         data["host_memory_total"] = summary.hardware.memorySize / (1024 * 1024)
         data["host_memory_free"] = data["host_memory_total"] - \
-                                   summary.quickStats.overallMemoryUsage
+            summary.quickStats.overallMemoryUsage
         data["hypervisor_type"] = summary.config.product.name
         data["hypervisor_version"] = summary.config.product.version
         data["hypervisor_hostname"] = self._host_name
@@ -133,6 +135,7 @@ class VCState(object):
     """Manages information about the VC host this compute
     node is running on.
     """
+
     def __init__(self, session, host_name, cluster):
         super(VCState, self).__init__()
         self._session = session

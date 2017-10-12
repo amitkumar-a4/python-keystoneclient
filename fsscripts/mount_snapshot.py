@@ -10,8 +10,11 @@ from nbd import trycmd
 import configdrive
 
 root_path = '/home/ubuntu/tvault-mounts/'
+
+
 def _(*args):
     return str(args[0])
+
 
 class log():
     def info(self, *arg):
@@ -29,21 +32,23 @@ class log():
     def critical(self, *arg):
         print arg[0]
 
+
 LOG = log()
+
 
 def getfdisk_output(mountpath=None):
     partitions = []
-    cmdspec = ["sudo", "fdisk", "-l",]
+    cmdspec = ["sudo", "fdisk", "-l", ]
     if mountpath:
         cmdspec.append(str(mountpath))
 
-    LOG.info(_( " ".join(cmdspec) ))
+    LOG.info(_(" ".join(cmdspec)))
     #stdout_value = check_output(cmdspec, stderr=subprocess.STDOUT)
     process = subprocess.Popen(cmdspec,
                                stdin=subprocess.PIPE,
                                stdout=subprocess.PIPE,
                                stderr=subprocess.PIPE,
-                               bufsize= -1,
+                               bufsize=-1,
                                close_fds=True,
                                shell=False)
 
@@ -55,7 +60,7 @@ def getfdisk_output(mountpath=None):
             fields = line.split()
             if (len(fields) == 0):
                 continue
-            index = 0;
+            index = 0
             partition["Device Name"] = fields[index]
             index += 1
             if fields[index] == "*":
@@ -82,20 +87,21 @@ def getfdisk_output(mountpath=None):
             parse = True
     return partitions
 
+
 def getgptdisk_output(mountpath=None):
     partitions = []
-    cmdspec = ["sudo", "parted", "-s",]
+    cmdspec = ["sudo", "parted", "-s", ]
     if mountpath:
         cmdspec.append(str(mountpath))
 
     cmdspec.append("print")
 
-    LOG.info(_( " ".join(cmdspec) ))
+    LOG.info(_(" ".join(cmdspec)))
     process = subprocess.Popen(cmdspec,
                                stdin=subprocess.PIPE,
                                stdout=subprocess.PIPE,
                                stderr=subprocess.PIPE,
-                               bufsize= -1,
+                               bufsize=-1,
                                close_fds=True,
                                shell=False)
 
@@ -108,7 +114,7 @@ def getgptdisk_output(mountpath=None):
                 fields = line.split()
                 if (len(fields) == 0):
                     continue
-                index = 0;
+                index = 0
                 partition["Number"] = fields[index]
                 index += 1
                 partition["start"] = fields[index]
@@ -130,7 +136,7 @@ def getgptdisk_output(mountpath=None):
                 partitions.append(partition)
 
             if "Number" in line and "Start" in line and "End" in line and \
-                "Size" in line and "File system" in line and "Flags" in line:
+                    "Size" in line and "File system" in line and "Flags" in line:
                 parse = True
     else:
         partition = {}
@@ -139,38 +145,40 @@ def getgptdisk_output(mountpath=None):
 
     return partitions
 
+
 def mountdevice(devname, mntpath):
     mountoptions = [[], ["-o", "nouuid"], ["-o", "ro"], ["-o", "ro,noload"]]
-   
+
     try:
         for opt in mountoptions:
-            cmdspec = ["sudo", "mount",]
+            cmdspec = ["sudo", "mount", ]
             cmdspec += opt
             cmdspec += [devname, mntpath]
             process = subprocess.Popen(cmdspec,
-                                   stdin=subprocess.PIPE,
-                                   stdout=subprocess.PIPE,
-                                   stderr=subprocess.PIPE,
-                                   bufsize= -1,
-                                   close_fds=True,
-                                   shell=False)
+                                       stdin=subprocess.PIPE,
+                                       stdout=subprocess.PIPE,
+                                       stderr=subprocess.PIPE,
+                                       bufsize=-1,
+                                       close_fds=True,
+                                       shell=False)
 
             stdout_value, stderr_value = process.communicate()
 
             if process.returncode == 0:
                 return
-    except:
+    except BaseException:
         pass
+
 
 def lvtodev():
     cmdspec = ["sudo", "lvs", "--noheading", "-o", "lv_path,devices"]
     process = subprocess.Popen(cmdspec,
-                         stdin=subprocess.PIPE,
-                         stdout=subprocess.PIPE,
-                         stderr=subprocess.PIPE,
-                         bufsize= -1,
-                         close_fds=True,
-                         shell=False)
+                               stdin=subprocess.PIPE,
+                               stdout=subprocess.PIPE,
+                               stderr=subprocess.PIPE,
+                               bufsize=-1,
+                               close_fds=True,
+                               shell=False)
 
     stdout_value, stderr_value = process.communicate()
 
@@ -180,37 +188,38 @@ def lvtodev():
             lv = line.split()[0]
             dev = line.split()[1].split("(")[0]
 
-            if not lv in lv2pv:
+            if lv not in lv2pv:
                 lv2pv[lv] = set([])
 
             lv2pv[lv].add(dev)
 
     return lv2pv
 
+
 def mountvolumes():
     lv2pv = lvtodev()
 
-    cmdspec = ["sudo", "vgscan",]
+    cmdspec = ["sudo", "vgscan", ]
 
-    LOG.info(_( " ".join(cmdspec) ))
+    LOG.info(_(" ".join(cmdspec)))
     process = subprocess.Popen(cmdspec,
-                          stdin=subprocess.PIPE,
-                          stdout=subprocess.PIPE,
-                          stderr=subprocess.PIPE,
-                          bufsize= -1,
-                          close_fds=True,
-                          shell=False)
+                               stdin=subprocess.PIPE,
+                               stdout=subprocess.PIPE,
+                               stderr=subprocess.PIPE,
+                               bufsize=-1,
+                               close_fds=True,
+                               shell=False)
 
     stdout_value, stderr_value = process.communicate()
 
     cmdspec = ["sudo", "lvdisplay", "-c"]
 
-    LOG.info(_( " ".join(cmdspec) ))
+    LOG.info(_(" ".join(cmdspec)))
     process = subprocess.Popen(cmdspec,
                                stdin=subprocess.PIPE,
                                stdout=subprocess.PIPE,
                                stderr=subprocess.PIPE,
-                               bufsize= -1,
+                               bufsize=-1,
                                close_fds=True,
                                shell=False)
 
@@ -240,23 +249,24 @@ def mountvolumes():
                 vmpath = os.path.join(mountspath, vmname)
                 try:
                     os.mkdir(vmpath)
-                except:
+                except BaseException:
                     pass
 
                 vgpath = os.path.join(vmpath, vgname)
                 try:
                     os.mkdir(vgpath)
-                except:
+                except BaseException:
                     pass
 
                 mntpath = os.path.join(vgpath, volume)
                 try:
                     os.mkdir(mntpath)
-                except:
+                except BaseException:
                     pass
 
                 mountdevice(lvpath, mntpath)
-                
+
+
 partitions = []
 
 vms, maps = configdrive.readconfigdrive()
@@ -273,21 +283,21 @@ for vm in vms:
     mntpath = os.path.join(mntpath, vm)
     try:
         os.mkdir(mntpath)
-    except:
+    except BaseException:
         pass
 
 for part in partitions:
     image_path = os.path.join(root_path,
-                  part["Device Name"].split("/")[2] + ".qcow2")
+                              part["Device Name"].split("/")[2] + ".qcow2")
     cmdspec = ["sudo", "qemu-img", "create", "-f", "qcow2", "-b",
                part["Device Name"],
                image_path]
-    LOG.info(_( " ".join(cmdspec) ))
+    LOG.info(_(" ".join(cmdspec)))
     process = subprocess.Popen(cmdspec,
                                stdin=subprocess.PIPE,
                                stdout=subprocess.PIPE,
                                stderr=subprocess.PIPE,
-                               bufsize= -1,
+                               bufsize=-1,
                                close_fds=True,
                                shell=False)
 
@@ -300,11 +310,11 @@ for part in partitions:
     mntpath = os.path.join(mntpath, maps[fsdevname]['vm'])
     try:
         os.mkdir(mntpath)
-    except:
+    except BaseException:
         pass
     mntpath = os.path.join(mntpath, vmdevname + str(partnumber) + ".mnt")
     os.mkdir(mntpath)
-    
+
     nbddevice = nbd(image_path, None)
     nbddevice.get_dev()
 

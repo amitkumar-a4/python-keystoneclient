@@ -48,15 +48,14 @@ class ChanceScheduler(driver.Scheduler):
         host = self._schedule(context, topic, request_spec,
                               filter_properties=filter_properties)
         snapshot_id = request_spec['snapshot_id']
-        
-        #call rpc api
-        
+
+        # call rpc api
+
     def schedule_restore(self, context, request_spec, filter_properties):
         """Picks a host that is up at random."""
         topic = FLAGS.workloads_topic
         host = self._schedule(context, topic, request_spec,
                               filter_properties=filter_properties)
         restore_id = request_spec['restore_id']
-        
-        #call rpc api        
 
+        # call rpc api

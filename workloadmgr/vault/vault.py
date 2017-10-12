@@ -54,7 +54,7 @@ Logger = autolog.Logger(LOG)
 wlm_vault_opts = [
     cfg.StrOpt('vault_storage_type',
                default='none',
-               help='Storage type: local, das, vault, nfs, swift-i, swift-s, s3'), 
+               help='Storage type: local, das, vault, nfs, swift-i, swift-s, s3'),
     # swift-i: integrated(keystone), swift-s: standalone
     cfg.StrOpt('vault_data_directory',
                default='/var/triliovault-mounts',
@@ -73,32 +73,32 @@ wlm_vault_opts = [
                help='das device /dev/sdb'),
     cfg.StrOpt('vault_swift_auth_version',
                default='KEYSTONE_V2',
-               help='KEYSTONE_V2 KEYSTONE_V3 TEMPAUTH'),                  
+               help='KEYSTONE_V2 KEYSTONE_V3 TEMPAUTH'),
     cfg.StrOpt('vault_swift_auth_url',
                default='http://localhost:5000/v2.0',
                help='Keystone Authorization URL'),
     cfg.StrOpt('vault_swift_tenant',
                default='admin',
-               help='Swift tenant'),                  
+               help='Swift tenant'),
     cfg.StrOpt('vault_swift_username',
                default='admin',
                help='Swift username'),
     cfg.StrOpt('vault_swift_password',
                default='password',
-               help='Swift password'),                                                         
+               help='Swift password'),
     cfg.StrOpt('vault_swift_container_prefix',
                default='TrilioVault',
-               help='Swift Container Prefix'), 
+               help='Swift Container Prefix'),
     cfg.StrOpt('vault_swift_segment_size',
-               #default='5368709120', 5GB
-               default='524288000', # 500MB
+               # default='5368709120', 5GB
+               default='524288000',  # 500MB
                help='Default segment size 500MB'),
     cfg.IntOpt('vault_retry_count',
                default=2,
                help='The number of times we retry on failures'),
     cfg.StrOpt('vault_swift_url_template',
                default='http://localhost:8080/v1/AUTH_%(project_id)s',
-               help='The URL of the Swift endpoint'),                                                                      
+               help='The URL of the Swift endpoint'),
     cfg.StrOpt('vault_read_chunk_size_kb',
                default=128,
                help='Read size in KB'),
@@ -107,7 +107,7 @@ wlm_vault_opts = [
                help='Write size in KB'),
     cfg.StrOpt('trustee_role',
                default='Member',
-               help='Role that trustee will impersonate'),                                                         
+               help='Role that trustee will impersonate'),
     cfg.StrOpt('triliovault_public_key',
                default='/etc/workloadmgr/triliovault.pub',
                help='Location where snapshots will be stored'),
@@ -130,6 +130,7 @@ wlm_vault_opts = [
 
 CONF = cfg.CONF
 CONF.register_opts(wlm_vault_opts)
+
 
 def run_async(func):
     """
@@ -156,11 +157,12 @@ def run_async(func):
 
     @wraps(func)
     def async_func(*args, **kwargs):
-        func_hl = Thread(target = func, args = args, kwargs = kwargs)
+        func_hl = Thread(target=func, args=args, kwargs=kwargs)
         func_hl.start()
         return func_hl
 
     return async_func
+
 
 class TrilioVaultBackupTarget(object):
 
@@ -216,7 +218,7 @@ class TrilioVaultBackupTarget(object):
     @abc.abstractmethod
     def get_workload_transfers_path(self, transfers_metadata):
         """
-        The absolute path of workload transfer file for the workload id 
+        The absolute path of workload transfer file for the workload id
         defined in transfers_metadata
         """
         raise NotImplementedError()
@@ -226,19 +228,20 @@ class TrilioVaultBackupTarget(object):
         pass
 
     @abc.abstractmethod
-    def get_snapshot_path(self, snapshot_metadata):                 
+    def get_snapshot_path(self, snapshot_metadata):
         pass
 
     @abc.abstractmethod
-    def get_snapshot_vm_path(self, snapshot_vm_metadata):                 
+    def get_snapshot_vm_path(self, snapshot_vm_metadata):
         pass
 
     @abc.abstractmethod
-    def get_snapshot_vm_resource_path(self, snapshot_vm_resource_metadata):                 
+    def get_snapshot_vm_resource_path(self, snapshot_vm_resource_metadata):
         pass
 
     @abc.abstractmethod
-    def get_snapshot_vm_disk_resource_path(self, snapshot_vm_disk_resource_metadata):
+    def get_snapshot_vm_disk_resource_path(
+            self, snapshot_vm_disk_resource_metadata):
         pass
 
     @abc.abstractmethod
@@ -246,15 +249,17 @@ class TrilioVaultBackupTarget(object):
         pass
 
     @abc.abstractmethod
-    def get_restore_vm_staging_path(self, restore_vm_metadata): 
+    def get_restore_vm_staging_path(self, restore_vm_metadata):
         pass
 
     @abc.abstractmethod
-    def get_restore_vm_resource_staging_path(self, restore_vm_resource_metadata):                 
+    def get_restore_vm_resource_staging_path(
+            self, restore_vm_resource_metadata):
         pass
 
     @abc.abstractmethod
-    def get_restore_vm_disk_resource_staging_path(self, restore_vm_disk_resource_metadata):
+    def get_restore_vm_disk_resource_staging_path(
+            self, restore_vm_disk_resource_metadata):
         pass
 
     ##
@@ -265,16 +270,19 @@ class TrilioVaultBackupTarget(object):
         shutil.rmtree(directory)
         pass
 
-    def purge_snapshot_vm_from_staging_area(self, context, snapshot_vm_metadata):
+    def purge_snapshot_vm_from_staging_area(
+            self, context, snapshot_vm_metadata):
         pass
 
-    def purge_snapshot_vm_resource_from_staging_area(self, context, snapshot_vm_resource_metadata):
+    def purge_snapshot_vm_resource_from_staging_area(
+            self, context, snapshot_vm_resource_metadata):
         pass
 
     def purge_restore_vm_from_staging_area(self, context, restore_vm_metadata):
         pass
 
-    def purge_restore_vm_resource_from_staging_area(self, context, restore_vm_resource_metadata):
+    def purge_restore_vm_resource_from_staging_area(
+            self, context, restore_vm_resource_metadata):
         pass
 
     ##
@@ -368,7 +376,7 @@ class TrilioVaultBackupTarget(object):
     @abc.abstractmethod
     def snapshot_delete(self, context, snapshot_metadata):
         pass
-  
+
     ##
     # upload workloadmgr objects metadata functions
     ##
@@ -379,6 +387,7 @@ class TrilioVaultBackupTarget(object):
     def download_metadata_from_object_store(self, context):
         return 0
 
+
 def ensure_mounted():
     '''Make sure NFS share is mounted at designated location. Otherwise
        throw exception '''
@@ -387,7 +396,7 @@ def ensure_mounted():
         def new_function(*args, **kw):
             if args[0].is_mounted() == False:
                 raise exception.InvalidNFSMountPoint(
-                    reason="'%s' is not '%s' mounted" % \
+                    reason="'%s' is not '%s' mounted" %
                            (args[0].mount_path, args[0].backup_endpoint))
 
             return func(*args, **kw)
@@ -409,25 +418,34 @@ def to_abs():
         return new_function
     return wrap
 
+
 class NfsTrilioVaultBackupTarget(TrilioVaultBackupTarget):
     def __init__(self, backupendpoint):
         if CONF.vault_storage_type == 'nfs':
-           base64encode = base64.b64encode(backupendpoint)
-           mountpath = os.path.join(CONF.vault_data_directory,
-                                 base64encode)
-           self.umount_backup_target_swift()
-           fileutils.ensure_tree(mountpath)
-           self.__mountpath = mountpath
-           super(NfsTrilioVaultBackupTarget, self).__init__(backupendpoint, "nfs",
-                                                         mountpath=mountpath)
-           if not self.is_mounted():
-              utils.chmod(mountpath, '0777')
+            base64encode = base64.b64encode(backupendpoint)
+            mountpath = os.path.join(CONF.vault_data_directory,
+                                     base64encode)
+            self.umount_backup_target_swift()
+            fileutils.ensure_tree(mountpath)
+            self.__mountpath = mountpath
+            super(
+                NfsTrilioVaultBackupTarget,
+                self).__init__(
+                backupendpoint,
+                "nfs",
+                mountpath=mountpath)
+            if not self.is_mounted():
+                utils.chmod(mountpath, '0777')
 
         elif CONF.vault_storage_type == 'swift-s':
-             mountpath = CONF.vault_data_directory
-             self.__mountpath = mountpath
-             super(NfsTrilioVaultBackupTarget, self).__init__(backupendpoint, "swift-s",
-                                                         mountpath=mountpath)
+            mountpath = CONF.vault_data_directory
+            self.__mountpath = mountpath
+            super(
+                NfsTrilioVaultBackupTarget,
+                self).__init__(
+                backupendpoint,
+                "swift-s",
+                mountpath=mountpath)
 
     def get_progress_tracker_directory(self, tracker_metadata):
         """
@@ -435,8 +453,9 @@ class NfsTrilioVaultBackupTarget(TrilioVaultBackupTarget):
         object is a file on NFS. It can be object in object store
         """
         mountpath = self.mount_path
-        progress_tracker_directory = os.path.join(mountpath,
-            "contego_tasks", 'snapshot_%s' % (tracker_metadata['snapshot_id']))
+        progress_tracker_directory = os.path.join(
+            mountpath, "contego_tasks", 'snapshot_%s' %
+            (tracker_metadata['snapshot_id']))
 
         fileutils.ensure_tree(progress_tracker_directory)
         utils.chmod(progress_tracker_directory, '0777')
@@ -446,14 +465,15 @@ class NfsTrilioVaultBackupTarget(TrilioVaultBackupTarget):
         """
         Get the path of the tracker object based on the tracker matadata.
         """
-        progress_tracker_directory = self.get_progress_tracker_directory(tracker_metadata)
+        progress_tracker_directory = self.get_progress_tracker_directory(
+            tracker_metadata)
         if progress_tracker_directory:
             progress_tracking_file_path = os.path.join(
                 progress_tracker_directory,
-                tracker_metadata['resource_id'])    
+                tracker_metadata['resource_id'])
             return progress_tracking_file_path
         else:
-            return None      
+            return None
 
     def get_workload_transfers_directory(self):
         """
@@ -469,58 +489,70 @@ class NfsTrilioVaultBackupTarget(TrilioVaultBackupTarget):
 
     def get_workload_transfers_path(self, transfers_metadata):
         """
-        The absolute path of workload transfer file for the workload id 
+        The absolute path of workload transfer file for the workload id
         defined in transfers_metadata
         """
         workload_transfers_directory = self.get_workload_transfers_directory()
         if workload_transfers_directory:
             workload_transfers_file_path = os.path.join(
                 workload_transfers_directory,
-                transfers_metadata['workload_id'])    
+                transfers_metadata['workload_id'])
             return workload_transfers_file_path
         else:
             return None
 
     @ensure_mounted()
     def get_workload_path(self, workload_metadata):
-        workload_path = os.path.join(self.mount_path,
-            'workload_%s' % (workload_metadata['workload_id']))
+        workload_path = os.path.join(
+            self.mount_path, 'workload_%s' %
+            (workload_metadata['workload_id']))
         return workload_path
- 
+
     @ensure_mounted()
     def get_config_workload_path(self):
-        config_workload_path = os.path.join(self.mount_path, CONF.cloud_unique_id, 'config_workload')
+        config_workload_path = os.path.join(
+            self.mount_path, CONF.cloud_unique_id, 'config_workload')
         return config_workload_path
- 
+
     def get_config_backup_path(self, backup_id):
         workload_path = self.get_config_workload_path()
         backup_path = os.path.join(workload_path, 'backup_%s' % (backup_id))
         return backup_path
- 
-    def get_snapshot_path(self, snapshot_metadata):                 
+
+    def get_snapshot_path(self, snapshot_metadata):
         workload_path = self.get_workload_path(snapshot_metadata)
-        snapshot_path = os.path.join(workload_path,
-                            'snapshot_%s' % (snapshot_metadata['snapshot_id']))
+        snapshot_path = os.path.join(
+            workload_path, 'snapshot_%s' %
+            (snapshot_metadata['snapshot_id']))
         return snapshot_path
 
-    def get_snapshot_vm_path(self, snapshot_vm_metadata):                 
+    def get_snapshot_vm_path(self, snapshot_vm_metadata):
         snapshot_path = self.get_snapshot_path(snapshot_vm_metadata)
-        snapshot_vm_path = os.path.join(snapshot_path,
-            'vm_id_%s' % (snapshot_vm_metadata['snapshot_vm_id']))
+        snapshot_vm_path = os.path.join(
+            snapshot_path, 'vm_id_%s' %
+            (snapshot_vm_metadata['snapshot_vm_id']))
         return snapshot_vm_path
 
-    def get_snapshot_vm_resource_path(self, snapshot_vm_resource_metadata):                 
-        snapshot_vm_path = self.get_snapshot_vm_path(snapshot_vm_resource_metadata)
-        snapshot_vm_resource_path = os.path.join(snapshot_vm_path,
-            'vm_res_id_%s_%s' % (snapshot_vm_resource_metadata['snapshot_vm_resource_id'], 
-            snapshot_vm_resource_metadata['snapshot_vm_resource_name'].replace(' ','')))
+    def get_snapshot_vm_resource_path(self, snapshot_vm_resource_metadata):
+        snapshot_vm_path = self.get_snapshot_vm_path(
+            snapshot_vm_resource_metadata)
+        snapshot_vm_resource_path = os.path.join(
+            snapshot_vm_path,
+            'vm_res_id_%s_%s' %
+            (snapshot_vm_resource_metadata['snapshot_vm_resource_id'],
+             snapshot_vm_resource_metadata['snapshot_vm_resource_name'].replace(
+                ' ',
+                '')))
 
-        return snapshot_vm_resource_path    
+        return snapshot_vm_resource_path
 
-    def get_snapshot_vm_disk_resource_path(self, snapshot_vm_disk_resource_metadata):
+    def get_snapshot_vm_disk_resource_path(
+            self, snapshot_vm_disk_resource_metadata):
         snapshot_vm_resource_path = \
-            self.get_snapshot_vm_resource_path(snapshot_vm_disk_resource_metadata)
-        snapshot_vm_disk_resource_path = os.path.join(snapshot_vm_resource_path,
+            self.get_snapshot_vm_resource_path(
+                snapshot_vm_disk_resource_metadata)
+        snapshot_vm_disk_resource_path = os.path.join(
+            snapshot_vm_resource_path,
             snapshot_vm_disk_resource_metadata['vm_disk_resource_snap_id'])
 
         return snapshot_vm_disk_resource_path
@@ -529,26 +561,38 @@ class NfsTrilioVaultBackupTarget(TrilioVaultBackupTarget):
         vault_data_directory = os.path.join(self.mount_path,
                                             "staging",
                                             socket.gethostname())
-        restore_staging_path = os.path.join(vault_data_directory,
-            'restore_%s' % (restore_metadata['restore_id']))
+        restore_staging_path = os.path.join(
+            vault_data_directory, 'restore_%s' %
+            (restore_metadata['restore_id']))
         return restore_staging_path
 
-    def get_restore_vm_staging_path(self, restore_vm_metadata): 
-        restore_staging_path = self.get_restore_staging_path(restore_vm_metadata)
-        restore_vm_staging_path = os.path.join(restore_staging_path,
-            'vm_id_%s' % (restore_vm_metadata['snapshot_vm_id']))
+    def get_restore_vm_staging_path(self, restore_vm_metadata):
+        restore_staging_path = self.get_restore_staging_path(
+            restore_vm_metadata)
+        restore_vm_staging_path = os.path.join(
+            restore_staging_path, 'vm_id_%s' %
+            (restore_vm_metadata['snapshot_vm_id']))
         return restore_vm_staging_path
 
-    def get_restore_vm_resource_staging_path(self, restore_vm_resource_metadata):                 
-        restore_vm_staging_path = self.get_restore_vm_staging_path(restore_vm_resource_metadata)
-        restore_vm_resource_staging_path = os.path.join(restore_vm_staging_path,
-            'vm_res_id_%s_%s' % (restore_vm_resource_metadata['snapshot_vm_resource_id'], 
-                                 restore_vm_resource_metadata['snapshot_vm_resource_name'].replace(' ','')))
-        return restore_vm_resource_staging_path  
+    def get_restore_vm_resource_staging_path(
+            self, restore_vm_resource_metadata):
+        restore_vm_staging_path = self.get_restore_vm_staging_path(
+            restore_vm_resource_metadata)
+        restore_vm_resource_staging_path = os.path.join(
+            restore_vm_staging_path,
+            'vm_res_id_%s_%s' %
+            (restore_vm_resource_metadata['snapshot_vm_resource_id'],
+             restore_vm_resource_metadata['snapshot_vm_resource_name'].replace(
+                ' ',
+                '')))
+        return restore_vm_resource_staging_path
 
-    def get_restore_vm_disk_resource_staging_path(self, restore_vm_disk_resource_metadata):
-        restore_vm_resource_staging_path = self.get_restore_vm_resource_staging_path(restore_vm_disk_resource_metadata)
-        restore_vm_disk_resource_staging_path = os.path.join(restore_vm_resource_staging_path,
+    def get_restore_vm_disk_resource_staging_path(
+            self, restore_vm_disk_resource_metadata):
+        restore_vm_resource_staging_path = self.get_restore_vm_resource_staging_path(
+            restore_vm_disk_resource_metadata)
+        restore_vm_disk_resource_staging_path = os.path.join(
+            restore_vm_resource_staging_path,
             restore_vm_disk_resource_metadata['vm_disk_resource_snap_id'])
         return restore_vm_disk_resource_staging_path
 
@@ -577,7 +621,7 @@ class NfsTrilioVaultBackupTarget(TrilioVaultBackupTarget):
     ##
     # backup target availability status
     ##
-    @autolog.log_method(logger=Logger) 
+    @autolog.log_method(logger=Logger)
     def is_online(self):
         status = False
         try:
@@ -592,9 +636,9 @@ class NfsTrilioVaultBackupTarget(TrilioVaultBackupTarget):
         except Exception as ex:
             LOG.exception(ex)
 
-        return status 
+        return status
 
-    @autolog.log_method(logger=Logger) 
+    @autolog.log_method(logger=Logger)
     def is_mounted(self):
         '''Make sure backup endpoint is mounted at mount_path'''
         mountpath = self.mount_path
@@ -603,7 +647,7 @@ class NfsTrilioVaultBackupTarget(TrilioVaultBackupTarget):
         if not os.path.ismount(mountpath):
             return False
 
-        with open('/proc/mounts','r') as f:
+        with open('/proc/mounts', 'r') as f:
             mounts = [{line.split()[1]:line.split()[0]}
                       for line in f.readlines() if line.split()[1] == mountpath]
 
@@ -614,7 +658,7 @@ class NfsTrilioVaultBackupTarget(TrilioVaultBackupTarget):
             command = ['sudo', 'service', 'tvault-swift', 'stop']
             subprocess.check_call(command, shell=False)
         except Exception as ex:
-               pass
+            pass
 
         try:
             command = ['sudo', 'umount', '-f', CONF.vault_data_directory]
@@ -622,7 +666,7 @@ class NfsTrilioVaultBackupTarget(TrilioVaultBackupTarget):
         except Exception as exception:
             pass
 
-    @autolog.log_method(logger=Logger) 
+    @autolog.log_method(logger=Logger)
     def umount_backup_target(self):
         nfsshare = self.backup_endpoint
         mountpath = self.mount_path
@@ -633,20 +677,20 @@ class NfsTrilioVaultBackupTarget(TrilioVaultBackupTarget):
             subprocess.call(command, shell=False)
         except Exception as exception:
             pass
-    
+
         try:
             command = ['sudo', 'umount', nfsshare]
             subprocess.call(command, shell=False)
         except Exception as exception:
-            pass           
-    
+            pass
+
         try:
             command = ['sudo', 'umount', '-l', nfsshare]
             subprocess.call(command, shell=False)
         except Exception as exception:
-            pass                
+            pass
 
-    @autolog.log_method(logger=Logger) 
+    @autolog.log_method(logger=Logger)
     def mount_backup_target(self, old_share=False):
         self.umount_backup_target()
 
@@ -655,19 +699,19 @@ class NfsTrilioVaultBackupTarget(TrilioVaultBackupTarget):
         nfsoptions = CONF.vault_storage_nfs_options
 
         if self.is_online():
-           command = ['timeout', '-sKILL', '30' , 'sudo',
+            command = ['timeout', '-sKILL', '30', 'sudo',
                        'mount', '-o', nfsoptions, nfsshare,
                        mountpath]
-           subprocess.check_call(command, shell=False) 
-           if old_share is True:
-              command = ['timeout', '-sKILL', '30' , 'sudo',
+            subprocess.check_call(command, shell=False)
+            if old_share is True:
+                command = ['timeout', '-sKILL', '30', 'sudo',
                            'mount', '--bind', mountpath,
                            CONF.vault_data_directory_old]
-              subprocess.check_call(command, shell=False) 
+                subprocess.check_call(command, shell=False)
         else:
-             raise exception.BackupTargetOffline(endpoint=nfsshare)
+            raise exception.BackupTargetOffline(endpoint=nfsshare)
 
-    @autolog.log_method(logger=Logger) 
+    @autolog.log_method(logger=Logger)
     def get_total_capacity(self, context):
         """
         return total capacity of the backup target and
@@ -680,7 +724,8 @@ class NfsTrilioVaultBackupTarget(TrilioVaultBackupTarget):
             nfsshare = self.backup_endpoint
             stdout, stderr = utils.execute('df', mountpath)
             if stderr != '':
-                msg = _('Could not execute df command successfully. Error %s'), (stderr)
+                msg = _(
+                    'Could not execute df command successfully. Error %s'), (stderr)
                 raise exception.ErrorOccurred(reason=msg)
 
             # Filesystem     1K-blocks      Used Available Use% Mounted on
@@ -700,7 +745,7 @@ class NfsTrilioVaultBackupTarget(TrilioVaultBackupTarget):
                     msg = _('Could not execute du command successfully. Error %s'), (stderr)
                     raise exception.ErrorOccurred(reason=msg)
                 #196022926557    /var/triliovault
-                du_values = stdout.split()                
+                du_values = stdout.split()
                 total_utilization = int(du_values[0])
             except Exception as ex:
                 LOG.exception(ex)
@@ -708,7 +753,7 @@ class NfsTrilioVaultBackupTarget(TrilioVaultBackupTarget):
         except Exception as ex:
             LOG.exception(ex)
 
-        return total_capacity,total_utilization
+        return total_capacity, total_utilization
 
     ##
     # object manipulation methods on the backup target
@@ -731,21 +776,22 @@ class NfsTrilioVaultBackupTarget(TrilioVaultBackupTarget):
 
         return transfers
 
-    @autolog.log_method(logger=Logger) 
+    @autolog.log_method(logger=Logger)
     def transfers_delete(self, context, transfers_metadata):
         """
         List of workload transfers on this particular backup media
         """
         try:
-            transfer_path  = self.get_workload_transfers_path(transfers_metadata)
+            transfer_path = self.get_workload_transfers_path(
+                transfers_metadata)
             if isfile(transfer_path):
                 os.remove(transfer_path)
         except Exception as ex:
-            LOG.exception(ex)  
+            LOG.exception(ex)
 
     ##
     # triliovault object (json) access methods
-    @autolog.log_method(logger=Logger)         
+    @autolog.log_method(logger=Logger)
     @to_abs()
     def put_object(self, path, json_data):
         head, tail = os.path.split(path)
@@ -754,7 +800,7 @@ class NfsTrilioVaultBackupTarget(TrilioVaultBackupTarget):
             json_file.write(json_data)
         return
 
-    @autolog.log_method(logger=Logger)     
+    @autolog.log_method(logger=Logger)
     @to_abs()
     def get_object(self, path):
         with open(path, 'r') as json_file:
@@ -772,7 +818,7 @@ class NfsTrilioVaultBackupTarget(TrilioVaultBackupTarget):
             size = statinfo.st_size
         except Exception as ex:
             LOG.exception(ex)
-        return size            
+        return size
 
     @autolog.log_method(logger=Logger)
     def get_workloads(self, context):
@@ -781,21 +827,22 @@ class NfsTrilioVaultBackupTarget(TrilioVaultBackupTarget):
         workload_urls = []
         try:
             for name in os.listdir(parent_path):
-                if os.path.isdir(os.path.join(parent_path, name)) and name.startswith('workload_'):
+                if os.path.isdir(os.path.join(parent_path, name)
+                                 ) and name.startswith('workload_'):
                     workload_urls.append(os.path.join(parent_path, name))
         except Exception as ex:
             LOG.exception(ex)
-        return workload_urls  
+        return workload_urls
 
-    @autolog.log_method(logger=Logger) 
+    @autolog.log_method(logger=Logger)
     def workload_delete(self, context, workload_metadata):
         try:
             workload_path = self.get_workload_path(workload_metadata)
             self.remove_directory(workload_path)
         except Exception as ex:
-            LOG.exception(ex)  
+            LOG.exception(ex)
 
-    @autolog.log_method(logger=Logger)         
+    @autolog.log_method(logger=Logger)
     def snapshot_delete(self, context, snapshot_metadata):
         try:
             snapshot_path = self.get_snapshot_path(snapshot_metadata)
@@ -813,11 +860,13 @@ class NfsTrilioVaultBackupTarget(TrilioVaultBackupTarget):
 
     ##
     # Object specific operations
-    @autolog.log_method(logger=Logger) 
+    @autolog.log_method(logger=Logger)
     def _update_workload_ownership_on_media(self, context, workload_id):
         try:
-            workload_path  = self.get_workload_path({'workload_id': workload_id})
-            def _update_metadata_file(pathname): 
+            workload_path = self.get_workload_path(
+                {'workload_id': workload_id})
+
+            def _update_metadata_file(pathname):
                 metadata = json.loads(self.get_object(pathname))
 
                 metadata['user_id'] = context.user_id
@@ -845,7 +894,7 @@ class SwiftTrilioVaultBackupTarget(NfsTrilioVaultBackupTarget):
             try:
                 command = ['rm', '-rf', backup_path]
                 subprocess.check_call(command, shell=False)
-            except:
+            except BaseException:
                 pass
             retry += 1
             if retry >= 1:
@@ -858,32 +907,35 @@ class SwiftTrilioVaultBackupTarget(NfsTrilioVaultBackupTarget):
         object is a file on NFS. It can be object in object store
         """
         mountpath = self.mount_path
-        progress_tracker_directory = os.path.join(mountpath,
-            "contego_tasks", 'snapshot_%s' % (tracker_metadata['snapshot_id']))
+        progress_tracker_directory = os.path.join(
+            mountpath, "contego_tasks", 'snapshot_%s' %
+            (tracker_metadata['snapshot_id']))
 
         fileutils.ensure_tree(progress_tracker_directory)
         return progress_tracker_directory
 
     @autolog.log_method(logger=Logger)
-    def mount_backup_target(self, old_share=False): 
+    def mount_backup_target(self, old_share=False):
         try:
             command = ['sudo', 'service', 'tvault-swift', 'start']
             subprocess.check_call(command, shell=False)
         except Exception as ex:
-               pass
+            pass
 
     @autolog.log_method(logger=Logger)
     def is_online(self):
         status = False
-        stdout, stderr = utils.execute('sudo', 'service', 'tvault-swift', 'status', run_as_root=False)
+        stdout, stderr = utils.execute(
+            'sudo', 'service', 'tvault-swift', 'status', run_as_root=False)
         if 'running' in stdout:
             stdout, stderr = utils.execute('stat', '-f', self.mount_path)
             if stderr != '':
-                msg = _('Could not execute stat command successfully. Error %s'), (stderr)
+                msg = _(
+                    'Could not execute stat command successfully. Error %s'), (stderr)
                 raise exception.ErrorOccurred(reason=msg)
-            file_type = stdout.split('\n')[1].split('Type: ')[1] 
+            file_type = stdout.split('\n')[1].split('Type: ')[1]
             if file_type == 'fuseblk':
-               status = True
+                status = True
         return status
 
     @autolog.log_method(logger=Logger)
@@ -892,7 +944,7 @@ class SwiftTrilioVaultBackupTarget(NfsTrilioVaultBackupTarget):
             command = ['sudo', 'service', 'tvault-swift', 'stop']
             subprocess.check_call(command, shell=False)
         except Exception as ex:
-               pass
+            pass
 
     @autolog.log_method(logger=Logger)
     @to_abs()
@@ -901,10 +953,10 @@ class SwiftTrilioVaultBackupTarget(NfsTrilioVaultBackupTarget):
         fileutils.ensure_tree(head)
         try:
             with open(path, 'w') as json_file:
-                 json_file.write(json_data)
-        except:
-               with open(path, 'w') as json_file:
-                    json_file.write(json_data)
+                json_file.write(json_data)
+        except BaseException:
+            with open(path, 'w') as json_file:
+                json_file.write(json_data)
         return
 
     @autolog.log_method(logger=Logger)
@@ -935,28 +987,36 @@ class SwiftTrilioVaultBackupTarget(NfsTrilioVaultBackupTarget):
             mountpath = self.mount_path
             stdout, stderr = utils.execute('stat', '-f', mountpath)
             if stderr != '':
-                msg = _('Could not execute stat command successfully. Error %s'), (stderr)
+                msg = _(
+                    'Could not execute stat command successfully. Error %s'), (stderr)
                 raise exception.ErrorOccurred(reason=msg)
-            total_capacity = int(stdout.split('\n')[3].split('Blocks:')[1].split(' ')[2])
+            total_capacity = int(
+                stdout.split('\n')[3].split('Blocks:')[1].split(' ')[2])
             try:
-                 total_free = int(stdout.split('\n')[3].split('Blocks:')[1].split(' ')[4])
-            except:
-                   total_free = int(stdout.split('\n')[3].split('Blocks:')[1].split('Available: ')[1])
+                total_free = int(
+                    stdout.split('\n')[3].split('Blocks:')[1].split(' ')[4])
+            except BaseException:
+                total_free = int(stdout.split('\n')[3].split(
+                    'Blocks:')[1].split('Available: ')[1])
             total_utilization = abs(total_capacity - total_free)
 
         except Exception as ex:
             LOG.exception(ex)
 
-        return total_capacity,total_utilization
+        return total_capacity, total_utilization
+
 
 triliovault_backup_targets = {}
-@autolog.log_method(logger=Logger) 
+
+
+@autolog.log_method(logger=Logger)
 def mount_backup_media():
-    for idx, backup_target in enumerate(CONF.vault_storage_nfs_export.split(',')):
+    for idx, backup_target in enumerate(
+            CONF.vault_storage_nfs_export.split(',')):
         backup_target = backup_target.strip()
         if backup_target == '':
             continue
-        if CONF.vault_storage_type == 'nfs': 
+        if CONF.vault_storage_type == 'nfs':
             backend = NfsTrilioVaultBackupTarget(backup_target)
         elif CONF.vault_storage_type == 'swift-s':
             backend = SwiftTrilioVaultBackupTarget(backup_target)
@@ -968,7 +1028,7 @@ def mount_backup_media():
 def get_backup_target(backup_endpoint):
     backup_endpoint = backup_endpoint.strip()
     backup_target = triliovault_backup_targets.get(backup_endpoint, None)
-    
+
     if backup_target is None:
         mount_backup_media()
         backup_target = triliovault_backup_targets.get(backup_endpoint, None)
@@ -977,7 +1037,7 @@ def get_backup_target(backup_endpoint):
 
 
 def get_settings_backup_target():
-    settings_path_new = os.path.join(CONF.cloud_unique_id,"settings_db")
+    settings_path_new = os.path.join(CONF.cloud_unique_id, "settings_db")
     for backup_endpoint in CONF.vault_storage_nfs_export.split(','):
         get_backup_target(backup_endpoint.strip())
     for endpoint, backup_target in triliovault_backup_targets.iteritems():
@@ -993,14 +1053,15 @@ def get_settings_backup_target():
 
     return (triliovault_backup_targets.values()[0], settings_path_new)
 
+
 def get_capacities_utilizations(context):
     def fill_capacity_utilization(context, backup_target, stats):
         nfsshare = backup_target.backup_endpoint
         cap, util = backup_target.get_total_capacity(context)
-           
+
         stats[nfsshare] = {'total_capacity': cap,
                            'total_utilization': util,
-                           'nfsstatus': True }
+                           'nfsstatus': True}
 
     stats = {}
     threads = []
@@ -1011,7 +1072,7 @@ def get_capacities_utilizations(context):
 
         stats[nfsshare] = {'total_capacity': -1,
                            'total_utilization': -1,
-                           'nfsstatus': nfsstatus }
+                           'nfsstatus': nfsstatus}
         if nfsstatus is True:
             t = threading.Thread(target=fill_capacity_utilization,
                                  args=[context, backup_target, stats])
@@ -1035,8 +1096,10 @@ def get_workloads(context):
 
     return workloads
 
+
 def validate_workload(workload_url):
-    if os.path.isdir(workload_url) and os.path.exists(os.path.join(workload_url, "workload_db")):
+    if os.path.isdir(workload_url) and os.path.exists(
+            os.path.join(workload_url, "workload_db")):
         return True
     else:
         return False
@@ -1053,6 +1116,7 @@ def get_all_workload_transfers(context):
 
     return transfers
 
+
 def get_nfs_share_for_workload_by_free_overcommit(context, workload):
     """
        workload is a dict with id, name, description and metadata.
@@ -1066,12 +1130,12 @@ def get_nfs_share_for_workload_by_free_overcommit(context, workload):
         if caps[endpoint]['nfsstatus'] is False:
             continue
         shares[endpoint] = {
-                     'noofworkloads': 0,
-                     'totalcommitted': 0,
-                     'endpoint': endpoint,
-                     'capacity': caps[endpoint]['total_capacity'],
-                     'used': caps[endpoint]['total_utilization']
-                    }
+            'noofworkloads': 0,
+            'totalcommitted': 0,
+            'endpoint': endpoint,
+            'capacity': caps[endpoint]['total_capacity'],
+            'used': caps[endpoint]['total_utilization']
+        }
     if len(shares) == 0:
         raise exception.InvalidState(reason="No NFS shares mounted")
 
@@ -1084,7 +1148,7 @@ def get_nfs_share_for_workload_by_free_overcommit(context, workload):
         mountpath = os.path.join(CONF.vault_data_directory, base64encode)
         for w in os.listdir(mountpath):
             try:
-                if not 'workload_' in w:
+                if 'workload_' not in w:
                     continue
                 workload_path = os.path.join(mountpath, w)
                 with open(os.path.join(workload_path, "workload_db"), "r") as f:
@@ -1098,35 +1162,41 @@ def get_nfs_share_for_workload_by_free_overcommit(context, workload):
 
                 if workload_approx_backup_size == 0:
                     workload_backup_media_size = 0
-                    for result in glob.iglob(os.path.join(workload_path, 'snapshot_*/snapshot_db')): 
-                         with open(result, "r") as snaprecf:
-                             snaprec = json.load(snaprecf)
-                         if snaprec['snapshot_type'] == "full":
-                             workload_backup_media_size = snaprec['size'] / 1024 / 1024 / 1024
-      
+                    for result in glob.iglob(os.path.join(
+                            workload_path, 'snapshot_*/snapshot_db')):
+                        with open(result, "r") as snaprecf:
+                            snaprec = json.load(snaprecf)
+                        if snaprec['snapshot_type'] == "full":
+                            workload_backup_media_size = snaprec['size'] / \
+                                1024 / 1024 / 1024
+
                     # workload_backup_media_size is in GBs
                     workload_backup_media_size = workload_backup_media_size or 10
                     jobschedule = pickle.loads(str(wjson['jobschedule']))
                     if jobschedule['retention_policy_type'] == 'Number of Snapshots to Keep':
                         incrs = int(jobschedule['retention_policy_value'])
                     else:
-                        jobsperday = int(jobschedule['interval'].split("hr")[0])
-                        incrs = int(jobschedule['retention_policy_value']) * jobsperday
+                        jobsperday = int(
+                            jobschedule['interval'].split("hr")[0])
+                        incrs = int(
+                            jobschedule['retention_policy_value']) * jobsperday
 
                     if jobschedule['fullbackup_interval'] == '-1':
                         fulls = 1
                     else:
-                        fulls = incrs/int(jobschedule['fullbackup_interval'])
+                        fulls = incrs / int(jobschedule['fullbackup_interval'])
                         incrs = incrs - fulls
 
                     workload_approx_backup_size = \
-                            (fulls * workload_backup_media_size * CONF.workload_full_backup_factor +
-                             incrs * workload_backup_media_size * CONF.workload_incr_backup_factor) / 100
-                    values['totalcommitted'] += workload_approx_backup_size * 1024 * 1024 * 1024
+                        (fulls * workload_backup_media_size * CONF.workload_full_backup_factor +
+                         incrs * workload_backup_media_size * CONF.workload_incr_backup_factor) / 100
+                    values['totalcommitted'] += workload_approx_backup_size * \
+                        1024 * 1024 * 1024
                 else:
-                    values['totalcommitted'] += workload_approx_backup_size * 1024 * 1024 * 1024
+                    values['totalcommitted'] += workload_approx_backup_size * \
+                        1024 * 1024 * 1024
             except Exception as ex:
-                LOG.exception(ex) 
+                LOG.exception(ex)
 
     def getKey(item):
         item['free'] = item['capacity'] - item['totalcommitted']
@@ -1137,6 +1207,7 @@ def get_nfs_share_for_workload_by_free_overcommit(context, workload):
 
     return sortedlist[0]['endpoint']
 
+
 def get_workloads_for_tenant(context, tenant_ids):
     workload_ids = []
     for backup_endpoint in CONF.vault_storage_nfs_export.split(','):
@@ -1144,15 +1215,16 @@ def get_workloads_for_tenant(context, tenant_ids):
         try:
             backup_target = get_backup_target(backup_endpoint)
             for workload_url in backup_target.get_workloads(context):
-                workload_values = json.loads(backup_target.get_object(\
-                        os.path.join(workload_url, 'workload_db')))
+                workload_values = json.loads(backup_target.get_object(
+                    os.path.join(workload_url, 'workload_db')))
                 project_id = workload_values.get('project_id')
                 workload_id = workload_values.get('id')
                 if project_id in tenant_ids:
                     workload_ids.append(workload_id)
         except Exception as ex:
             LOG.exception(ex)
-    return  workload_ids
+    return workload_ids
+
 
 def update_workload_db(context, workloads_to_update, new_tenant_id, user_id):
 
@@ -1160,22 +1232,26 @@ def update_workload_db(context, workloads_to_update, new_tenant_id, user_id):
     jobscheduler_map = {}
 
     try:
-        #Get list of workload directory path for workloads need to update
+        # Get list of workload directory path for workloads need to update
         for workload_id in workloads_to_update:
             for backup_endpoint in CONF.vault_storage_nfs_export.split(','):
                 backup_target = None
                 backup_target = get_backup_target(backup_endpoint)
-                workload_url = os.path.join(backup_target.mount_path, "workload_" + workload_id)
+                workload_url = os.path.join(
+                    backup_target.mount_path, "workload_" + workload_id)
                 if os.path.isdir(workload_url):
                     workload_urls.append(workload_url)
-                    break;
+                    break
 
-        #Iterate through each workload directory and update workload_db and snapsot_db with new values
+        # Iterate through each workload directory and update workload_db and
+        # snapsot_db with new values
         for workload_path in workload_urls:
             for path, subdirs, files in os.walk(workload_path):
                 for name in files:
-                    if name.endswith("snapshot_db") or name.endswith("workload_db"):
-                        db_values = json.loads(open(os.path.join(path, name), 'r').read())
+                    if name.endswith("snapshot_db") or name.endswith(
+                            "workload_db"):
+                        db_values = json.loads(
+                            open(os.path.join(path, name), 'r').read())
 
                         if db_values.get('project_id', None) is not None:
                             db_values['project_id'] = new_tenant_id
@@ -1184,11 +1260,14 @@ def update_workload_db(context, workloads_to_update, new_tenant_id, user_id):
                         db_values['user_id'] = user_id
 
                         if db_values.get('jobschedule', None) is not None:
-                            jobschedule = pickle.loads(db_values['jobschedule'])
+                            jobschedule = pickle.loads(
+                                db_values['jobschedule'])
                             if jobschedule['enabled'] is True:
-                               jobschedule['enabled'] = False
-                               db_values['jobschedule'] = pickle.dumps(jobschedule)
-                            jobscheduler_map[db_values['id']] = db_values['jobschedule']
+                                jobschedule['enabled'] = False
+                                db_values['jobschedule'] = pickle.dumps(
+                                    jobschedule)
+                            jobscheduler_map[db_values['id']
+                                             ] = db_values['jobschedule']
 
                         with open(os.path.join(path, name), 'w') as file:
                             json.dump(db_values, file)
@@ -1198,14 +1277,19 @@ def update_workload_db(context, workloads_to_update, new_tenant_id, user_id):
     except Exception as ex:
         LOG.exception(ex)
 
+
 def create_backup_directory(context, services, backup_directory_path):
     try:
         fileutils.ensure_tree(backup_directory_path)
-        for service,config_path in  services.iteritems():
+        for service, config_path in services.iteritems():
             service_name = service
-            fileutils.ensure_tree(os.path.join(backup_directory_path,service_name))
+            fileutils.ensure_tree(
+                os.path.join(
+                    backup_directory_path,
+                    service_name))
     except Exception as ex:
         LOG.exception(ex)
+
 
 def get_directory_size(path):
     try:
@@ -1216,12 +1300,14 @@ def get_directory_size(path):
     except Exception as ex:
         LOG.exception(ex)
 
+
 def get_key_file(key_data, temp=False):
     try:
         backup_target, path = get_settings_backup_target()
         config_workload_path = backup_target.get_config_workload_path()
         if temp is True:
-            file_path = os.path.join(config_workload_path, "authorized_key_temp")
+            file_path = os.path.join(
+                config_workload_path, "authorized_key_temp")
         else:
             file_path = os.path.join(config_workload_path, "authorized_key")
         backup_target.put_object(file_path, key_data)
@@ -1231,10 +1317,11 @@ def get_key_file(key_data, temp=False):
         LOG.exception(ex)
         raise ex
 
+
 """
 if __name__ == '__main__':
-    nfsbackend = 
- 
+    nfsbackend =
+
     nfsbackend.umount_backup_target()
     nfsbackend.mount_backup_target()
     workload_path = nfsbackend.get_workload_path({'workload_id': str(uuid.uuid4())})

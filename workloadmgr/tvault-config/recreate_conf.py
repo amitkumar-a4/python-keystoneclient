@@ -6,6 +6,7 @@
 from datetime import datetime
 from cork import Cork
 
+
 def populate_conf_directory():
     cork = Cork('conf', initialize=True)
 
@@ -26,6 +27,6 @@ def populate_conf_directory():
     }
     cork._store.save_users()
 
+
 if __name__ == '__main__':
     populate_conf_directory()
-

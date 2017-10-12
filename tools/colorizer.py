@@ -64,6 +64,7 @@ class _AnsiColorizer(object):
 
 class _Win32Colorizer(object):
     """See _AnsiColorizer docstring."""
+
     def __init__(self, stream):
         import win32console
         red, green, blue, bold = (win32console.FOREGROUND_RED,
@@ -112,6 +113,7 @@ class _Win32Colorizer(object):
 
 class _NullColorizer(object):
     """See _AnsiColorizer docstring."""
+
     def __init__(self, stream):
         self.stream = stream
 
@@ -286,7 +288,8 @@ test = subunit.ProtocolTestCase(sys.stdin, passthrough=None)
 if sys.version_info[0:2] <= (2, 6):
     runner = unittest.TextTestRunner(verbosity=2)
 else:
-    runner = unittest.TextTestRunner(verbosity=2, resultclass=WorkloadMgrTestResult)
+    runner = unittest.TextTestRunner(
+        verbosity=2, resultclass=WorkloadMgrTestResult)
 
 if runner.run(test).wasSuccessful():
     exit_code = 0

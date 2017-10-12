@@ -8,6 +8,7 @@ from workloadmgr.api import common
 
 LOG = logging.getLogger(__name__)
 
+
 class ViewBuilder(common.ViewBuilder):
     """Model config backup API responses as a python dictionary."""
 
@@ -38,7 +39,6 @@ class ViewBuilder(common.ViewBuilder):
                 'description': config_backup.get('display_description'),
                 'config_workload_id': config_backup.get('config_workload_id'),
             }}
-      
 
     def detail(self, request, config_backup):
         """Detailed view of a single backup."""
@@ -66,11 +66,11 @@ class ViewBuilder(common.ViewBuilder):
 
     def _list_view(self, func, request, backups):
         """Provide a view for a list of backups."""
-        backups_list = [func(request, backup)['config_backup'] for backup in backups]
+        backups_list = [func(request, backup)['config_backup']
+                        for backup in backups]
 
         backups_list = sorted(backups_list,
-                                key=lambda backup: backup['created_at'])
+                              key=lambda backup: backup['created_at'])
         backups_dict = dict(backups=backups_list)
 
         return backups_dict
-

@@ -17,9 +17,11 @@ class IntervalTrigger(object):
             self.interval_length = 1
 
         if start_date is None:
-            self.start_date = convert_to_datetime(parse(datetime.now().strftime("%m/%d/%Y") + " " + self.start_time))
+            self.start_date = convert_to_datetime(
+                parse(datetime.now().strftime("%m/%d/%Y") + " " + self.start_time))
         else:
-            self.start_date = convert_to_datetime(parse(start_date + " " + self.start_time))
+            self.start_date = convert_to_datetime(
+                parse(start_date + " " + self.start_time))
 
     def get_next_fire_time(self, start_date):
         if start_date < self.start_date:
@@ -34,5 +36,7 @@ class IntervalTrigger(object):
 
     def __repr__(self):
         return "<%s (interval=%s, start_time=%s, start_date=%s)>" % (
-            self.__class__.__name__, repr(self.interval), repr(self.start_time),
+            self.__class__.__name__, repr(
+                self.interval), repr(
+                self.start_time),
             repr(self.start_date))
