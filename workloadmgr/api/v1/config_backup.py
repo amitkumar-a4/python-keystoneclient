@@ -37,7 +37,8 @@ class ConfigBackupController(wsgi.Controller):
         try:
             context = req.environ['workloadmgr.context']
             try:
-                config_workload = self.workload_api.get_config_workload(context)
+                config_workload = self.workload_api.get_config_workload(
+                    context)
             except wlm_exceptions.ConfigWorkloadNotFound:
                 message = "Configuration backup is not configured. First configure it."
                 raise wlm_exceptions.ErrorOccurred(reason=message)
@@ -48,8 +49,10 @@ class ConfigBackupController(wsgi.Controller):
                 description = body['backup'].get('description', "")
                 description = description.strip() or 'no-description'
 
-            backup = self.workload_api.config_backup(context, name, description)
-            return self.backup_view_builder.summary(req, dict(backup.iteritems()))
+            backup = self.workload_api.config_backup(
+                context, name, description)
+            return self.backup_view_builder.summary(
+                req, dict(backup.iteritems()))
         except wlm_exceptions.InvalidState as error:
             LOG.exception(error)
             raise exc.HTTPBadRequest(explanation=unicode(error))
@@ -123,4 +126,3 @@ class ConfigBackupController(wsgi.Controller):
 
 def create_resource(ext_mgr):
     return wsgi.Resource(ConfigBackupController(ext_mgr))
-

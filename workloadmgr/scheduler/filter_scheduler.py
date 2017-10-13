@@ -23,6 +23,7 @@ LOG = logging.getLogger(__name__)
 
 class FilterScheduler(driver.Scheduler):
     """Scheduler that can be used for filtering and weighing."""
+
     def __init__(self, *args, **kwargs):
         super(FilterScheduler, self).__init__(*args, **kwargs)
         self.cost_function_cache = None
@@ -46,9 +47,9 @@ class FilterScheduler(driver.Scheduler):
         """
         pass
 
-
     def schedule_file_search(self, context, request_spec, filter_properties):
-        weighed_host = self._host_for_file_search(context, request_spec, filter_properties)
+        weighed_host = self._host_for_file_search(
+            context, request_spec, filter_properties)
 
         if not weighed_host:
             raise exception.NoValidHost(reason="")
@@ -56,7 +57,8 @@ class FilterScheduler(driver.Scheduler):
         host = weighed_host.obj.host
         search_id = request_spec['search_id']
 
-        updated_snapshot = driver.file_search_update_db(context, search_id, host)
+        updated_snapshot = driver.file_search_update_db(
+            context, search_id, host)
         self._post_select_populate_filter_properties(filter_properties,
                                                      weighed_host.obj)
 
@@ -66,8 +68,10 @@ class FilterScheduler(driver.Scheduler):
 
         self.workloads_rpcapi.file_search(context, host, search_id)
 
-    def schedule_workload_snapshot(self, context, request_spec, filter_properties):
-        weighed_host = self._host_for_snapshot(context, request_spec, filter_properties)
+    def schedule_workload_snapshot(
+            self, context, request_spec, filter_properties):
+        weighed_host = self._host_for_snapshot(
+            context, request_spec, filter_properties)
 
         if not weighed_host:
             raise exception.NoValidHost(reason="")
@@ -75,7 +79,8 @@ class FilterScheduler(driver.Scheduler):
         host = weighed_host.obj.host
         snapshot_id = request_spec['snapshot_id']
 
-        updated_snapshot = driver.snapshot_update_db(context, snapshot_id, host)
+        updated_snapshot = driver.snapshot_update_db(
+            context, snapshot_id, host)
         self._post_select_populate_filter_properties(filter_properties,
                                                      weighed_host.obj)
 
@@ -85,8 +90,10 @@ class FilterScheduler(driver.Scheduler):
 
         self.workloads_rpcapi.workload_snapshot(context, host, snapshot_id)
 
-    def schedule_snapshot_restore(self, context, request_spec, filter_properties):
-        weighed_host = self._host_for_restore(context, request_spec, filter_properties)
+    def schedule_snapshot_restore(
+            self, context, request_spec, filter_properties):
+        weighed_host = self._host_for_restore(
+            context, request_spec, filter_properties)
 
         if not weighed_host:
             raise exception.NoValidHost(reason="")
@@ -105,21 +112,23 @@ class FilterScheduler(driver.Scheduler):
         self.workloads_rpcapi.snapshot_restore(context, host, restore_id)
 
     def schedule_config_backup(self, context, request_spec, filter_properties):
-        weighed_host = self._host_for_snapshot(context, request_spec, filter_properties)
-    
+        weighed_host = self._host_for_snapshot(
+            context, request_spec, filter_properties)
+
         if not weighed_host:
             raise exception.NoValidHost(reason="")
         host = weighed_host.obj.host
         backup_id = request_spec['backup_id']
-    
-        updated_backup = driver.config_backup_update_db(context, backup_id, host)
+
+        updated_backup = driver.config_backup_update_db(
+            context, backup_id, host)
         self._post_select_populate_filter_properties(filter_properties,
                                                      weighed_host.obj)
-    
+
         # context is not serializable
         if filter_properties:
             filter_properties.pop('context', None)
-    
+
         self.workloads_rpcapi.config_backup(context, host, backup_id)
 
     def _post_select_populate_filter_properties(self, filter_properties,
@@ -154,7 +163,7 @@ class FilterScheduler(driver.Scheduler):
         return max_attempts
 
     def _log_snapshot_error(self, id, retry):
-        """If the request contained an exception from a previous workload_snapshot operation, 
+        """If the request contained an exception from a previous workload_snapshot operation,
            log it to aid debugging
         """
         exc = retry.pop('exc', None)  # string-ified exception from snapshot
@@ -199,7 +208,8 @@ class FilterScheduler(driver.Scheduler):
                     "snapshot %(snapshot_id)s") % locals()
             raise exception.NoValidHost(reason=msg)
 
-    def _host_for_file_search(self, context, request_spec, filter_properties=None):
+    def _host_for_file_search(
+            self, context, request_spec, filter_properties=None):
         """Returns a list of hosts that meet the required specs,
         ordered by their fitness.
         """
@@ -238,7 +248,8 @@ class FilterScheduler(driver.Scheduler):
         best_host.obj.consume_from_file_search(search_properties)
         return best_host
 
-    def _host_for_snapshot(self, context, request_spec, filter_properties=None):
+    def _host_for_snapshot(self, context, request_spec,
+                           filter_properties=None):
         """Returns a list of hosts that meet the required specs,
         ordered by their fitness.
         """

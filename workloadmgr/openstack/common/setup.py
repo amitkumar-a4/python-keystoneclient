@@ -76,12 +76,12 @@ def parse_requirements(requirements_files=['requirements.txt',
         # -e git://github.com/openstack/nova/master#egg=nova
         if re.match(r'\s*-e\s+', line):
             requirements.append(re.sub(r'\s*-e\s+.*#egg=(.*)$', r'\1',
-                                line))
+                                       line))
         # such as:
         # http://github.com/openstack/nova/zipball/master#egg=nova
         elif re.match(r'\s*https?:', line):
             requirements.append(re.sub(r'\s*https?:.*#egg=(.*)$', r'\1',
-                                line))
+                                       line))
         # -f lines are for index locations, and don't get used here
         elif re.match(r'\s*-f\s+', line):
             pass
@@ -233,8 +233,7 @@ def get_cmdclass():
                 for pkg in self.distribution.packages:
                     if '.' not in pkg:
                         os.path.walk(pkg, _find_modules, modules)
-                module_list = modules.keys()
-                module_list.sort()
+                module_list = sorted(modules.keys())
                 autoindex_filename = os.path.join(source_dir, 'autoindex.rst')
                 with open(autoindex_filename, 'w') as autoindex:
                     autoindex.write(""".. toctree::
@@ -349,7 +348,7 @@ def get_version(package_name, pre_version=None):
     version = os.environ.get("OSLO_PACKAGE_VERSION", None)
     if version:
         return version
-    version = "2013.1" #_get_version_from_pkg_info(package_name)
+    version = "2013.1"  # _get_version_from_pkg_info(package_name)
     if version:
         return version
     version = _get_version_from_git(pre_version)

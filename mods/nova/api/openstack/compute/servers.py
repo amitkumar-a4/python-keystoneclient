@@ -193,7 +193,7 @@ class CommonDeserializer(wsgi.MetadataXMLDeserializer):
         res_id = server_node.getAttribute('return_reservation_id')
         if res_id:
             server['return_reservation_id'] = \
-                    strutils.bool_from_string(res_id)
+                strutils.bool_from_string(res_id)
 
         scheduler_hints = self._extract_scheduler_hints(server_node)
         if scheduler_hints:
@@ -283,13 +283,14 @@ class CommonDeserializer(wsgi.MetadataXMLDeserializer):
                     continue
                 block_device_mapping.append(
                     dict((attr, child.getAttribute(attr))
-                        for attr in block_device.bdm_new_api_fields
-                        if child.getAttribute(attr)))
+                         for attr in block_device.bdm_new_api_fields
+                         if child.getAttribute(attr)))
             return block_device_mapping
 
     def _extract_scheduler_hints(self, server_node):
         """Marshal the scheduler hints attribute of a parsed request."""
-        node = self.find_first_child_named_in_namespace(server_node,
+        node = self.find_first_child_named_in_namespace(
+            server_node,
             "http://docs.openstack.org/compute/ext/scheduler-hints/api/v2",
             "scheduler_hints")
         if node:
@@ -447,7 +448,7 @@ class ActionDeserializer(CommonDeserializer):
         metadata_node = self.find_first_child_named(node, 'metadata')
         if metadata_node is not None:
             metadata = self.metadata_deserializer.extract_metadata(
-                                                        metadata_node)
+                metadata_node)
             data['metadata'] = metadata
         return data
 
@@ -517,7 +518,7 @@ class Controller(wsgi.Controller):
 
         context = req.environ['nova.context']
         remove_invalid_options(context, search_opts,
-                self._get_server_search_options())
+                               self._get_server_search_options())
 
         # Verify search by 'status' contains a valid status.
         # Convert it to filter by vm_state or task_state for compute_api.
@@ -663,9 +664,9 @@ class Controller(wsgi.Controller):
                                 "(%s)") % network_uuid
                         raise exc.HTTPBadRequest(explanation=msg)
 
-                #fixed IP address is optional
-                #if the fixed IP address is not provided then
-                #it will use one of the available IP address from the network
+                # fixed IP address is optional
+                # if the fixed IP address is not provided then
+                # it will use one of the available IP address from the network
                 address = network.get('fixed_ip', None)
                 if address is not None and not utils.is_valid_ipv4(address):
                     msg = _("Invalid fixed IP address (%s)") % address
@@ -905,27 +906,28 @@ class Controller(wsgi.Controller):
                                        read_deleted="no")
 
             (instances, resv_id) = self.compute_api.create(context,
-                            inst_type,
-                            image_uuid,
-                            display_name=name,
-                            display_description=name,
-                            key_name=key_name,
-                            metadata=server_dict.get('metadata', {}),
-                            access_ip_v4=access_ip_v4,
-                            access_ip_v6=access_ip_v6,
-                            injected_files=injected_files,
-                            admin_password=password,
-                            min_count=min_count,
-                            max_count=max_count,
-                            requested_networks=requested_networks,
-                            security_group=sg_names,
-                            user_data=user_data,
-                            availability_zone=availability_zone,
-                            config_drive=config_drive,
-                            block_device_mapping=block_device_mapping,
-                            auto_disk_config=auto_disk_config,
-                            scheduler_hints=scheduler_hints,
-                            legacy_bdm=legacy_bdm)
+                                                           inst_type,
+                                                           image_uuid,
+                                                           display_name=name,
+                                                           display_description=name,
+                                                           key_name=key_name,
+                                                           metadata=server_dict.get(
+                                                               'metadata', {}),
+                                                           access_ip_v4=access_ip_v4,
+                                                           access_ip_v6=access_ip_v6,
+                                                           injected_files=injected_files,
+                                                           admin_password=password,
+                                                           min_count=min_count,
+                                                           max_count=max_count,
+                                                           requested_networks=requested_networks,
+                                                           security_group=sg_names,
+                                                           user_data=user_data,
+                                                           availability_zone=availability_zone,
+                                                           config_drive=config_drive,
+                                                           block_device_mapping=block_device_mapping,
+                                                           auto_disk_config=auto_disk_config,
+                                                           scheduler_hints=scheduler_hints,
+                                                           legacy_bdm=legacy_bdm)
         except exception.QuotaError as error:
             raise exc.HTTPRequestEntityTooLarge(
                 explanation=error.format_message(),
@@ -1024,7 +1026,7 @@ class Controller(wsgi.Controller):
 
         if 'auto_disk_config' in body['server']:
             auto_disk_config = strutils.bool_from_string(
-                    body['server']['auto_disk_config'])
+                body['server']['auto_disk_config'])
             update_dict['auto_disk_config'] = auto_disk_config
 
         if 'hostId' in body['server']:
@@ -1061,8 +1063,8 @@ class Controller(wsgi.Controller):
             msg = _("Instance has not been resized.")
             raise exc.HTTPBadRequest(explanation=msg)
         except exception.InstanceInvalidState as state_error:
-            common.raise_http_conflict_for_instance_invalid_state(state_error,
-                    'confirmResize')
+            common.raise_http_conflict_for_instance_invalid_state(
+                state_error, 'confirmResize')
         return exc.HTTPNoContent()
 
     @wsgi.response(202)
@@ -1081,8 +1083,8 @@ class Controller(wsgi.Controller):
             msg = _("Flavor used by the instance could not be found.")
             raise exc.HTTPBadRequest(explanation=msg)
         except exception.InstanceInvalidState as state_error:
-            common.raise_http_conflict_for_instance_invalid_state(state_error,
-                    'revertResize')
+            common.raise_http_conflict_for_instance_invalid_state(
+                state_error, 'revertResize')
         return webob.Response(status_int=202)
 
     @wsgi.response(202)
@@ -1109,7 +1111,7 @@ class Controller(wsgi.Controller):
             self.compute_api.reboot(context, instance, reboot_type)
         except exception.InstanceInvalidState as state_error:
             common.raise_http_conflict_for_instance_invalid_state(state_error,
-                    'reboot')
+                                                                  'reboot')
         return webob.Response(status_int=202)
 
     def _resize(self, req, instance_id, flavor_id, **kwargs):
@@ -1127,7 +1129,7 @@ class Controller(wsgi.Controller):
             raise exc.HTTPBadRequest(explanation=msg)
         except exception.InstanceInvalidState as state_error:
             common.raise_http_conflict_for_instance_invalid_state(state_error,
-                    'resize')
+                                                                  'resize')
         except exception.ImageNotAuthorized:
             msg = _("You are not authorized to access the image "
                     "the instance was started with.")
@@ -1152,7 +1154,7 @@ class Controller(wsgi.Controller):
             raise exc.HTTPNotFound(explanation=msg)
         except exception.InstanceInvalidState as state_error:
             common.raise_http_conflict_for_instance_invalid_state(state_error,
-                    'delete')
+                                                                  'delete')
 
     def _image_ref_from_req_data(self, data):
         try:
@@ -1209,7 +1211,7 @@ class Controller(wsgi.Controller):
     @wsgi.action('changePassword')
     def _action_change_password(self, req, id, body):
         context = req.environ['nova.context']
-        if (not 'changePassword' in body
+        if ('changePassword' not in body
                 or 'adminPass' not in body['changePassword']):
             msg = _("No adminPass was specified")
             raise exc.HTTPBadRequest(explanation=msg)
@@ -1323,7 +1325,7 @@ class Controller(wsgi.Controller):
                                      **kwargs)
         except exception.InstanceInvalidState as state_error:
             common.raise_http_conflict_for_instance_invalid_state(state_error,
-                    'rebuild')
+                                                                  'rebuild')
         except exception.InstanceNotFound:
             msg = _("Instance could not be found")
             raise exc.HTTPNotFound(explanation=msg)
@@ -1390,26 +1392,26 @@ class Controller(wsgi.Controller):
                     # device is set to 'vda'. It needs to be fixed later,
                     # but tentatively we use it here.
                     image_meta = {'properties': self.compute_api.
-                                    _get_bdm_image_metadata(context, bdms)}
+                                  _get_bdm_image_metadata(context, bdms)}
                 else:
                     src_image = self.compute_api.image_service.\
-                                                show(context, img)
+                        show(context, img)
                     image_meta = dict(src_image)
 
                 image = self.compute_api.snapshot_volume_backed(
-                                                       context,
-                                                       instance,
-                                                       image_meta,
-                                                       image_name,
-                                                       extra_properties=props)
+                    context,
+                    instance,
+                    image_meta,
+                    image_name,
+                    extra_properties=props)
             else:
                 image = self.compute_api.snapshot(context,
                                                   instance,
                                                   image_name,
                                                   extra_properties=props)
         except exception.InstanceInvalidState as state_error:
-            common.raise_http_conflict_for_instance_invalid_state(state_error,
-                        'createImage')
+            common.raise_http_conflict_for_instance_invalid_state(
+                state_error, 'createImage')
         except exception.Invalid as err:
             raise exc.HTTPBadRequest(explanation=err.format_message())
 
@@ -1457,7 +1459,7 @@ def remove_invalid_options(context, search_options, allowed_search_options):
         return
     # Otherwise, strip out all unknown options
     unknown_options = [opt for opt in search_options
-                        if opt not in allowed_search_options]
+                       if opt not in allowed_search_options]
     LOG.debug(_("Removing options '%s' from query"),
               ", ".join(unknown_options))
     for opt in unknown_options:

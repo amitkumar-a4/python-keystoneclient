@@ -7,4 +7,4 @@ import workloadmgr.flags
 import workloadmgr.openstack.common.importutils
 
 API = workloadmgr.openstack.common.importutils.import_class(
-        workloadmgr.flags.FLAGS.workloads_api_class)
+    workloadmgr.flags.FLAGS.workloads_api_class)

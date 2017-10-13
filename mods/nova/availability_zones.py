@@ -32,7 +32,7 @@ availability_zone_opts = [
     cfg.StrOpt('default_availability_zone',
                default='nova',
                help='default compute node availability_zone'),
-    ]
+]
 
 CONF = cfg.CONF
 CONF.register_opts(availability_zone_opts)
@@ -65,7 +65,7 @@ def set_availability_zones(context, services):
     # Makes sure services isn't a sqlalchemy object
     services = [dict(service.iteritems()) for service in services]
     metadata = db.aggregate_host_get_by_metadata_key(context,
-            key='availability_zone')
+                                                     key='availability_zone')
     for service in services:
         az = CONF.internal_service_availability_zone
         if service['topic'] == "compute":
@@ -74,7 +74,7 @@ def set_availability_zones(context, services):
             else:
                 az = CONF.default_availability_zone
                 if 'vmware_az' in service['host']:
-                    az = 'vmware_az' 
+                    az = 'vmware_az'
                 # update the cache
                 cache = _get_cache()
                 cache_key = _make_cache_key(service['host'])
@@ -96,8 +96,8 @@ def get_host_availability_zone(context, host, conductor_api=None):
     else:
         az = CONF.default_availability_zone
         if 'vmware_az' in host:
-            az = 'vmware_az' 
-        
+            az = 'vmware_az'
+
     return az
 
 
@@ -123,7 +123,7 @@ def get_availability_zones(context, get_only_available=False):
         disabled_services = set_availability_zones(context, disabled_services)
         not_available_zones = []
         zones = [service['availability_zone'] for service in disabled_services
-                if service['availability_zone'] not in available_zones]
+                 if service['availability_zone'] not in available_zones]
         for zone in zones:
             if zone not in not_available_zones:
                 not_available_zones.append(zone)

@@ -19,6 +19,7 @@ CONF.import_opt('compute_topic', 'nova.compute.rpcapi')
 CONF.import_opt('enable', 'nova.cells.opts', group='cells')
 CONF.import_opt('default_ephemeral_format', 'nova.virt.driver')
 
+
 class VMwareAPI(base.Base):
     """API for interacting with vmware vcenter to discover top level abstracts"""
 
@@ -28,7 +29,7 @@ class VMwareAPI(base.Base):
 
     def get_datacenters(self):
         dcs = cm.list_datacenters()
-        
+
         # get the datastores, hosts (clusters) and networks
         for dc in dcs:
             pass

@@ -12,12 +12,13 @@ from workloadmgr.virt.libvirt import qemuimages
 
 libvirt_opts = [
 
-    ]
+]
 
 CONF = cfg.CONF
 CONF.register_opts(libvirt_opts)
 LOG = logging.getLogger(__name__)
-   
+
+
 def get_instance_path(instance_id, relative=False):
     """Determine the correct path for instance storage.
     This method determines the directory name for instance storage
@@ -27,5 +28,4 @@ def get_instance_path(instance_id, relative=False):
     """
     if relative:
         return instance_id
-    return os.path.join(CONF.instances_path, instance_id)    
-
+    return os.path.join(CONF.instances_path, instance_id)

@@ -52,5 +52,6 @@ def main(argv):
     install.install_dependencies()
     print_help()
 
+
 if __name__ == '__main__':
     main(sys.argv)

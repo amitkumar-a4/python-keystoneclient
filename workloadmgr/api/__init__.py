@@ -31,6 +31,7 @@ def root_app_factory(loader, global_conf, **local_conf):
         del local_conf['/v1']
     return paste.urlmap.urlmap_factory(loader, global_conf, **local_conf)
 
+
 class APIMapper(routes.Mapper):
     def routematch(self, url=None, environ=None):
         if url is "":
