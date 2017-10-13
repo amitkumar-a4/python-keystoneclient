@@ -50,20 +50,22 @@ def upload_settings_db_entry(cntx):
     settings_json = jsonutils.dumps(settings_db)
     settings_path = os.path.join(str(CONF.cloud_unique_id), "settings_db")
     db_settings = json.loads(settings_json)
-    available_settings = []
-    for setting in db_settings:
-        available_settings.append(setting['type'])
+    db_settings_keys = [setting['type'] for setting in db_settings]
 
     try:
         backend_settings = json.loads(backup_target.get_object(settings_path))
     except Exception as ex:
         backend_settings = []
+    backend_settings_keys = [setting['type'] for setting in backend_settings]
 
-    for setting in backend_settings:
-        if setting['type'] in available_settings:
-            backend_settings.remove(setting)
+    #If on the backend we have more settings than DB means we havn't
+    #imported them yet, In that case appending DB settings with backend settings.
+    if len(backend_settings) > len(db_settings) or len(list(set(db_settings_keys) - set(backend_settings_keys))):
+        for setting in backend_settings:
+            if setting['type'] in db_settings_keys:
+                backend_settings.remove(setting)
 
-    db_settings.extend(backend_settings)
+        db_settings.extend(backend_settings)
     db_settings = json.dumps(db_settings)
     backup_target.put_object(settings_path, db_settings)
 
