@@ -540,7 +540,7 @@ class NfsTrilioVaultBackupTarget(TrilioVaultBackupTarget):
             snapshot_vm_path,
             'vm_res_id_%s_%s' %
             (snapshot_vm_resource_metadata['snapshot_vm_resource_id'],
-                snapshot_vm_resource_metadata['snapshot_vm_resource_name'].replace(' ', '')))
+             snapshot_vm_resource_metadata['snapshot_vm_resource_name'].replace(' ', '')))
 
         return snapshot_vm_resource_path
 

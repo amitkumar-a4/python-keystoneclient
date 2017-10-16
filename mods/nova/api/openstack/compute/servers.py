@@ -789,8 +789,8 @@ class Controller(wsgi.Controller):
         sg_names = list(set(sg_names))
 
         requested_networks = None
-        if (self.ext_mgr.is_loaded('os-networks')
-                or utils.is_neutron()):
+        if (self.ext_mgr.is_loaded('os-networks') or
+                utils.is_neutron()):
             requested_networks = server_dict.get('networks')
 
         if requested_networks is not None:
@@ -1211,8 +1211,8 @@ class Controller(wsgi.Controller):
     @wsgi.action('changePassword')
     def _action_change_password(self, req, id, body):
         context = req.environ['nova.context']
-        if ('changePassword' not in body
-                or 'adminPass' not in body['changePassword']):
+        if ('changePassword' not in body or
+                'adminPass' not in body['changePassword']):
             msg = _("No adminPass was specified")
             raise exc.HTTPBadRequest(explanation=msg)
         password = body['changePassword']['adminPass']

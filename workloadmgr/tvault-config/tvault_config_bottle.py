@@ -1045,8 +1045,7 @@ def _authenticate_with_keystone():
     if config_data['nodetype'] == 'controller':
         # this is the first node
         config_data['sql_connection'] = 'mysql://root:' + TVAULT_SERVICE_PASSWORD + \
-            '@' + config_data['floating_ipaddress'] + \
-            '/workloadmgr?charset=utf8'
+            '@' + config_data['floating_ipaddress'] + '/workloadmgr?charset=utf8'
         config_data['rabbit_host'] = config_data['floating_ipaddress']
         config_data['rabbit_password'] = TVAULT_SERVICE_PASSWORD
     else:
@@ -1064,8 +1063,7 @@ def _authenticate_with_keystone():
         parse_result = urlparse(wlm_public_url)
 
         config_data['sql_connection'] = 'mysql://root:' + TVAULT_SERVICE_PASSWORD + \
-            '@' + config_data['floating_ipaddress'] + \
-            '/workloadmgr?charset=utf8'
+            '@' + config_data['floating_ipaddress'] + '/workloadmgr?charset=utf8'
         config_data['rabbit_host'] = config_data['floating_ipaddress']
         config_data['rabbit_password'] = TVAULT_SERVICE_PASSWORD
 
@@ -2733,8 +2731,7 @@ def configure_host():
         subprocess.call(command, shell=False)
 
         config_data['sql_connection'] = 'mysql://root:' + TVAULT_SERVICE_PASSWORD + \
-            '@' + config_data['floating_ipaddress'] + \
-            '/workloadmgr?charset=utf8'
+            '@' + config_data['floating_ipaddress'] + '/workloadmgr?charset=utf8'
         engine = create_engine(config_data['sql_connection'])
         update = models.Service.__table__.update().where(models.Service.__table__.columns.host ==
                                                          prev_hostname). values({'host': socket.gethostname()})
@@ -3807,8 +3804,8 @@ def ntp_setup():
             detect = 0
             for line in contents.splitlines():
                 line = line.strip()
-                if (line.find('#server ') != -1 or line.find('server ')
-                        != -1) and (detect == 0 or detect == 1):
+                if (line.find('#server ') != -1 or line.find('server ') !=
+                        -1) and (detect == 0 or detect == 1):
                     detect = 1
                 else:
                     if line.find('fallback') != -1 and detect == 1:
@@ -3859,8 +3856,7 @@ def configure_vmware():
         config_inputs = bottle.request.POST
         if config_inputs['refresh'] == '1':
             config_data['sql_connection'] = 'mysql://root:' + TVAULT_SERVICE_PASSWORD + \
-                '@' + config_inputs['tvault-primary-node'] + \
-                '/workloadmgr?charset=utf8'
+                '@' + config_inputs['tvault-primary-node'] + '/workloadmgr?charset=utf8'
             engine = create_engine(config_data['sql_connection'])
             for row in engine.execute(select([models.Settings.__table__]).where(
                     models.Settings.__table__.columns.project_id == 'Configurator')):

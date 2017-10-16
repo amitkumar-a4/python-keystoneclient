@@ -309,8 +309,8 @@ class API(base.Base):
             # That is why True is returned if 'port_security_enabled'
             # is not found.
             if (security_groups and not (
-                    network['subnets']
-                    and network.get('port_security_enabled', True))):
+                    network['subnets'] and
+                    network.get('port_security_enabled', True))):
 
                 raise exception.SecurityGroupCannotBeApplied()
             network_id = network['id']
@@ -370,8 +370,8 @@ class API(base.Base):
     def _refresh_neutron_extensions_cache(self):
         """Refresh the neutron extensions cache when necessary."""
         if (not self.last_neutron_extension_sync or
-            ((time.time() - self.last_neutron_extension_sync)
-             >= CONF.neutron_extension_sync_interval)):
+            ((time.time() - self.last_neutron_extension_sync) >=
+             CONF.neutron_extension_sync_interval)):
             neutron = neutronv2.get_client(context.get_admin_context(),
                                            admin=True)
             extensions_list = neutron.list_extensions()['extensions']

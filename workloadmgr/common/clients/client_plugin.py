@@ -245,9 +245,9 @@ class ClientPlugin(object):
     def client(self):
         if not self._client:
             self._client = self._create()
-        elif (cfg.CONF.reauthentication_auth_method == 'trusts'
-                and self.context.auth_plugin.auth_ref.will_expire_soon(
-                    cfg.CONF.stale_token_duration)):
+        elif (cfg.CONF.reauthentication_auth_method == 'trusts' and
+              self.context.auth_plugin.auth_ref.will_expire_soon(
+                  cfg.CONF.stale_token_duration)):
             # If the token is near expiry, force creating a new client,
             # which will get a new token via another call to auth_token
             # We also have to invalidate all other cached clients
