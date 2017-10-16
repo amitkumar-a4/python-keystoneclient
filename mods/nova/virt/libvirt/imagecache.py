@@ -497,8 +497,8 @@ class ImageCacheManager(object):
         if base_file in self.unexplained_images:
             self.unexplained_images.remove(base_file)
 
-        if (base_file and os.path.exists(base_file)
-                and os.path.isfile(base_file)):
+        if (base_file and os.path.exists(base_file) and
+                os.path.isfile(base_file)):
             # _verify_checksum returns True if the checksum is ok, and None if
             # there is no checksum file
             checksum_result = self._verify_checksum(img_id, base_file)

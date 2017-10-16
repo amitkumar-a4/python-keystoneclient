@@ -496,8 +496,8 @@ def get_usedblockslist_from_part(mountpath, usedblockfile, part, blocksize):
     except BaseException:
         # we did not recognize a valid partition on the disk. Copy
         # entire partition
-        LOG.info(_("No valid ext fs found on partitin starting at:"
-                   + str(part['start'])))
+        LOG.info(_("No valid ext fs found on partitin starting at:" +
+                   str(part['start'])))
         startblk = 0
         length = (int(part['blocks']) * 1024) / blocksize
         usedblocks = "startblk " + str(startblk) + " length " + str(length)
@@ -533,8 +533,8 @@ def get_usedblockslist_from_lv(mountpath, usedblockfiles, lv, pvinfo,
         # we did not recognize a valid file system on the lv.
         # we probably need to bail out and backup the entire
         # partition using cbt
-        LOG.info(_("No valid ext fs found on partitin starting on: /dev/"
-                   + lv['LVM2_VG_NAME'] + "/" + lv['LVM2_LV_NAME']))
+        LOG.info(_("No valid ext fs found on partitin starting on: /dev/" +
+                   lv['LVM2_VG_NAME'] + "/" + lv['LVM2_LV_NAME']))
         startblk = 0
         length = int(lv['LVM2_LV_SIZE']) / blocksize
         usedblocks = "startblk " + str(startblk) + " length " + str(length)
@@ -736,8 +736,8 @@ def get_partition_table_from_vmdk(hostip, username, password, vmspec,
                             str(extended_part['start']), 2048)
 
             with open(extentsfile, "a") as f:
-                f.write(str(int(extended_part['start']) * 512) + ","
-                        + str(2048 * 512) + "\n")
+                f.write(str(int(extended_part['start']) * 512) + "," +
+                        str(2048 * 512) + "\n")
 
             with mount_local_vmdk(listfile, mntlist, diskonly=True) as mountpaths:
                 for key, value in mountpaths.iteritems():
@@ -756,8 +756,8 @@ def get_partition_table_from_vmdk(hostip, username, password, vmspec,
                                         str(int(part['end']) + 1), 2048)
 
                         with open(extentsfile, "a") as f:
-                            f.write(str(int(part['end'] + 1) * 512) + ","
-                                    + str(2048 * 512) + "\n")
+                            f.write(str(int(part['end'] + 1) * 512) + "," +
+                                    str(2048 * 512) + "\n")
 
                 with mount_local_vmdk(listfile, mntlist, diskonly=True) as mountpaths:
                     for key, value in mountpaths.iteritems():

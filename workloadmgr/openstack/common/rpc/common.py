@@ -371,7 +371,8 @@ def deserialize_remote_exception(conf, data):
 
     ex_type = type(failure)
 
-    def str_override(self): return message
+    def str_override(self):
+        return message
     new_ex_type = type(ex_type.__name__ + "_Remote", (ex_type,),
                        {'__str__': str_override, '__unicode__': str_override})
     try:

@@ -1593,8 +1593,7 @@ def LinearPrepareBackupImages(context, instance, snapshotobj):
             continue
 
         flow.add(PrepareBackupImage("PrepareBackupImage" + snapshot_vm_resource.id,
-                                    rebind=dict(
-                                        vm_resource_id=snapshot_vm_resource.id),
+                                    rebind=dict(vm_resource_id=snapshot_vm_resource.id),
                                     provides=('restore_file_path_' + str(snapshot_vm_resource.id),
                                               'image_virtual_size_' + str(snapshot_vm_resource.id))))
     return flow
