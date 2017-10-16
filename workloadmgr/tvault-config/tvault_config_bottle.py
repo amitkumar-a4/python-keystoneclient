@@ -106,7 +106,8 @@ class SSLWSGIRefServer(ServerAdapter):
         import ssl
         if self.quiet:
             class QuietHandler(WSGIRequestHandler):
-                def log_request(*args, **kw): pass
+                def log_request(*args, **kw):
+                    pass
             self.options['handler_class'] = QuietHandler
         srv = make_server(self.host, self.port, handler, **self.options)
         srv.socket = ssl.wrap_socket(
@@ -2705,7 +2706,7 @@ def configure_host():
         command = ['sudo', 'mv', abs_path, "/etc/hostname"]
         subprocess.call(command, shell=False)
         os.chmod('/etc/hostname', 0o644)
-        command = ['sudo', 'chown', 'root:root', "/etc/hostname"];
+        command = ['sudo', 'chown', 'root:root', "/etc/hostname"]
         command = ['sudo', 'service', 'hostname', 'restart']
         subprocess.call(command, shell=False)
         command = ['sudo', 'service', 'networking', 'restart']
@@ -2728,7 +2729,7 @@ def configure_host():
         command = ['sudo', 'mv', abs_path, "/etc/hosts"]
         subprocess.call(command, shell=False)
         os.chmod('/etc/hosts', 0o644)
-        command = ['sudo', 'chown', 'root:root', "/etc/hosts"];
+        command = ['sudo', 'chown', 'root:root', "/etc/hosts"]
         subprocess.call(command, shell=False)
 
         config_data['sql_connection'] = 'mysql://root:' + TVAULT_SERVICE_PASSWORD + \
@@ -2758,7 +2759,7 @@ def configure_host():
             subprocess.call(command, shell=False)
             os.chmod('/etc/resolvconf/resolv.conf.d/base', 0o644)
             command = ['sudo', 'chown', 'root:root',
-                       "/etc/resolvconf/resolv.conf.d/base"];
+                       "/etc/resolvconf/resolv.conf.d/base"]
             subprocess.call(command, shell=False)
             command = ['sudo', 'resolvconf', '-u']
             subprocess.call(command, shell=False)
@@ -3634,7 +3635,7 @@ def start_swift_service():
         except BaseException:
             os.mkdir(config_data['vault_data_directory'])
         command = ['sudo', 'chown', WLM_USER + ':' +
-                   WLM_USER, config_data['vault_data_directory']];
+                   WLM_USER, config_data['vault_data_directory']]
         subprocess.call(command, shell=False)
         command = [
             'sudo',
@@ -3642,7 +3643,7 @@ def start_swift_service():
             WLM_USER +
             ':' +
             WLM_USER,
-            config_data['vault_data_directory_old']];
+            config_data['vault_data_directory_old']]
         subprocess.call(command, shell=False)
         command = [
             'sudo',
@@ -3650,7 +3651,7 @@ def start_swift_service():
             WLM_USER +
             ':' +
             WLM_USER,
-            '/etc/fuse.conf'];
+            '/etc/fuse.conf']
         subprocess.call(command, shell=False)
         command = ['sudo', 'service', 'tvault-swift', 'restart']
         subprocess.call(command, shell=False)
@@ -4401,7 +4402,7 @@ def set_network_interfaces(propertyMap):
     command = ['sudo', 'mv', abs_path, "/etc/network/interfaces"]
     subprocess.call(command, shell=False)
     os.chmod('/etc/hostname', 0o644)
-    command = ['sudo', 'chown', 'root:root', "/etc/network/interfaces"];
+    command = ['sudo', 'chown', 'root:root', "/etc/network/interfaces"]
     subprocess.call(command, shell=False)
 
     command = ['sudo', 'ifdown', 'br-eth0']
@@ -4450,7 +4451,7 @@ def main():
             command = ['sudo', 'mv', abs_path, "/etc/hostname"]
             subprocess.call(command, shell=False)
             os.chmod('/etc/hostname', 0o644)
-            command = ['sudo', 'chown', 'root:root', "/etc/hostname"];
+            command = ['sudo', 'chown', 'root:root', "/etc/hostname"]
             subprocess.call(command, shell=False)
 
             command = ['sudo', 'hostname', hostname]
@@ -4471,7 +4472,7 @@ def main():
             command = ['sudo', 'mv', abs_path, "/etc/hosts"]
             subprocess.call(command, shell=False)
             os.chmod('/etc/hosts', 0o644)
-            command = ['sudo', 'chown', 'root:root', "/etc/hosts"];
+            command = ['sudo', 'chown', 'root:root', "/etc/hosts"]
             subprocess.call(command, shell=False)
 
             set_network_interfaces(propertyMap)

@@ -309,9 +309,10 @@ def get_available_languages(domain):
 
     localedir = '%s_LOCALEDIR' % domain.upper()
 
-    def find(x): return gettext.find(domain,
-                                     localedir=os.environ.get(localedir),
-                                     languages=[x])
+    def find(x):
+        return gettext.find(domain,
+                            localedir=os.environ.get(localedir),
+                            languages=[x])
 
     # NOTE(mrodden): en_US should always be available (and first in case
     # order matters) since our in-line message strings are en_US

@@ -173,9 +173,8 @@ class Brain(object):
             LOG.warning(_("Inheritance-based rules are deprecated; update "
                           "_check_%s") % match_kind)
 
-            def func(brain, kind, value, target, cred): return old_func(value,
-                                                                        target,
-                                                                        cred)
+            def func(brain, kind, value, target, cred):
+                return old_func(value, target, cred)
 
         if not func:
             LOG.error(_("No handler for matches of kind %s") % match_kind)

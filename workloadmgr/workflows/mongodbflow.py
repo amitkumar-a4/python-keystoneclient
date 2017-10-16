@@ -244,7 +244,7 @@ class PauseBalancer(task.Task):
                 timeout = settings.get_settings().get('mongodb_stop_balancer_timeout', '300')
                 currtime = time.time()
                 db.settings.update({'_id': 'balancer'}, {
-                                   '$set': {'stopped': True}}, True);
+                                   '$set': {'stopped': True}}, True)
                 balancer_info = db.locks.find_one({'_id': 'balancer'})
                 while int(str(balancer_info['state'])) > 0 and\
                         time.time() - currtime < timeout:
@@ -273,7 +273,7 @@ class PauseBalancer(task.Task):
             # Resume DB
             db = self.client.config
             db.settings.update({'_id': 'balancer'}, {
-                               '$set': {'stopped': False}}, True);
+                               '$set': {'stopped': False}}, True)
         except Exception as ex:
             LOG.exception(ex)
         finally:
@@ -299,7 +299,7 @@ class ResumeBalancer(task.Task):
 
                 db = self.client.config
                 db.settings.update({'_id': 'balancer'}, {
-                                   '$set': {'stopped': False}}, True);
+                                   '$set': {'stopped': False}}, True)
                 return
             except BaseException:
                 LOG.debug(_('"' + cfghost + '" appears to be offline'))
