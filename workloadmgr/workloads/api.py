@@ -1471,7 +1471,7 @@ class API(base.Base):
                 "username=admin&password=password",
                 "https://" +
                 ip +
-                "/login"];
+                "/login"]
             try:
                 res = subprocess.check_output(command)
             except Exception as ex:
@@ -1488,7 +1488,7 @@ class API(base.Base):
             command = ['sudo', 'curl', '-k', '--cookie', file_name, '--data',
                        "refresh=1&from=api&tvault-primary-node=" +
                        controller_ip + "&nodetype=additional",
-                       "https://" + ip + "/configure_vmware"];
+                       "https://" + ip + "/configure_vmware"]
             subprocess.call(command, shell=False)
             urls = [
                 'configure_host',
@@ -1521,7 +1521,7 @@ class API(base.Base):
                     "https://" +
                     ip +
                     "/" +
-                    url];
+                    url]
                 res = subprocess.check_output(command)
                 if res != '{"status": "Success"}' and url != 'ntp_setup':
                     command = ['sudo', 'rm', '-rf', file_name]

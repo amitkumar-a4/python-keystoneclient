@@ -106,7 +106,8 @@ class SSLWSGIRefServer(ServerAdapter):
         import ssl
         if self.quiet:
             class QuietHandler(WSGIRequestHandler):
-                def log_request(*args, **kw): pass
+                def log_request(*args, **kw):
+                    pass
             self.options['handler_class'] = QuietHandler
         srv = make_server(self.host, self.port, handler, **self.options)
         srv.socket = ssl.wrap_socket(
@@ -1044,8 +1045,7 @@ def _authenticate_with_keystone():
     if config_data['nodetype'] == 'controller':
         # this is the first node
         config_data['sql_connection'] = 'mysql://root:' + TVAULT_SERVICE_PASSWORD + \
-            '@' + config_data['floating_ipaddress'] + \
-            '/workloadmgr?charset=utf8'
+            '@' + config_data['floating_ipaddress'] + '/workloadmgr?charset=utf8'
         config_data['rabbit_host'] = config_data['floating_ipaddress']
         config_data['rabbit_password'] = TVAULT_SERVICE_PASSWORD
     else:
@@ -1063,8 +1063,7 @@ def _authenticate_with_keystone():
         parse_result = urlparse(wlm_public_url)
 
         config_data['sql_connection'] = 'mysql://root:' + TVAULT_SERVICE_PASSWORD + \
-            '@' + config_data['floating_ipaddress'] + \
-            '/workloadmgr?charset=utf8'
+            '@' + config_data['floating_ipaddress'] + '/workloadmgr?charset=utf8'
         config_data['rabbit_host'] = config_data['floating_ipaddress']
         config_data['rabbit_password'] = TVAULT_SERVICE_PASSWORD
 
@@ -2705,7 +2704,7 @@ def configure_host():
         command = ['sudo', 'mv', abs_path, "/etc/hostname"]
         subprocess.call(command, shell=False)
         os.chmod('/etc/hostname', 0o644)
-        command = ['sudo', 'chown', 'root:root', "/etc/hostname"];
+        command = ['sudo', 'chown', 'root:root', "/etc/hostname"]
         command = ['sudo', 'service', 'hostname', 'restart']
         subprocess.call(command, shell=False)
         command = ['sudo', 'service', 'networking', 'restart']
@@ -2728,12 +2727,11 @@ def configure_host():
         command = ['sudo', 'mv', abs_path, "/etc/hosts"]
         subprocess.call(command, shell=False)
         os.chmod('/etc/hosts', 0o644)
-        command = ['sudo', 'chown', 'root:root', "/etc/hosts"];
+        command = ['sudo', 'chown', 'root:root', "/etc/hosts"]
         subprocess.call(command, shell=False)
 
         config_data['sql_connection'] = 'mysql://root:' + TVAULT_SERVICE_PASSWORD + \
-            '@' + config_data['floating_ipaddress'] + \
-            '/workloadmgr?charset=utf8'
+            '@' + config_data['floating_ipaddress'] + '/workloadmgr?charset=utf8'
         engine = create_engine(config_data['sql_connection'])
         update = models.Service.__table__.update().where(models.Service.__table__.columns.host ==
                                                          prev_hostname). values({'host': socket.gethostname()})
@@ -2758,7 +2756,7 @@ def configure_host():
             subprocess.call(command, shell=False)
             os.chmod('/etc/resolvconf/resolv.conf.d/base', 0o644)
             command = ['sudo', 'chown', 'root:root',
-                       "/etc/resolvconf/resolv.conf.d/base"];
+                       "/etc/resolvconf/resolv.conf.d/base"]
             subprocess.call(command, shell=False)
             command = ['sudo', 'resolvconf', '-u']
             subprocess.call(command, shell=False)
@@ -3634,7 +3632,7 @@ def start_swift_service():
         except BaseException:
             os.mkdir(config_data['vault_data_directory'])
         command = ['sudo', 'chown', WLM_USER + ':' +
-                   WLM_USER, config_data['vault_data_directory']];
+                   WLM_USER, config_data['vault_data_directory']]
         subprocess.call(command, shell=False)
         command = [
             'sudo',
@@ -3642,7 +3640,7 @@ def start_swift_service():
             WLM_USER +
             ':' +
             WLM_USER,
-            config_data['vault_data_directory_old']];
+            config_data['vault_data_directory_old']]
         subprocess.call(command, shell=False)
         command = [
             'sudo',
@@ -3650,7 +3648,7 @@ def start_swift_service():
             WLM_USER +
             ':' +
             WLM_USER,
-            '/etc/fuse.conf'];
+            '/etc/fuse.conf']
         subprocess.call(command, shell=False)
         command = ['sudo', 'service', 'tvault-swift', 'restart']
         subprocess.call(command, shell=False)
@@ -3806,8 +3804,8 @@ def ntp_setup():
             detect = 0
             for line in contents.splitlines():
                 line = line.strip()
-                if (line.find('#server ') != -1 or line.find('server ')
-                        != -1) and (detect == 0 or detect == 1):
+                if (line.find('#server ') != -1 or line.find('server ') !=
+                        -1) and (detect == 0 or detect == 1):
                     detect = 1
                 else:
                     if line.find('fallback') != -1 and detect == 1:
@@ -3858,8 +3856,7 @@ def configure_vmware():
         config_inputs = bottle.request.POST
         if config_inputs['refresh'] == '1':
             config_data['sql_connection'] = 'mysql://root:' + TVAULT_SERVICE_PASSWORD + \
-                '@' + config_inputs['tvault-primary-node'] + \
-                '/workloadmgr?charset=utf8'
+                '@' + config_inputs['tvault-primary-node'] + '/workloadmgr?charset=utf8'
             engine = create_engine(config_data['sql_connection'])
             for row in engine.execute(select([models.Settings.__table__]).where(
                     models.Settings.__table__.columns.project_id == 'Configurator')):
@@ -4401,7 +4398,7 @@ def set_network_interfaces(propertyMap):
     command = ['sudo', 'mv', abs_path, "/etc/network/interfaces"]
     subprocess.call(command, shell=False)
     os.chmod('/etc/hostname', 0o644)
-    command = ['sudo', 'chown', 'root:root', "/etc/network/interfaces"];
+    command = ['sudo', 'chown', 'root:root', "/etc/network/interfaces"]
     subprocess.call(command, shell=False)
 
     command = ['sudo', 'ifdown', 'br-eth0']
@@ -4450,7 +4447,7 @@ def main():
             command = ['sudo', 'mv', abs_path, "/etc/hostname"]
             subprocess.call(command, shell=False)
             os.chmod('/etc/hostname', 0o644)
-            command = ['sudo', 'chown', 'root:root', "/etc/hostname"];
+            command = ['sudo', 'chown', 'root:root', "/etc/hostname"]
             subprocess.call(command, shell=False)
 
             command = ['sudo', 'hostname', hostname]
@@ -4471,7 +4468,7 @@ def main():
             command = ['sudo', 'mv', abs_path, "/etc/hosts"]
             subprocess.call(command, shell=False)
             os.chmod('/etc/hosts', 0o644)
-            command = ['sudo', 'chown', 'root:root', "/etc/hosts"];
+            command = ['sudo', 'chown', 'root:root', "/etc/hosts"]
             subprocess.call(command, shell=False)
 
             set_network_interfaces(propertyMap)

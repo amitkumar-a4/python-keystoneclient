@@ -57,8 +57,8 @@ class TasksController(wsgi.Controller):
 
             # function to get values from query string if it's available
             # else it will assign None
-            def get_value(value): return var.get(
-                value, [None])[0] if var else None
+            def get_value(value):
+                return var.get(value, [None])[0] if var else None
 
             time_in_minutes = get_value(value='time_in_minutes')
             status = get_value(value='status')

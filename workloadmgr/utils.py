@@ -1590,11 +1590,11 @@ def get_local_time(record_time, input_format, output_format, tz):
             if not input_format \
                     or input_format is None \
                     or input_format == '':
-                input_format = '%Y-%m-%dT%H:%M:%S.%f';
+                input_format = '%Y-%m-%dT%H:%M:%S.%f'
             if not output_format  \
                     or output_format is None \
                     or output_format == '':
-                output_format = "%m/%d/%Y %I:%M:%S %p";
+                output_format = "%m/%d/%Y %I:%M:%S %p"
 
             local_time = datetime.datetime.strptime(
                 record_time, input_format)

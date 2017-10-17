@@ -219,14 +219,18 @@ def to_unicode(string, encoding='ascii'):
 
 
 if sys.version_info < (3, 0):  # pragma: nocover
-    def iteritems(d): return d.iteritems()
+    def iteritems(d):
+        return d.iteritems()
 
-    def itervalues(d): return d.itervalues()
+    def itervalues(d):
+        return d.itervalues()
     xrange = xrange
     basestring = basestring
 else:  # pragma: nocover
-    def iteritems(d): return d.items()
+    def iteritems(d):
+        return d.items()
 
-    def itervalues(d): return d.values()
+    def itervalues(d):
+        return d.values()
     xrange = range
     basestring = str

@@ -3294,7 +3294,7 @@ def restored_vm_resource_get(context, id):
             models.RestoredVMResources) .options(
             sa_orm.joinedload(
                 models.RestoredVMResources.metadata)) .filter_by(
-                id=id)
+            id=id)
 
         # TODO(gbasava): filter out deleted restored if context disallows it
         restored_vm_resources = query.first()

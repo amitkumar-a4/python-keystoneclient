@@ -460,8 +460,8 @@ class ClusterComputeResource(ManagedObject):
             summary.numCpuCores += host_summary.hardware.numCpuCores
             summary.numCpuThreads += host_summary.hardware.numCpuThreads
             summary.totalMemory += host_summary.hardware.memorySize
-            free_memory = (host_summary.hardware.memorySize / (1024 * 1024)
-                           - host_summary.quickStats.overallMemoryUsage)
+            free_memory = (host_summary.hardware.memorySize / (1024 * 1024) -
+                           host_summary.quickStats.overallMemoryUsage)
             summary.effectiveMemory += free_memory if connected else 0
             summary.numEffectiveHosts += 1 if connected else 0
         self.set("summary", summary)

@@ -237,8 +237,8 @@ class ProcessLauncher(object):
         wrap = ServerWrapper(server, workers)
         self.totalwrap = self.totalwrap + 1
         LOG.info(_('Starting %d workers'), wrap.workers)
-        while (self.running and len(wrap.children) < wrap.workers
-               and not wrap.failed):
+        while (self.running and len(wrap.children) < wrap.workers and
+                not wrap.failed):
             self._start_child(wrap)
 
     def _wait_child(self):
@@ -286,8 +286,8 @@ class ProcessLauncher(object):
                 continue
 
             LOG.info(_('wait wrap.failed %s'), wrap.failed)
-            while (self.running and len(wrap.children) < wrap.workers
-                   and not wrap.failed):
+            while (self.running and len(wrap.children) < wrap.workers and
+                    not wrap.failed):
                 self._start_child(wrap)
 
         if self.sigcaught:

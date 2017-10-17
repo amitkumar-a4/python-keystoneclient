@@ -188,10 +188,10 @@ class BaseWorkloadTypeCassandraTestCase(test.TestCase):
         """Test workload can be created and deleted."""
 
         workload_type = self.workloadAPI.workload_type_create(self.context,
-			    self.workload_params['display_name'],
-                            self.workload_params['display_description'],
-                            self.workload_params['is_public'],
-                            self.workload_params['metadata'],)
+                        self.workload_params['display_name'],
+                        self.workload_params['display_description'],
+                        self.workload_params['is_public'],
+                        self.workload_params['metadata'],)
 
         workload_type = self.db.workload_type_get(self.context,
                                                   workload_type['id'])

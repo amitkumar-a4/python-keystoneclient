@@ -540,9 +540,7 @@ class NfsTrilioVaultBackupTarget(TrilioVaultBackupTarget):
             snapshot_vm_path,
             'vm_res_id_%s_%s' %
             (snapshot_vm_resource_metadata['snapshot_vm_resource_id'],
-             snapshot_vm_resource_metadata['snapshot_vm_resource_name'].replace(
-                ' ',
-                '')))
+             snapshot_vm_resource_metadata['snapshot_vm_resource_name'].replace(' ', '')))
 
         return snapshot_vm_resource_path
 
@@ -583,8 +581,8 @@ class NfsTrilioVaultBackupTarget(TrilioVaultBackupTarget):
             'vm_res_id_%s_%s' %
             (restore_vm_resource_metadata['snapshot_vm_resource_id'],
              restore_vm_resource_metadata['snapshot_vm_resource_name'].replace(
-                ' ',
-                '')))
+             ' ',
+             '')))
         return restore_vm_resource_staging_path
 
     def get_restore_vm_disk_resource_staging_path(

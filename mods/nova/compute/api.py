@@ -1015,8 +1015,8 @@ class API(base.Base):
         # Make sure that the boot indexes make sense
         boot_indexes = sorted([bdm['boot_index']
                                for bdm in all_mappings
-                               if bdm.get('boot_index') is not None
-                               and bdm.get('boot_index') >= 0])
+                               if bdm.get('boot_index') is not None and
+                               bdm.get('boot_index') >= 0])
 
         if 0 not in boot_indexes or not _subsequent_list(boot_indexes):
             raise exception.InvalidBDMBootSequence()
@@ -3303,8 +3303,8 @@ class API(base.Base):
 
         for bdm in bdms:
             if ((block_device.strip_dev(bdm['device_name']) ==
-                 block_device.strip_dev(instance['root_device_name']))
-                and
+                 block_device.strip_dev(instance['root_device_name'])) and
+
                 (bdm['volume_id'] is not None or
                  bdm['snapshot_id'] is not None)):
                 return True
