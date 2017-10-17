@@ -633,7 +633,7 @@ class VMwareVMOps(object):
                     data_store_name,
                     sparse_uploaded_vmdk_name)
                 if disk_type != "sparse":
-                   # Create a flat virtual disk and retain the metadata file.
+                    # Create a flat virtual disk and retain the metadata file.
                     _create_virtual_disk()
                     self._delete_datastore_file(instance,
                                                 flat_uploaded_vmdk_path,

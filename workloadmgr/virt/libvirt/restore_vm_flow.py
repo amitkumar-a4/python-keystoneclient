@@ -1391,7 +1391,8 @@ def LinearPrepareBackupImages(
                                     rebind=dict(vm_resource_id=snapshot_vm_resource.id,
                                                 volume_type='volume_type_' + snapshot_vm_resource.id),
                                     provides=('restore_file_path_' + str(snapshot_vm_resource.id),
-                                              'image_overlay_file_path_' + str(snapshot_vm_resource.id),
+                                              'image_overlay_file_path_' +
+                                              str(snapshot_vm_resource.id),
                                               'image_virtual_size_' + str(snapshot_vm_resource.id))))
     return flow
 
