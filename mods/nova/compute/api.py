@@ -667,8 +667,8 @@ class API(base.Base):
                 instance_type_id=instance_type['id'])
 
         if user_data:
-            l = len(user_data)
-            if l > MAX_USERDATA_SIZE:
+            ll = len(user_data)
+            if ll > MAX_USERDATA_SIZE:
                 # NOTE(mikal): user_data is stored in a text column, and
                 # the database might silently truncate if its over length.
                 raise exception.InstanceUserDataTooLarge(
