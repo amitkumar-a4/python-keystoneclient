@@ -407,10 +407,10 @@ def parse_mailmap(mailmap='.mailmap'):
     mapping = {}
     if os.path.exists(mailmap):
         fp = open(mailmap, 'r')
-        for l in fp:
-            l = l.strip()
-            if not l.startswith('#') and ' ' in l:
-                canonical_email, alias = l.split(' ')
+        for ll in fp:
+            ll = ll.strip()
+            if not ll.startswith('#') and ' ' in ll:
+                canonical_email, alias = ll.split(' ')
                 mapping[alias.lower()] = canonical_email.lower()
     return mapping
 
