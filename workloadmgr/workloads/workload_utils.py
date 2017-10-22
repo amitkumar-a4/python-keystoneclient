@@ -58,8 +58,8 @@ def upload_settings_db_entry(cntx):
         backend_settings = []
     backend_settings_keys = [setting['type'] for setting in backend_settings]
 
-    #If on the backend we have more settings than DB means we havn't
-    #imported them yet, In that case appending DB settings with backend settings.
+    # If on the backend we have more settings than DB means we havn't
+    # imported them yet, In that case appending DB settings with backend settings.
     if len(backend_settings) > len(db_settings) or len(list(set(db_settings_keys) - set(backend_settings_keys))):
         for setting in backend_settings:
             if setting['type'] in db_settings_keys:
