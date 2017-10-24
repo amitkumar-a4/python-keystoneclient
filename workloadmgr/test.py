@@ -48,14 +48,16 @@ from workloadmgr.openstack.common import timeutils
 from workloadmgr import service
 from workloadmgr.tests.unit import conf_fixture
 
-
 test_opts = [
     cfg.StrOpt('sqlite_clean_db',
                default='clean.sqlite',
                help='File name of clean sqlite db'),
     cfg.BoolOpt('fake_tests',
                 default=True,
-                help='should we use everything for testing'), ]
+                help='should we use everything for testing'),
+    cfg.StrOpt('policy_file',
+               default='workloadmgr/tests/unit/policy.json',
+               help='location for policy file') ]
 
 CONF = cfg.CONF
 CONF.register_opts(test_opts)
@@ -121,6 +123,7 @@ class Database(fixtures.Fixture):
 
 class TestCase(testtools.TestCase):
     """Test case base class for all unit tests."""
+    POLICY_PATH = 'workloadmgr/tests/unit/policy.json'
 
     def setUp(self):
         """Run before each test method to initialize test environment."""
@@ -186,6 +189,16 @@ class TestCase(testtools.TestCase):
         CONF.set_override('fatal_exception_format_errors', True)
         # This will be cleaned up by the NestedTempfile fixture
         CONF.set_override('lock_path', tempfile.mkdtemp())
+        CONF.set_override('policy_file',
+                                 os.path.join(
+                                 os.path.abspath(
+                                     os.path.join(
+                                         os.path.dirname(__file__),
+                                         '..',
+                                     )
+                                 ),
+                                 self.POLICY_PATH),
+                                 group='oslo_policy' )
 
     def tearDown(self):
         """Runs after each test method to tear down test environment."""
