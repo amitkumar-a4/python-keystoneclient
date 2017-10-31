@@ -48,6 +48,7 @@ from workloadmgr.openstack.common import timeutils
 from workloadmgr import service
 from workloadmgr.tests.unit import conf_fixture
 
+
 test_opts = [
     cfg.StrOpt('sqlite_clean_db',
                default='clean.sqlite',
