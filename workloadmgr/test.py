@@ -123,7 +123,6 @@ class Database(fixtures.Fixture):
 
 class TestCase(testtools.TestCase):
     """Test case base class for all unit tests."""
-    POLICY_PATH = 'workloadmgr/tests/unit/policy.json'
 
     def setUp(self):
         """Run before each test method to initialize test environment."""
@@ -197,7 +196,7 @@ class TestCase(testtools.TestCase):
                                       '..',
                                   )
                               ),
-                              self.POLICY_PATH),
+                              CONF.policy_file),
                           group='oslo_policy')
 
     def tearDown(self):
