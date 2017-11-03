@@ -1,26 +1,27 @@
 from datetime import datetime, timedelta
 from math import ceil
-
+from dateutil.parser import parse
 from workloadmgr.apscheduler.util import convert_to_datetime, timedelta_seconds
 
 
 class IntervalTrigger(object):
-    def __init__(self, interval, start_date=None):
+    def __init__(self, interval, start_time, start_date=None):
         if not isinstance(interval, timedelta):
             raise TypeError('interval must be a timedelta')
-        if start_date:
-            start_date = convert_to_datetime(start_date)
 
         self.interval = interval
+        self.start_time = start_time
         self.interval_length = timedelta_seconds(self.interval)
         if self.interval_length == 0:
             self.interval = timedelta(seconds=1)
             self.interval_length = 1
 
         if start_date is None:
-            self.start_date = datetime.now() + self.interval
+            self.start_date = convert_to_datetime(
+                parse(datetime.now().strftime("%m/%d/%Y") + " " + self.start_time))
         else:
-            self.start_date = convert_to_datetime(start_date)
+            self.start_date = convert_to_datetime(
+                parse(start_date + " " + self.start_time))
 
     def get_next_fire_time(self, start_date):
         if start_date < self.start_date:
@@ -34,6 +35,8 @@ class IntervalTrigger(object):
         return 'interval[%s]' % str(self.interval)
 
     def __repr__(self):
-        return "<%s (interval=%s, start_date=%s)>" % (
-            self.__class__.__name__, repr(self.interval),
+        return "<%s (interval=%s, start_time=%s, start_date=%s)>" % (
+            self.__class__.__name__, repr(
+                self.interval), repr(
+                self.start_time),
             repr(self.start_date))

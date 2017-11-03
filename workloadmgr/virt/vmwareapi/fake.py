@@ -204,8 +204,8 @@ class ManagedObject(object):
             if elem.name == attr:
                 return elem.val
         msg = _("Property %(attr)s not set for the managed object %(name)s")
-        raise exception.WorkloadMgrException(msg % {'attr': attr,
-                                             'name': self.__class__.__name__})
+        raise exception.WorkloadMgrException(
+            msg % {'attr': attr, 'name': self.__class__.__name__})
 
     def _generate_moid(self, prefix):
         """Generates a new Managed Object ID."""
@@ -214,7 +214,7 @@ class ManagedObject(object):
 
     def __repr__(self):
         return jsonutils.dumps(dict([(elem.name, elem.val)
-                                for elem in self.propSet]))
+                                     for elem in self.propSet]))
 
 
 class DataObject(object):
@@ -296,9 +296,9 @@ class VirtualMachine(ManagedObject):
         ds_do = kwargs.get("ds", None)
         self.set("datastore", _convert_to_array_of_mor(ds_do))
         self.set("summary.guest.toolsStatus", kwargs.get("toolsstatus",
-                                "toolsOk"))
+                                                         "toolsOk"))
         self.set("summary.guest.toolsRunningStatus", kwargs.get(
-                                "toolsrunningstate", "guestToolsRunning"))
+            "toolsrunningstate", "guestToolsRunning"))
         self.set("runtime.powerState", kwargs.get("powerstate", "poweredOn"))
         self.set("config.files.vmPathName", kwargs.get("vmPathName"))
         self.set("summary.config.numCpu", kwargs.get("numCpu", 1))
@@ -333,7 +333,7 @@ class VirtualMachine(ManagedObject):
             controller.key = controller_key
 
             self.set("config.hardware.device", [disk, controller,
-                                                  self.device[0]])
+                                                self.device[0]])
         except AttributeError:
             # Case of Reconfig of VM to set extra params
             self.set("config.extraConfig", val.extraConfig)
@@ -460,8 +460,8 @@ class ClusterComputeResource(ManagedObject):
             summary.numCpuCores += host_summary.hardware.numCpuCores
             summary.numCpuThreads += host_summary.hardware.numCpuThreads
             summary.totalMemory += host_summary.hardware.memorySize
-            free_memory = (host_summary.hardware.memorySize / (1024 * 1024)
-                           - host_summary.quickStats.overallMemoryUsage)
+            free_memory = (host_summary.hardware.memorySize / (1024 * 1024) -
+                           host_summary.quickStats.overallMemoryUsage)
             summary.effectiveMemory += free_memory if connected else 0
             summary.numEffectiveHosts += 1 if connected else 0
         self.set("summary", summary)
@@ -782,17 +782,17 @@ def fake_upload_image(context, image, instance, **kwargs):
 def fake_get_vmdk_size_and_properties(context, image_id, instance):
     """Fakes the file size and properties fetch for the image file."""
     props = {"vmware_ostype": "otherGuest",
-            "vmware_adaptertype": "lsiLogic"}
+             "vmware_adaptertype": "lsiLogic"}
     return _FAKE_FILE_SIZE, props
 
 
 def _get_vm_mdo(vm_ref):
     """Gets the Virtual Machine with the ref from the db."""
     if _db_content.get("VirtualMachine", None) is None:
-            raise exception.NotFound(_("There is no VM registered"))
+        raise exception.NotFound(_("There is no VM registered"))
     if vm_ref not in _db_content.get("VirtualMachine"):
         raise exception.NotFound(_("Virtual Machine with ref %s is not "
-                        "there") % vm_ref)
+                                   "there") % vm_ref)
     return _db_content.get("VirtualMachine")[vm_ref]
 
 
@@ -861,7 +861,7 @@ class FakeVim(object):
         if s not in _db_content['session']:
             raise exception.WorkloadMgrException(
                 _("Logging out a session that is invalid or already logged "
-                "out: %s") % s)
+                  "out: %s") % s)
         del _db_content['session'][s]
 
     def _terminate_session(self, *args, **kwargs):
@@ -874,11 +874,11 @@ class FakeVim(object):
     def _check_session(self):
         """Checks if the session is active."""
         if (self._session is None or self._session not in
-                 _db_content['session']):
+                _db_content['session']):
             LOG.debug(_("Session is faulty"))
             raise error_util.VimFaultException(
-                               [error_util.FAULT_NOT_AUTHENTICATED],
-                               _("Session Invalid"))
+                [error_util.FAULT_NOT_AUTHENTICATED],
+                _("Session Invalid"))
 
     def _create_vm(self, method, *args, **kwargs):
         """Creates and registers a VM object with the Host System."""
@@ -886,14 +886,14 @@ class FakeVim(object):
         ds = _db_content["Datastore"].keys()[0]
         host = _db_content["HostSystem"].keys()[0]
         vm_dict = {"name": config_spec.name,
-                  "ds": [ds],
-                  "runtime_host": host,
-                  "powerstate": "poweredOff",
-                  "vmPathName": config_spec.files.vmPathName,
-                  "numCpu": config_spec.numCPUs,
-                  "mem": config_spec.memoryMB,
-                  "extra_config": config_spec.extraConfig,
-                  "virtual_device": config_spec.deviceChange}
+                   "ds": [ds],
+                   "runtime_host": host,
+                   "powerstate": "poweredOff",
+                   "vmPathName": config_spec.files.vmPathName,
+                   "numCpu": config_spec.numCPUs,
+                   "mem": config_spec.memoryMB,
+                   "extra_config": config_spec.extraConfig,
+                   "virtual_device": config_spec.deviceChange}
         virtual_machine = VirtualMachine(**vm_dict)
         _create_object("VirtualMachine", virtual_machine)
         task_mdo = create_task(method, "success")
@@ -1046,70 +1046,70 @@ class FakeVim(object):
             self._logout()
         elif attr_name == "TerminateSession":
             return lambda *args, **kwargs: self._terminate_session(
-                                               *args, **kwargs)
+                *args, **kwargs)
         elif attr_name == "CreateVM_Task":
             return lambda *args, **kwargs: self._create_vm(attr_name,
-                                                *args, **kwargs)
+                                                           *args, **kwargs)
         elif attr_name == "ReconfigVM_Task":
             return lambda *args, **kwargs: self._reconfig_vm(attr_name,
-                                                *args, **kwargs)
+                                                             *args, **kwargs)
         elif attr_name == "CreateVirtualDisk_Task":
-            return lambda *args, **kwargs: self._create_copy_disk(attr_name,
-                                                kwargs.get("name"))
+            return lambda *args, **kwargs: self._create_copy_disk(
+                attr_name, kwargs.get("name"))
         elif attr_name == "DeleteDatastoreFile_Task":
             return lambda *args, **kwargs: self._delete_file(attr_name,
-                                                *args, **kwargs)
+                                                             *args, **kwargs)
         elif attr_name == "PowerOnVM_Task":
-            return lambda *args, **kwargs: self._set_power_state(attr_name,
-                                                args[0], "poweredOn")
+            return lambda *args, **kwargs: self._set_power_state(
+                attr_name, args[0], "poweredOn")
         elif attr_name == "PowerOffVM_Task":
-            return lambda *args, **kwargs: self._set_power_state(attr_name,
-                                                args[0], "poweredOff")
+            return lambda *args, **kwargs: self._set_power_state(
+                attr_name, args[0], "poweredOff")
         elif attr_name == "RebootGuest":
             return lambda *args, **kwargs: self._just_return()
         elif attr_name == "ResetVM_Task":
-            return lambda *args, **kwargs: self._set_power_state(attr_name,
-                                                args[0], "poweredOn")
+            return lambda *args, **kwargs: self._set_power_state(
+                attr_name, args[0], "poweredOn")
         elif attr_name == "SuspendVM_Task":
-            return lambda *args, **kwargs: self._set_power_state(attr_name,
-                                                args[0], "suspended")
+            return lambda *args, **kwargs: self._set_power_state(
+                attr_name, args[0], "suspended")
         elif attr_name == "CreateSnapshot_Task":
             return lambda *args, **kwargs: self._snapshot_vm(attr_name)
         elif attr_name == "CopyVirtualDisk_Task":
-            return lambda *args, **kwargs: self._create_copy_disk(attr_name,
-                                                kwargs.get("destName"))
+            return lambda *args, **kwargs: self._create_copy_disk(
+                attr_name, kwargs.get("destName"))
         elif attr_name == "ExtendVirtualDisk_Task":
-            return lambda *args, **kwargs: self._extend_disk(attr_name,
-                                                kwargs.get("size"))
+            return lambda *args, **kwargs: self._extend_disk(
+                attr_name, kwargs.get("size"))
         elif attr_name == "DeleteVirtualDisk_Task":
             return lambda *args, **kwargs: self._delete_disk(attr_name,
-                                                *args, **kwargs)
+                                                             *args, **kwargs)
         elif attr_name == "Destroy_Task":
             return lambda *args, **kwargs: self._unregister_vm(attr_name,
                                                                *args, **kwargs)
         elif attr_name == "UnregisterVM":
             return lambda *args, **kwargs: self._unregister_vm(attr_name,
-                                                *args, **kwargs)
+                                                               *args, **kwargs)
         elif attr_name == "SearchDatastore_Task":
             return lambda *args, **kwargs: self._search_ds(attr_name,
-                                                *args, **kwargs)
+                                                           *args, **kwargs)
         elif attr_name == "MakeDirectory":
             return lambda *args, **kwargs: self._make_dir(attr_name,
-                                                *args, **kwargs)
+                                                          *args, **kwargs)
         elif attr_name == "RetrievePropertiesEx":
             return lambda *args, **kwargs: self._retrieve_properties(
-                                                attr_name, *args, **kwargs)
+                attr_name, *args, **kwargs)
         elif attr_name == "ContinueRetrievePropertiesEx":
             return lambda *args, **kwargs: self._retrieve_properties_continue(
-                                                attr_name, *args, **kwargs)
+                attr_name, *args, **kwargs)
         elif attr_name == "CancelRetrievePropertiesEx":
             return lambda *args, **kwargs: self._retrieve_properties_cancel(
-                                                attr_name, *args, **kwargs)
+                attr_name, *args, **kwargs)
         elif attr_name == "AcquireCloneTicket":
             return lambda *args, **kwargs: self._just_return()
         elif attr_name == "AddPortGroup":
-            return lambda *args, **kwargs: self._add_port_group(attr_name,
-                                                *args, **kwargs)
+            return lambda *args, **kwargs: self._add_port_group(
+                attr_name, *args, **kwargs)
         elif attr_name == "RebootHost_Task":
             return lambda *args, **kwargs: self._just_return_task(attr_name)
         elif attr_name == "ShutdownHost_Task":

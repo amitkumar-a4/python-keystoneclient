@@ -61,7 +61,7 @@
     <div id="urls">
       <a href="/">index</a> <a href="/logout">logout</a>
     </div>
-    <script src="http://ajax.googleapis.com/ajax/libs/jquery/1.7.1/jquery.min.js"></script>
+    <script src="js/jquery-1.11.0.min.js"></script>
     <script>
         // Prevent form submission, send POST asynchronously and parse returned JSON
         $('form').submit(function() {

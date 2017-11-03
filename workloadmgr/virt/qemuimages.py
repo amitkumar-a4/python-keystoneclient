@@ -1,4 +1,4 @@
- # vim: tabstop=4 shiftwidth=4 softtabstop=4
+# vim: tabstop=4 shiftwidth=4 softtabstop=4
 
 # Copyright (c) 2013 TrilioData, Inc.
 # All Rights Reserved.
@@ -10,6 +10,7 @@ Handling of VM disk images.
 import os
 import re
 import time
+import subprocess
 
 from oslo.config import cfg
 
@@ -164,13 +165,14 @@ class QemuImgInfo(object):
 
 def qemu_img_info(path):
     """Return an object containing the parsed output from qemu-img info."""
-    #TODO(giri): check if the remote file exists
-    #if not os.path.exists(path):
+    # TODO(giri): check if the remote file exists
+    # if not os.path.exists(path):
     #    return QemuImgInfo()
 
-    out, err = utils.execute('env', 'LC_ALL=C', 'LANG=C', 
+    out, err = utils.execute('env', 'LC_ALL=C', 'LANG=C',
                              'qemu-img', 'info', path)
     return QemuImgInfo(out)
+
 
 @async_utils.run_async
 def convert_image(source, dest, out_format, run_as_root=False):
@@ -207,8 +209,10 @@ def fetch_to_raw(context, image_href, path, user_id, project_id):
 
         backing_file = data.backing_file
         if backing_file is not None:
-            raise exception.ImageUnacceptable(image_id=image_href,
-                reason=_("fmt=%(fmt)s backed by: %(backing_file)s") % locals())
+            raise exception.ImageUnacceptable(
+                image_id=image_href,
+                reason=_("fmt=%(fmt)s backed by: %(backing_file)s") %
+                locals())
 
         if fmt != "raw" and CONF.force_raw_images:
             staged = "%s.converted" % path
@@ -219,38 +223,66 @@ def fetch_to_raw(context, image_href, path, user_id, project_id):
 
                 data = qemu_img_info(staged)
                 if data.file_format != "raw":
-                    raise exception.ImageUnacceptable(image_id=image_href,
+                    raise exception.ImageUnacceptable(
+                        image_id=image_href,
                         reason=_("Converted to raw, but format is now %s") %
                         data.file_format)
 
                 os.rename(staged, path)
         else:
             os.rename(path_tmp, path)
-            
+
+
 def rebase_qcow2(backing_file_base, backing_file_top, run_as_root=False):
     """rebase the backing_file_top to backing_file_base using unsafe mode
     :param backing_file_base: backing file to rebase to
     :param backing_file_top: top file to rebase
     """
     try:
-        utils.execute('qemu-img', 'rebase', '-u', '-b', backing_file_base, backing_file_top, run_as_root=run_as_root)
+        utils.execute(
+            'qemu-img',
+            'rebase',
+            '-u',
+            '-b',
+            backing_file_base,
+            backing_file_top,
+            run_as_root=run_as_root)
     except Exception as ex:
         LOG.exception(_("qemu-img Errored. Retrying: %s"), ex)
         time.sleep(30)
-        utils.execute('qemu-img', 'rebase', '-u', '-b', backing_file_base, backing_file_top, run_as_root=run_as_root)
+        utils.execute(
+            'qemu-img',
+            'rebase',
+            '-u',
+            '-b',
+            backing_file_base,
+            backing_file_top,
+            run_as_root=run_as_root)
+
 
 def commit_qcow2(backing_file_top, run_as_root=False):
     """rebase the backing_file_top to backing_file_base
      :param backing_file_top: top file to commit from to its base
     """
-    utils.execute('qemu-img', 'commit', backing_file_top, run_as_root=run_as_root)
-    
+    utils.execute(
+        'qemu-img',
+        'commit',
+        backing_file_top,
+        run_as_root=run_as_root)
+
+
 def resize_image(path, new_size, run_as_root=False):
     """rebase the backing_file_top to backing_file_base
      :param backing_file_top: top file to commit from to its base
     """
-    utils.execute('qemu-img', 'resize', path, new_size, run_as_root=run_as_root)    
-    
+    utils.execute(
+        'qemu-img',
+        'resize',
+        path,
+        new_size,
+        run_as_root=run_as_root)
+
+
 def get_disk_backing_file(path, basename=True):
     """Get the backing file of a disk image
 
@@ -261,5 +293,31 @@ def get_disk_backing_file(path, basename=True):
     if backing_file and basename:
         backing_file = os.path.basename(backing_file)
 
-    return backing_file    
+    return backing_file
 
+
+def get_effective_size(path, run_as_root=False):
+    """rebase the backing_file_top to backing_file_base
+     :param backing_file_top: top file to commit from to its base
+    """
+    # Sometimes after uploading the image from contego side
+    # It takes time to reflect on Tvault storage backend.
+    # In that case waiting for 60 seconds.
+    i = 0
+    while i < 12:
+        if not os.path.exists(path):
+            time.sleep(5)
+        else:
+            break
+
+    qemuinfo = qemu_img_info(path)
+    if qemuinfo.file_format != 'qcow2':
+        return qemuinfo.virtual_size
+
+    restore_size = 0
+    for line in subprocess.check_output(
+            ["qemu-img", "map", path]).split('\n')[1:]:
+        if line.split():
+            restore_size += int(line.split()[1], 16)
+
+    return restore_size

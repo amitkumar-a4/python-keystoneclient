@@ -22,6 +22,7 @@ CONF = cfg.CONF
 
 authorize_show = extensions.extension_authorizer('compute', 'vmfolder:show')
 
+
 def make_vmfolder(elem):
     elem.set('name', 'vmfolder')
 
@@ -34,7 +35,7 @@ def make_vmfolder(elem):
 
     dcsElem = xmlutil.SubTemplateElement(elem, 'datastores', selector=1)
     dcElem = xmlutil.SubTemplateElement(elem, 'datastore',
-                                         selector=xmlutil.get_items)
+                                        selector=xmlutil.get_items)
     dcElem.set('name', 0)
 
     networksElem = xmlutil.SubTemplateElement(elem, 'networks', selector=1)
@@ -46,14 +47,15 @@ def make_vmfolder(elem):
     svcStateElem.set('active')
     svcStateElem.set('updated_at')
 
+
 class vmfolderTemplate(xmlutil.TemplateBuilder):
     def construct(self):
         root = xmlutil.TemplateElement('vmfolder')
         vmfolderElem = xmlutil.SubTemplateElement(root, 'vmfolder',
-                                                    selector='vmfolderInfo')
+                                                  selector='vmfolderInfo')
         make_vmfolder(vmfolderElem)
         return xmlutil.MasterTemplate(root, 1, nsmap={
-                                       vmfolder.alias: vmfolder.namespace})
+            vmfolder.alias: vmfolder.namespace})
 
 
 class vmfolderController(wsgi.Controller):
@@ -98,7 +100,7 @@ class Vmfolder(extensions.ExtensionDescriptor):
         resources = []
 
         res = extensions.ResourceExtension('os-vmfolder',
-                                       vmfolderController())
+                                           vmfolderController())
         resources.append(res)
 
         return resources

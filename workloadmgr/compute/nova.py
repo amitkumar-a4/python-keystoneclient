@@ -46,6 +46,7 @@ from workloadmgr.decorators import retry
 LOG = logging.getLogger(__name__)
 Logger = autolog.Logger(LOG)
 
+
 nova_opts = [
     cfg.StrOpt('nova_admin_auth_url',
                default='http://localhost:5000/v2.0',
@@ -61,10 +62,10 @@ nova_opts = [
                default='admin',
                help='tenant name for connecting to nova in admin context'),
     cfg.StrOpt('nova_production_endpoint_template',
-               default= 'http://localhost:8774/v2/%(project_id)s',
+               default='http://localhost:8774/v2/%(project_id)s',
                help='nova production endpoint e.g. http://localhost:8774/v2/%(project_id)s'),
     cfg.StrOpt('nova_tvault_endpoint_template',
-               default= 'http://localhost:8774/v2/%(project_id)s',
+               default='http://localhost:8774/v2/%(project_id)s',
                help='nova tvault endpoint e.g. http://localhost:8774/v2/%(project_id)s'),
     cfg.StrOpt('nova_production_region_name',
                default=None,
@@ -90,6 +91,12 @@ CONF.register_opts(nova_opts)
 LOG = logging.getLogger(__name__)
 
 novalock = Lock()
+
+
+class ObjectDummy(object):
+    pass
+
+
 def synchronized(lock):
     '''Synchronization decorator.'''
     def wrap(f):
@@ -101,6 +108,7 @@ def synchronized(lock):
                 lock.release()
         return new_function
     return wrap
+
 
 def _discover_extensions(version):
     extensions = []
@@ -114,6 +122,7 @@ def _discover_extensions(version):
 
     return extensions
 
+
 def _discover_via_python_path():
     for (module_loader, name, _ispkg) in pkgutil.iter_modules():
         if name.endswith('_python_novaclient_ext'):
@@ -126,6 +135,7 @@ def _discover_via_python_path():
                 name = module.extension_name
 
             yield name, module
+
 
 def _discover_via_contrib_path(version):
     module_path = os.path.dirname(os.path.abspath(__file__))
@@ -142,6 +152,7 @@ def _discover_via_contrib_path(version):
         module = imp.load_source(name, ext_path)
         yield name, module
 
+
 def _discover_via_entry_points():
     for ep in pkg_resources.iter_entry_points('novaclient.extension'):
         name = ep.name
@@ -149,92 +160,109 @@ def _discover_via_entry_points():
 
         yield name, module
 
+
 try:
     # load keystone_authtoken by importing keystonemiddleware
     # if it is already loaded, just ignore the exception
     cfg.CONF.import_group('keystone_authtoken',
                           'keystonemiddleware.auth_token')
-except:
+except BaseException:
     pass
+
 
 def _get_trusts(user_id, tenant_id):
 
     db = WorkloadMgrDB().db
     context = wlm_context.RequestContext(
-                user_id=user_id,
-                project_id=tenant_id)
+        user_id=user_id,
+        project_id=tenant_id)
 
     settings = db.setting_get_all_by_project(
-                        context, context.project_id)
+        context, context.project_id)
 
-    trust = [t for t in settings if t.type == "trust_id" and \
-             t.project_id == context.project_id and \
+    trust = [t for t in settings if t.type == "trust_id" and
+             t.project_id == context.project_id and
              t.user_id == context.user_id]
     return trust
 
 
 def _get_tenant_context(context):
-    if type(context) is dict:
-       user_id = context['user_id']
-       tenant_id = context['project_id']
-       user = context.get('user',None)
-       tenant = context.get('tenant',None)
-       if 'user_domain_id' in context:
-          user_domain_id = context['user_domain_id']
-       else:
+    from workloadmgr import workloads as workloadAPI
+    if isinstance(context, dict):
+        user_id = context['user_id']
+        tenant_id = context['project_id']
+        user = context.get('user', None)
+        tenant = context.get('tenant', None)
+        if 'user_domain_id' in context:
+            user_domain_id = context['user_domain_id']
+        else:
             user_domain_id = 'default'
-    else:   
-         if hasattr(context, 'user_id'):
+    else:
+        if hasattr(context, 'user_id'):
             user_id = context.user_id
-         elif hasattr(context, 'user'):
-              user_id = context.user
+        elif hasattr(context, 'user'):
+            user_id = context.user
 
-         if hasattr(context, 'tenant_id'):
+        if hasattr(context, 'tenant_id'):
             tenant_id = context.tenant_id
-         elif hasattr(context, 'project_id'):
-              tenant_id = context.project_id
-         elif hasattr(context, 'tenant'):
-              tenant_id = context.tenant
+        elif hasattr(context, 'project_id'):
+            tenant_id = context.project_id
+        elif hasattr(context, 'tenant'):
+            tenant_id = context.tenant
 
-         if hasattr(context, 'user_domain_id'):
+        if hasattr(context, 'user_domain_id'):
             if context.user_domain_id is None:
-               user_domain_id = 'default'
+                user_domain_id = 'default'
             else:
-                 user_domain_id = context.user_domain_id
-         elif hasattr(context, 'user_domain'):
-              if context.user_domain is None:
-                 user_domain_id = 'default'
-              else:
-                   user_domain_id = context.user_domain
-         else:
-              user_domain_id = 'default'
+                user_domain_id = context.user_domain_id
+        elif hasattr(context, 'user_domain'):
+            if context.user_domain is None:
+                user_domain_id = 'default'
+            else:
+                user_domain_id = context.user_domain
+        else:
+            user_domain_id = 'default'
 
-         user = getattr(context, 'user', 'NA')
-         tenant = getattr(context, 'tenant', 'NA')
+        user = getattr(context, 'user', 'NA')
+        tenant = getattr(context, 'tenant', 'NA')
 
     trust = _get_trusts(user_id, tenant_id)
     if len(trust):
-        trust_id = trust[0].value
-        context = wlm_context.RequestContext(
-            username=CONF.keystone_authtoken.admin_user,
-            password=CONF.keystone_authtoken.admin_password,
-            trust_id=trust_id,
-            tenant_id=tenant_id,
-            trustor_user_id=user_id,
-            user_domain_id=CONF.triliovault_user_domain_id,
-            is_admin=False)
+        try:
+            trust_id = trust[0].value
+            context = wlm_context.RequestContext(
+                username=CONF.keystone_authtoken.admin_user,
+                password=CONF.keystone_authtoken.admin_password,
+                trust_id=trust_id,
+                tenant_id=tenant_id,
+                trustor_user_id=user_id,
+                user_domain_id=CONF.triliovault_user_domain_id,
+                is_admin=False)
 
-        clients.initialise()
-        client_plugin = clients.Clients(context)
-        kclient = client_plugin.client("keystone")
-        context.auth_token = kclient.auth_token
-        context.user_id = user_id
-        if user != 'NA' and not hasattr(context, 'user'):
-           context.user = user
-        if tenant != 'NA' and not hasattr(context, 'tenant'):
-           context.tenant = tenant
+            clients.initialise()
+            client_plugin = clients.Clients(context)
+            kclient = client_plugin.client("keystone")
+            context.auth_token = kclient.auth_token
+            context.user_id = user_id
+            if user != 'NA' and getattr(context, 'user', None) is None:
+                context.user = user
+            if tenant != 'NA' and getattr(context, 'tenant', None) is None:
+                context.tenant = tenant
+        except Exception:
+            with excutils.save_and_reraise_exception():
+                msg = _("Assign valid trustee role to tenant %s") % tenant_id
+                cntx = ObjectDummy()
+                cntx.user_id = user_id
+                cntx.project_id = tenant_id
+                workloadAPI.api.AUDITLOG.log(cntx, msg, None)
+                LOG.info(msg)
+                LOG.exception(_("token cannot be created using saved "
+                                "trust id for user %s, tenant %s") %
+                              (user_id, tenant_id))
     else:
-         try:
+        LOG.info(_("Could not find any saved trust ids. Trying "
+                   "admin credentials to generate token"))
+        try:
             httpclient = client.HTTPClient(
                 user=CONF.nova_admin_username,
                 password=CONF.nova_admin_password,
@@ -251,13 +279,20 @@ def _get_tenant_context(context):
             context = wlm_context.RequestContext(
                 user_id=user_id, project_id=tenant_id,
                 is_admin=True, auth_token=httpclient.auth_token)
-            if user != 'NA' and not hasattr(context, 'user'):
-               context.user = user
-            if tenant != 'NA' and not hasattr(context, 'tenant'):
-               context.tenant = tenant
-         except Exception:
+            if user != 'NA' and getattr(context, 'user', None) is None:
+                context.user = user
+            if tenant != 'NA' and getattr(context, 'tenant', None) is None:
+                context.tenant = tenant
+        except Exception:
             with excutils.save_and_reraise_exception():
-                LOG.exception(_("_get_auth_token() failed"))
+                LOG.exception(_("_get_auth_token() with admin credentials failed. "
+                                "Perhaps admin is not member of tenant %s") % tenant_id)
+                cntx = ObjectDummy()
+                cntx.user_id = user_id
+                cntx.project_id = tenant_id
+                msg = _("Assign valid trustee role to tenant %s") % tenant_id
+                workloadAPI.api.AUDITLOG.log(cntx, msg, None)
+                LOG.info(msg)
 
     return context
 
@@ -265,17 +300,17 @@ def _get_tenant_context(context):
 def novaclient(context, production=True, refresh_token=False, extensions=None):
     trust = _get_trusts(context.user_id, context.tenant_id)
     if hasattr(context, 'user_domain_id'):
-       if context.user_domain_id is None:
-          user_domain_id = 'default'
-       else:
+        if context.user_domain_id is None:
+            user_domain_id = 'default'
+        else:
             user_domain_id = context.user_domain_id
     elif hasattr(context, 'user_domain'):
-       if context.user_domain is None:
-          user_domain_id = 'default'
-       else:
+        if context.user_domain is None:
+            user_domain_id = 'default'
+        else:
             user_domain_id = context.user_domain
     else:
-         user_domain_id = 'default'
+        user_domain_id = 'default'
     # pick the first trust. Usually it should not be more than one trust
     if len(trust):
         trust_id = trust[0].value
@@ -305,51 +340,58 @@ def novaclient(context, production=True, refresh_token=False, extensions=None):
     else:
         # trusts are not enabled
         if refresh_token:
-            if production == True:
-                url = CONF.nova_production_endpoint_template.replace('%(project_id)s', context.tenant_id)
+            if production:
+                url = CONF.nova_production_endpoint_template.replace(
+                    '%(project_id)s', context.tenant_id)
                 url = url.replace("/v2.1/", "/v2/")
-                novaclient = nova_client.Client(CONF.nova_admin_username,
-                                       CONF.nova_admin_password,
-                                       project_id=context.tenant_id,
-                                       auth_url=url,
-                                       domain_name=user_domain_id,
-                                       insecure=CONF.nova_api_insecure,
-                                       extensions = extensions,
-                                       timeout=CONF.nova_url_timeout)
+                novaclient = nova_client.Client(
+                    CONF.nova_admin_username,
+                    CONF.nova_admin_password,
+                    project_id=context.tenant_id,
+                    auth_url=url,
+                    domain_name=user_domain_id,
+                    insecure=CONF.nova_api_insecure,
+                    extensions=extensions,
+                    timeout=CONF.nova_url_timeout)
             else:
-                url = CONF.nova_tvault_endpoint_template.replace('%(project_id)s', context.tenant_id)
-                novaclient = nova_client.Client(CONF.nova_admin_username,
-                                       CONF.nova_admin_password,
-                                       project_id=context.tenant_id,
-                                       auth_url=url,
-                                       domain_name=user_domain_id,
-                                       insecure=CONF.nova_api_insecure,
-                                       extensions = extensions,
-                                       timeout=CONF.nova_url_timeout)
+                url = CONF.nova_tvault_endpoint_template.replace(
+                    '%(project_id)s', context.tenant_id)
+                novaclient = nova_client.Client(
+                    CONF.nova_admin_username,
+                    CONF.nova_admin_password,
+                    project_id=context.tenant_id,
+                    auth_url=url,
+                    domain_name=user_domain_id,
+                    insecure=CONF.nova_api_insecure,
+                    extensions=extensions,
+                    timeout=CONF.nova_url_timeout)
             LOG.debug(_('Novaclient connection created using URL: %s') % url)
         else:
-            if production == True:
+            if production:
                 url = CONF.nova_production_endpoint_template % context.to_dict()
                 url = url.replace("/v2.1/", "/v2/")
             else:
                 url = CONF.nova_tvault_endpoint_template % context.to_dict()
             LOG.debug(_('Novaclient connection created using URL: %s') % url)
             novaclient = nova_client.Client(context.user_id,
-                                   context.auth_token,
-                                   project_id=context.project_id,
-                                   auth_url=url,
-                                   domain_name=user_domain_id,
-                                   insecure=CONF.nova_api_insecure,
-                                   extensions = extensions,
-                                   timeout=CONF.nova_url_timeout)
+                                            context.auth_token,
+                                            project_id=context.project_id,
+                                            auth_url=url,
+                                            domain_name=user_domain_id,
+                                            insecure=CONF.nova_api_insecure,
+                                            extensions=extensions,
+                                            timeout=CONF.nova_url_timeout)
 
             # noauth extracts user_id:tenant_id from auth_token
-            novaclient.client.auth_token = context.auth_token or '%s:%s' % (context.user_id, context.project_id)
+            novaclient.client.auth_token = context.auth_token or '%s:%s' % (
+                context.user_id, context.project_id)
             novaclient.client.management_url = url
 
     return novaclient
 
-def novaclient2(auth_url, username, password, tenant_name, nova_endpoint_template):
+
+def novaclient2(auth_url, username, password,
+                tenant_name, nova_endpoint_template):
     httpclient = client.HTTPClient(
         user=username,
         password=password,
@@ -362,13 +404,14 @@ def novaclient2(auth_url, username, password, tenant_name, nova_endpoint_templat
         auth_system=CONF.nova_auth_system,
         insecure=CONF.nova_api_insecure)
     httpclient.authenticate()
-    url = nova_endpoint_template.replace('%(project_id)s', httpclient.tenant_id)
+    url = nova_endpoint_template.replace(
+        '%(project_id)s', httpclient.tenant_id)
     c = nova_client.Client(username,
                            password,
                            project_id=httpclient.tenant_id,
                            auth_url=url,
                            insecure=CONF.nova_api_insecure,
-                           extensions = None,
+                           extensions=None,
                            timeout=CONF.nova_url_timeout)
     LOG.debug(_('Novaclient connection created using URL: %s') % url)
     c.client.auth_token = httpclient.auth_token
@@ -376,7 +419,8 @@ def novaclient2(auth_url, username, password, tenant_name, nova_endpoint_templat
     return c
 
 
-def exception_handler(ignore_exception=False, refresh_token=True, contego=False):
+def exception_handler(ignore_exception=False,
+                      refresh_token=True, contego=False):
     def exception_handler_decorator(func):
         @wraps(func)
         def func_wrapper(*args, **argv):
@@ -402,16 +446,16 @@ def exception_handler(ignore_exception=False, refresh_token=True, contego=False)
                 if ignore_exception is True:
                     LOG.exception(ex)
                     if nova_exception.BadRequest in \
-                        inspect.getmro(ex.__class__) or \
-                        nova_exception.NotFound in \
-                        inspect.getmro(ex.__class__):
+                            inspect.getmro(ex.__class__) or \
+                            nova_exception.NotFound in \
+                            inspect.getmro(ex.__class__):
                         return
 
                 if contego is True:
                     msg = "Unable to call %s; Please check contego " \
                           "logs for more details" % func.func_name
                     if hasattr(ex, 'code') and ex.code == 413:
-                       msg = ex.message
+                        msg = ex.message
                     raise exception.ErrorOccurred(reason=msg)
                 else:
                     raise
@@ -423,26 +467,41 @@ def exception_handler(ignore_exception=False, refresh_token=True, contego=False)
 class API(base.Base):
     """API for interacting with the volume manager."""
 
-    def __init__(self, production = True):
+    def __init__(self, production=True):
         self._production = production
 
     @synchronized(novalock)
     @exception_handler(ignore_exception=True)
     def get_hypervisors(self, context, **kwargs):
         client = kwargs['client']
-        hypervisors = novaclient(context, self._production, True).hypervisors.list()
+        hypervisors = novaclient(
+            context,
+            self._production,
+            True).hypervisors.list()
         return hypervisors
 
     @synchronized(novalock)
     @exception_handler(ignore_exception=False)
-    def create_server(self, context, name, image, flavor,
-                      meta=None, files=None,
-                      reservation_id=None, min_count=None,
-                      max_count=None, security_groups=None, userdata=None,
-                      key_name=None, availability_zone=None,
-                      block_device_mapping=None, nics=None, scheduler_hints=None,
-                      config_drive=None, **kwargs):
-
+    def create_server(
+            self,
+            context,
+            name,
+            image,
+            flavor,
+            meta=None,
+            files=None,
+            reservation_id=None,
+            min_count=None,
+            max_count=None,
+            security_groups=None,
+            userdata=None,
+            key_name=None,
+            availability_zone=None,
+            block_device_mapping=None,
+            nics=None,
+            scheduler_hints=None,
+            config_drive=None,
+            **kwargs):
         """
         Create (boot) a new server.
 
@@ -478,14 +537,24 @@ class API(base.Base):
         """
 
         client = kwargs['client']
-        item = client.servers.create(name, image, flavor,
-                                     meta=meta, files=files,
-                                     reservation_id=reservation_id, min_count=min_count,
-                                     max_count=max_count, security_groups=security_groups,
-                                     userdata=userdata, key_name=key_name,
-                                     availability_zone=availability_zone,block_device_mapping=block_device_mapping,
-                                     nics=nics, scheduler_hints=scheduler_hints,
-                                     config_drive=config_drive, **kwargs)
+        item = client.servers.create(
+            name,
+            image,
+            flavor,
+            meta=meta,
+            files=files,
+            reservation_id=reservation_id,
+            min_count=min_count,
+            max_count=max_count,
+            security_groups=security_groups,
+            userdata=userdata,
+            key_name=key_name,
+            availability_zone=availability_zone,
+            block_device_mapping=block_device_mapping,
+            nics=nics,
+            scheduler_hints=scheduler_hints,
+            config_drive=config_drive,
+            **kwargs)
         time.sleep(15)
         return item
 
@@ -546,13 +615,15 @@ class API(base.Base):
 
     @synchronized(novalock)
     @exception_handler(ignore_exception=False)
-    def get_server_by_id(self, context, id, admin=False, search_opts=None, **kwargs):
+    def get_server_by_id(self, context, id, admin=False,
+                         search_opts=None, **kwargs):
         """
         :param id to query.
         :rtype: :class:`Server`
         """
-        if search_opts == None:
-            servers = self._get_servers(context, search_opts, admin=admin, **kwargs)
+        if search_opts is None:
+            servers = self._get_servers(
+                context, search_opts, admin=admin, **kwargs)
             for server in servers:
                 if server.id == id:
                     return server
@@ -569,7 +640,9 @@ class API(base.Base):
                     query_string = "?%s" % parse.urlencode(new_qparams)
                 else:
                     query_string = ""
-                server = client.servers._get("/servers/%s%s" % (id, query_string), "server")
+                server = client.servers._get(
+                    "/servers/%s%s" %
+                    (id, query_string), "server")
                 return server
 
     @synchronized(novalock)
@@ -612,8 +685,8 @@ class API(base.Base):
         """
         Suspend the server given the id
         :param server: The :class:`Server` (or its ID) to query.
-        """   
-    
+        """
+
         client = kwargs['client']
         return client.servers.reboot(server=server, reboot_type=reboot_type)
 
@@ -717,7 +790,8 @@ class API(base.Base):
 
     @synchronized(novalock)
     @exception_handler(ignore_exception=False)
-    def add_security_group(self, context, server_id, security_group_id, **kwargs):
+    def add_security_group(self, context, server_id,
+                           security_group_id, **kwargs):
         """
         Add security group identified by security group id
         :param server: The :class:`Server` (or its ID) to query.
@@ -728,11 +802,13 @@ class API(base.Base):
         s = server(id=server_id)
         client = kwargs['client']
 
-        return client.servers.add_security_group(server=s, security_group=security_group_id)
+        return client.servers.add_security_group(
+            server=s, security_group=security_group_id)
 
     @synchronized(novalock)
     @exception_handler(ignore_exception=False)
-    def remove_security_group(self, context, server_id, security_group_id, **kwargs):
+    def remove_security_group(self, context, server_id,
+                              security_group_id, **kwargs):
         """
         Removes a security group identified by the security group_id
         :param server: The :class:`Server` (or its ID) to query.
@@ -743,11 +819,13 @@ class API(base.Base):
         s = server(id=server_id)
         client = kwargs['client']
 
-        return client.servers.remove_security_group(server=s, security_group=security_group_id)
+        return client.servers.remove_security_group(
+            server=s, security_group=security_group_id)
 
     @synchronized(novalock)
     @exception_handler(ignore_exception=False)
-    def add_floating_ip(self, context, server_id, floating_ip, fixed_ip, **kwargs):
+    def add_floating_ip(self, context, server_id,
+                        floating_ip, fixed_ip, **kwargs):
         """
         Add floating ip to the server
         :param server: The :class:`Server` (or its ID) to query.
@@ -787,7 +865,8 @@ class API(base.Base):
         """
 
         client = kwargs['client']
-        return client.volumes.create_server_volume(server_id, volume_id, device)
+        return client.volumes.create_server_volume(
+            server_id, volume_id, device)
 
     @synchronized(novalock)
     @exception_handler(ignore_exception=False)
@@ -844,7 +923,6 @@ class API(base.Base):
     @exception_handler(ignore_exception=False)
     def create_flavor(self, context, name, memory, vcpus,
                       root_gb, ephemeral_gb, **kwargs):
-
         """
         Create a new flavor
 
@@ -914,6 +992,7 @@ class API(base.Base):
             # This is configured to use nova network
             server = client.servers.get(server)
             return server._info['addresses']
+
     @synchronized(novalock)
     @exception_handler(ignore_exception=False)
     def get_networks(self, context, **kwargs):
@@ -932,7 +1011,7 @@ class API(base.Base):
         """
         Get the IP address information
 
-        :param IP4 address: 
+        :param IP4 address:
         """
         client = kwargs['client']
         return client.fixed_ips.get(ip)
@@ -963,46 +1042,47 @@ class API(base.Base):
         """
         contego_service_info = {}
         all_services = []
-        try:                
+        try:
             try:
                 client = novaclient(context, self._production)
-                
+
                 if host == 'all' and ip == 'all':
-                    all_services = client.services.list()               
+                    all_services = client.services.list()
                 elif host != 'all':
                     all_services = client.services.list(host=host)
                 elif ip != 'all':
-                    for hypervisor in client.hypervisors.list():                    
+                    for hypervisor in client.hypervisors.list():
                         if hypervisor.host_ip == ip:
-                            all_services = client.services.list(host=hypervisor.hypervisor_hostname)
-                            
-                for service in all_services:                    
+                            all_services = client.services.list(
+                                host=hypervisor.hypervisor_hostname)
+
+                for service in all_services:
                     if service.binary in 'contego':
-                        contego_service_info[service.host] = ({"id":service.id,
-                                                                "name":service.binary,
-                                                                "status":service.status,
-                                                                "running_state":service.state
-                                                                })                                                    
+                        contego_service_info[service.host] = ({"id": service.id,
+                                                               "name": service.binary,
+                                                               "status": service.status,
+                                                               "running_state": service.state
+                                                               })
                 return contego_service_info
             except nova_exception.Unauthorized as unauth_ex:
                 client = novaclient(context, self._production, admin=True)
                 all_services = client.services.list()
-                
-                for service in all_services:                    
+
+                for service in all_services:
                     if service.binary in 'contego':
-                        contego_service_info[service.host] = ({"id":service.id,
-                                                                "name":service.binary,
-                                                                "status":service.status,
-                                                                "running_state":service.state
-                                                                })
+                        contego_service_info[service.host] = ({"id": service.id,
+                                                               "name": service.binary,
+                                                               "status": service.status,
+                                                               "running_state": service.state
+                                                               })
                 return contego_service_info
             except Exception as ex:
-                LOG.exception(ex)                
+                LOG.exception(ex)
         except Exception as ex:
             LOG.exception(ex)
             msg = 'Unable to get the status of contego service'
-            raise exception.ErrorOccurred(msg)            
-            
+            raise exception.ErrorOccurred(msg)
+
     @synchronized(novalock)
     @exception_handler(ignore_exception=True, contego=True)
     def vast_freeze(self, context, server, params, **kwargs):
@@ -1052,7 +1132,8 @@ class API(base.Base):
         :param server: The :class:`Server` (or its ID) to query.
         """
         client = kwargs['client']
-        return client.contego.vast_data_transfer(server=server, params=params, do_checksum=True)
+        return client.contego.vast_data_transfer(
+            server=server, params=params, do_checksum=True)
 
     @synchronized(novalock)
     @exception_handler(ignore_exception=False, contego=True)
@@ -1062,8 +1143,8 @@ class API(base.Base):
         :param server: The :class:`Server` (or its ID) to query.
         """
         client = kwargs['client']
-        return client.contego.vast_check_prev_snapshot(server=server,
-                                         params=params, do_checksum=True)
+        return client.contego.vast_check_prev_snapshot(
+            server=server, params=params, do_checksum=True)
 
     @synchronized(novalock)
     @exception_handler(ignore_exception=False, contego=True)
@@ -1073,8 +1154,8 @@ class API(base.Base):
         :param server: The :class:`Server` (or its ID) to query.
         """
         client = kwargs['client']
-        return client.contego.copy_backup_image_to_volume(server=server,
-                                            params=params, do_checksum=True)
+        return client.contego.copy_backup_image_to_volume(
+            server=server, params=params, do_checksum=True)
 
     @synchronized(novalock)
     @exception_handler(ignore_exception=False, contego=True)
@@ -1084,7 +1165,8 @@ class API(base.Base):
         :param server: The :class:`Server` (or its ID) to query.
         """
         client = kwargs['client']
-        return client.contego.vast_async_task_status(server=server, params=params, do_checksum=True)
+        return client.contego.vast_async_task_status(
+            server=server, params=params, do_checksum=True)
 
     @synchronized(novalock)
     @exception_handler(ignore_exception=True, contego=True)
@@ -1116,7 +1198,8 @@ class API(base.Base):
         :param server: The :class:`Server` (or its ID) to query.
         """
         client = kwargs['client']
-        return client.contego.testbubble_attach_volume(server=server, params=params)
+        return client.contego.testbubble_attach_volume(
+            server=server, params=params)
 
     @synchronized(novalock)
     @exception_handler(ignore_exception=False, contego=True)
@@ -1126,7 +1209,8 @@ class API(base.Base):
         :param server: The :class:`Server` (or its ID) to query.
         """
         client = kwargs['client']
-        return client.contego.testbubble_reboot_instance(server=server, params=params)
+        return client.contego.testbubble_reboot_instance(
+            server=server, params=params)
 
     @synchronized(novalock)
     @exception_handler(ignore_exception=False, contego=True)
@@ -1137,3 +1221,44 @@ class API(base.Base):
         """
         client = kwargs['client']
         return client.contego.vast_commit_image(server=server, params=params)
+
+    @synchronized(novalock)
+    @exception_handler(ignore_exception=False, contego=True)
+    def vast_config_backup(self, context, backup_id, params, **kwargs):
+        """
+        Backup OpenStack config files.
+        :param services: services for which configuration and database need to backup.
+        """
+        client = kwargs['client']
+        return client.contego.vast_config_backup(backup_id, params)
+
+    @synchronized(novalock)
+    @exception_handler(ignore_exception=False, contego=True)
+    def validate_database_creds(self, context, params, **kwargs):
+        """
+        Validate database credentials.
+        :param : database credentials which need to be validate.
+        """
+        client = kwargs['client']
+        return client.contego.validate_database_creds(
+            CONF.cloud_unique_id, params)
+
+    @synchronized(novalock)
+    @exception_handler(ignore_exception=False, contego=True)
+    def validate_trusted_user_and_key(self, context, params, **kwargs):
+        """
+        validate trusted user and private key for connecting with controller node.
+        :param : trusted_user and priivate_key.
+        """
+        client = kwargs['client']
+        return client.contego.validate_trusted_user_and_key(
+            CONF.cloud_unique_id, params)
+
+    @synchronized(novalock)
+    @exception_handler(ignore_exception=False, contego=True)
+    def get_controller_nodes(self, context, **kwargs):
+        """
+        Get list of controller nodes.
+        """
+        client = kwargs['client']
+        return client.contego.get_controller_nodes(CONF.cloud_unique_id)

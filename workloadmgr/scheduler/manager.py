@@ -20,10 +20,11 @@ from workloadmgr.openstack.common.notifier import api as notifier
 
 LOG = logging.getLogger(__name__)
 
-scheduler_driver_opt = cfg.StrOpt('scheduler_driver',
-                                  default='workloadmgr.scheduler.filter_scheduler.'
-                                          'FilterScheduler',
-                                  help='Default scheduler driver to use')
+scheduler_driver_opt = cfg.StrOpt(
+    'scheduler_driver',
+    default='workloadmgr.scheduler.filter_scheduler.'
+    'FilterScheduler',
+    help='Default scheduler driver to use')
 
 FLAGS = flags.FLAGS
 FLAGS.register_opt(scheduler_driver_opt)
@@ -62,27 +63,27 @@ class SchedulerManager(manager.Manager):
                                                 capabilities)
 
     def file_search(self, context, topic, search_id,
-                          request_spec=None, filter_properties=None):
+                    request_spec=None, filter_properties=None):
         try:
             if request_spec is None:
                 request_spec = {}
                 snapshot_ref = db.file_search_get(context, search_id)
 
-                request_spec.update( {'search_id': search_id, 'file_search_properties':{}})
+                request_spec.update(
+                    {'search_id': search_id, 'file_search_properties': {}})
 
             self.driver.schedule_file_search(context, request_spec,
-                                                   filter_properties)
+                                             filter_properties)
         except exception.NoValidHost as ex:
             file_search_state = {'status': {'status': 'error'}}
             self._set_file_search_state_and_notify('file_search',
-                                              file_search_state,
-                                              context, ex, request_spec)
+                                                   file_search_state,
+                                                   context, ex, request_spec)
         except Exception as ex:
             with excutils.save_and_reraise_exception():
                 file_search_state = {'status': {'status': 'error'}}
-                self._set_file_search_state_and_notify('file_search',
-                                                  file_search_state,
-                                                  context, ex, request_spec)
+                self._set_file_search_state_and_notify(
+                    'file_search', file_search_state, context, ex, request_spec)
 
     def workload_snapshot(self, context, topic, snapshot_id,
                           request_spec=None, filter_properties=None):
@@ -91,47 +92,49 @@ class SchedulerManager(manager.Manager):
                 request_spec = {}
                 snapshot_ref = db.snapshot_get(context, snapshot_id)
 
-                request_spec.update( {'snapshot_id': snapshot_id, 'snapshot_properties':{}})
+                request_spec.update(
+                    {'snapshot_id': snapshot_id, 'snapshot_properties': {}})
 
             self.driver.schedule_workload_snapshot(context, request_spec,
                                                    filter_properties)
         except exception.NoValidHost as ex:
             snapshot_state = {'status': {'status': 'error'}}
             self._set_snapshot_state_and_notify('workload_snapshot',
-                                              snapshot_state,
-                                              context, ex, request_spec)
+                                                snapshot_state,
+                                                context, ex, request_spec)
         except Exception as ex:
             with excutils.save_and_reraise_exception():
                 snapshot_state = {'status': {'status': 'error'}}
                 self._set_snapshot_state_and_notify('workload_snapshot',
-                                                  snapshot_state,
-                                                  context, ex, request_spec)
+                                                    snapshot_state,
+                                                    context, ex, request_spec)
 
     def snapshot_restore(self, context, topic, restore_id,
-                          request_spec=None, filter_properties=None):
+                         request_spec=None, filter_properties=None):
         try:
             if request_spec is None:
                 request_spec = {}
                 restore_ref = db.restore_get(context, restore_id)
 
-                request_spec.update( {'restore_id': restore_id, 'restore_properties':{}})
+                request_spec.update(
+                    {'restore_id': restore_id, 'restore_properties': {}})
 
             self.driver.schedule_snapshot_restore(context, request_spec,
-                                                   filter_properties)
+                                                  filter_properties)
         except exception.NoValidHost as ex:
             restore_state = {'status': {'status': 'error'}}
             self._set_restore_state_and_notify('snapshot_restore',
-                                              restore_state,
-                                              context, ex, request_spec)
+                                               restore_state,
+                                               context, ex, request_spec)
         except Exception as ex:
             with excutils.save_and_reraise_exception():
                 restore_state = {'status': {'status': 'error'}}
                 self._set_restore_state_and_notify('snapshot_restore',
-                                                  restore_state,
-                                                  context, ex, request_spec)
+                                                   restore_state,
+                                                   context, ex, request_spec)
 
     def _set_file_search_state_and_notify(self, method, updates, context, ex,
-                                     request_spec):
+                                          request_spec):
         LOG.error(_("Failed to schedule_%(method)s: %(ex)s") % locals())
 
         file_search_status = updates['status']
@@ -152,11 +155,10 @@ class SchedulerManager(manager.Manager):
         notifier.notify(context, notifier.publisher_id("scheduler"),
                         'scheduler.' + method, notifier.ERROR, payload)
 
-
     def _set_snapshot_state_and_notify(self, method, updates, context, ex,
-                                     request_spec):
+                                       request_spec):
         LOG.error(_("Failed to schedule_%(method)s: %(ex)s") % locals())
-  
+
         snapshot_status = updates['status']
         properties = request_spec.get('snapshot_properties', {})
 
@@ -176,9 +178,9 @@ class SchedulerManager(manager.Manager):
                         'scheduler.' + method, notifier.ERROR, payload)
 
     def _set_restore_state_and_notify(self, method, updates, context, ex,
-                                     request_spec):
+                                      request_spec):
         LOG.error(_("Failed to schedule_%(method)s: %(ex)s") % locals())
-  
+
         restore_status = updates['status']
         properties = request_spec.get('restore_properties', {})
 
@@ -191,6 +193,48 @@ class SchedulerManager(manager.Manager):
                        restore_properties=properties,
                        restore_id=restore_id,
                        state=restore_status,
+                       method=method,
+                       reason=ex)
+
+        notifier.notify(context, notifier.publisher_id("scheduler"),
+                        'scheduler.' + method, notifier.ERROR, payload)
+
+    def config_backup(self, context, topic, backup_id,
+                      request_spec=None, filter_properties=None):
+        try:
+            request_spec.update(
+                {'backup_id': backup_id, 'snapshot_properties': {}})
+
+            self.driver.schedule_config_backup(context, request_spec,
+                                               filter_properties)
+        except exception.NoValidHost as ex:
+            backup_state = {'status': {'status': 'error'}}
+            self._set_backup_state_and_notify('config_backup',
+                                              backup_state,
+                                              context, ex, request_spec)
+        except Exception as ex:
+            with excutils.save_and_reraise_exception():
+                backup_state = {'status': {'status': 'error'}}
+                self._set_backup_state_and_notify('config_backup',
+                                                  backup_state,
+                                                  context, ex, request_spec)
+
+    def _set_backup_state_and_notify(self, method, updates, context, ex,
+                                     request_spec):
+        LOG.error(_("Failed to schedule_%(method)s: %(ex)s") % locals())
+
+        backup_status = updates['status']
+        properties = request_spec.get('backup_properties', {})
+
+        backup_id = request_spec.get('backup_id', None)
+
+        if backup_id:
+            db.config_backup_update(context, backup_id, backup_status)
+
+        payload = dict(request_spec=request_spec,
+                       backup_properties=properties,
+                       backup_id=backup_id,
+                       state=backup_status,
                        method=method,
                        reason=ex)
 

@@ -26,6 +26,7 @@ scheduler_driver_opts = [
 FLAGS = flags.FLAGS
 FLAGS.register_opts(scheduler_driver_opts)
 
+
 def file_search_update_db(context, search_id, host):
     '''Set the host and set the scheduled_at field of the snapshot.
 
@@ -34,6 +35,7 @@ def file_search_update_db(context, search_id, host):
     now = timeutils.utcnow()
     values = {'host': host, 'scheduled_at': now}
     return db.file_search_update(context, search_id, values)
+
 
 def snapshot_update_db(context, snapshot_id, host):
     '''Set the host and set the scheduled_at field of the snapshot.
@@ -44,6 +46,7 @@ def snapshot_update_db(context, snapshot_id, host):
     values = {'host': host, 'scheduled_at': now}
     return db.snapshot_update(context, snapshot_id, values)
 
+
 def restore_update_db(context, restore_id, host):
     '''Set the host and set the scheduled_at field of the restore.
 
@@ -52,6 +55,17 @@ def restore_update_db(context, restore_id, host):
     now = timeutils.utcnow()
     values = {'host': host, 'scheduled_at': now}
     return db.restore_update(context, restore_id, values)
+
+
+def config_backup_update_db(context, backup_id, host):
+    '''Set the host and set the scheduled_at field of the backup.
+
+    :returns: A ConfigBackup with the updated fields set properly.
+    '''
+    now = timeutils.utcnow()
+    values = {'host': host, 'scheduled_at': now}
+    return db.config_backup_update(context, backup_id, values)
+
 
 class Scheduler(object):
     """The base class that all Scheduler classes should inherit from."""
@@ -93,7 +107,7 @@ class Scheduler(object):
     def schedule_snapshot(self, context, request_spec, filter_properties):
         """Must override schedule method for scheduler to work."""
         raise NotImplementedError(_("Must implement schedule_snapshot"))
-    
+
     def schedule_restore(self, context, request_spec, filter_properties):
         """Must override schedule method for scheduler to work."""
-        raise NotImplementedError(_("Must implement schedule_restore"))    
+        raise NotImplementedError(_("Must implement schedule_restore"))

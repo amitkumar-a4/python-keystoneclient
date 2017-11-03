@@ -68,7 +68,7 @@ class GlanceWriteThread(object):
     """
 
     def __init__(self, context, input, image_service, image_id,
-            image_meta=None):
+                 image_meta=None):
         if not image_meta:
             image_meta = {}
 
@@ -103,20 +103,22 @@ class GlanceWriteThread(object):
                     elif image_status == "killed":
                         self.stop()
                         msg = (_("Glance image %s is in killed state") %
-                                 self.image_id)
+                               self.image_id)
                         LOG.error(msg)
-                        self.done.send_exception(exception.WorkloadMgrException(msg))
+                        self.done.send_exception(
+                            exception.WorkloadMgrException(msg))
                     elif image_status in ["saving", "queued"]:
                         greenthread.sleep(GLANCE_POLL_INTERVAL)
                     else:
                         self.stop()
                         msg = _("Glance image "
-                                    "%(image_id)s is in unknown state "
-                                    "- %(state)s") % {
-                                            "image_id": self.image_id,
-                                            "state": image_status}
+                                "%(image_id)s is in unknown state "
+                                "- %(state)s") % {
+                            "image_id": self.image_id,
+                            "state": image_status}
                         LOG.error(msg)
-                        self.done.send_exception(exception.WorkloadMgrException(msg))
+                        self.done.send_exception(
+                            exception.WorkloadMgrException(msg))
                 except Exception as exc:
                     self.stop()
                     self.done.send_exception(exc)
