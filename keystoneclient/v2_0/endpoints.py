@@ -18,7 +18,9 @@ from keystoneclient import base
 
 class Endpoint(base.Resource):
     """Represents a Keystone endpoint."""
+
     def __repr__(self):
+        """Return string representation of endpoint resource information."""
         return "<Endpoint %s>" % self._info
 
 
@@ -39,7 +41,7 @@ class EndpointManager(base.ManagerWithFind):
                              'publicurl': publicurl,
                              'adminurl': adminurl,
                              'internalurl': internalurl}}
-        return self._create('/endpoints', body, 'endpoint')
+        return self._post('/endpoints', body, 'endpoint')
 
     def delete(self, id):
         """Delete an endpoint."""

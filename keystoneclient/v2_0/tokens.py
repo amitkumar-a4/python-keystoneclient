@@ -10,16 +10,18 @@
 #    License for the specific language governing permissions and limitations
 #    under the License.
 
+from positional import positional
+
 from keystoneclient import access
 from keystoneclient import auth
 from keystoneclient import base
 from keystoneclient import exceptions
 from keystoneclient.i18n import _
-from keystoneclient import utils
 
 
 class Token(base.Resource):
     def __repr__(self):
+        """Return string representation of resource information."""
         return "<Token %s>" % self._info
 
     @property
@@ -38,7 +40,7 @@ class Token(base.Resource):
 class TokenManager(base.Manager):
     resource_class = Token
 
-    @utils.positional(enforcement=utils.positional.WARN)
+    @positional(enforcement=positional.WARN)
     def authenticate(self, username=None, tenant_id=None, tenant_name=None,
                      password=None, token=None, return_raw=False):
         if token:
@@ -61,10 +63,10 @@ class TokenManager(base.Manager):
         # no endpoint that can satisfy the request (eg an unscoped token) then
         # issue it against the auth_url.
         try:
-            token_ref = self._create(*args, **kwargs)
+            token_ref = self._post(*args, **kwargs)
         except exceptions.EndpointNotFound:
             kwargs['endpoint_filter'] = {'interface': auth.AUTH_INTERFACE}
-            token_ref = self._create(*args, **kwargs)
+            token_ref = self._post(*args, **kwargs)
 
         return token_ref
 
@@ -84,6 +86,17 @@ class TokenManager(base.Manager):
         """
         return self._get('/tokens/%s' % base.getid(token), 'access')
 
+    def get_token_data(self, token):
+        """Fetch the data about a token from the identity server.
+
+        :param str token: The token id.
+
+        :rtype: dict
+        """
+        url = '/tokens/%s' % token
+        resp, body = self.client.get(url)
+        return body
+
     def validate_access_info(self, token):
         """Validate a token.
 
@@ -94,19 +107,17 @@ class TokenManager(base.Manager):
         :rtype: :py:class:`keystoneclient.access.AccessInfoV2`
 
         """
-
         def calc_id(token):
             if isinstance(token, access.AccessInfo):
                 return token.auth_token
             return base.getid(token)
 
-        url = '/tokens/%s' % calc_id(token)
-        resp, body = self.client.get(url)
-        access_info = access.AccessInfo.factory(resp=resp, body=body)
-        return access_info
+        token_id = calc_id(token)
+        body = self.get_token_data(token_id)
+        return access.AccessInfo.factory(auth_token=token_id, body=body)
 
     def get_revoked(self):
-        """Returns the revoked tokens response.
+        """Return the revoked tokens response.
 
         The response will be a dict containing 'signed' which is a CMS-encoded
         document.

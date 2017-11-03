@@ -20,7 +20,7 @@ from keystoneclient.v2_0 import client
 from keystoneclient.v2_0 import tokens
 
 
-class TokenTests(utils.TestCase):
+class TokenTests(utils.ClientTestCase):
 
     def test_delete(self):
         id_ = uuid.uuid4().hex
@@ -139,9 +139,9 @@ class TokenTests(utils.TestCase):
         token_fixture.set_scope()
         self.stub_auth(json=token_fixture)
 
-        self.assertEqual(self.TEST_URL, self.client.management_url)
-
         token_ref = self.client.tokens.authenticate(token=uuid.uuid4().hex)
+        self.assertEqual(self.TEST_URL + '/tokens',
+                         self.requests_mock.last_request.url)
         self.assertIsInstance(token_ref, tokens.Token)
         self.assertEqual(token_fixture.token_id, token_ref.id)
         self.assertEqual(token_fixture.expires_str, token_ref.expires)
@@ -152,9 +152,11 @@ class TokenTests(utils.TestCase):
         token_fixture = fixture.V2Token()
         self.stub_auth(base_url=new_auth_url, json=token_fixture)
 
-        c = client.Client(username=self.TEST_USER,
-                          auth_url=new_auth_url,
-                          password=uuid.uuid4().hex)
+        # Creating a HTTPClient not using session is deprecated.
+        with self.deprecations.expect_deprecations_here():
+            c = client.Client(username=self.TEST_USER,
+                              auth_url=new_auth_url,
+                              password=uuid.uuid4().hex)
 
         self.assertIsNone(c.management_url)
 
@@ -168,6 +170,9 @@ class TokenTests(utils.TestCase):
         token_fixture = fixture.V2Token(token_id=id_)
         self.stub_url('GET', ['tokens', id_], json=token_fixture)
 
+        token_data = self.client.tokens.get_token_data(id_)
+        self.assertEqual(token_fixture, token_data)
+
         token_ref = self.client.tokens.validate(id_)
         self.assertIsInstance(token_ref, tokens.Token)
         self.assertEqual(id_, token_ref.id)
@@ -178,6 +183,9 @@ class TokenTests(utils.TestCase):
         id_ = uuid.uuid4().hex
         # The server is expected to return 404 if the token is invalid.
         self.stub_url('GET', ['tokens', id_], status_code=404)
+
+        self.assertRaises(exceptions.NotFound,
+                          self.client.tokens.get_token_data, id_)
         self.assertRaises(exceptions.NotFound,
                           self.client.tokens.validate, id_)
 

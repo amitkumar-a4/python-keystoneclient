@@ -23,13 +23,13 @@ import base64
 import errno
 import hashlib
 import logging
-import textwrap
 import zlib
 
+from debtcollector import removals
 import six
 
 from keystoneclient import exceptions
-from keystoneclient.i18n import _, _LE, _LW
+from keystoneclient.i18n import _, _LE
 
 
 subprocess = None
@@ -60,13 +60,20 @@ def _ensure_subprocess():
             if patcher.already_patched:
                 from eventlet.green import subprocess
             else:
-                import subprocess
+                import subprocess  # nosec(cjschaef): we must be careful when
+                # using subprocess.Popen with possibly untrusted data,
+                # assumption is that the certificate/key files provided are
+                # trustworthy
         except ImportError:
-            import subprocess  # noqa
+            import subprocess  # noqa # nosec(cjschaef): we must be careful
+            # when using subprocess.Popen with possibly untrusted data,
+            # assumption is that the certificate/key files provided are
+            # trustworthy
 
 
 def set_subprocess(_subprocess=None):
     """Set subprocess module to use.
+
     The subprocess could be eventlet.green.subprocess if using eventlet,
     or Python's subprocess otherwise.
     """
@@ -84,9 +91,7 @@ def _check_files_accessible(files):
     except IOError as e:
         # Catching IOError means there is an issue with
         # the given file.
-        err = _('Hit OSError in _process_communicate_handle_oserror()\n'
-                'Likely due to %(file)s: %(error)s') % {'file': try_file,
-                                                        'error': e.strerror}
+        err = try_file, e.strerror
         # Emulate openssl behavior, which returns with code 2 when
         # access to a file failed.
         retcode = OpensslCmsExitStatus.INPUT_FILE_READ_ERROR
@@ -96,13 +101,12 @@ def _check_files_accessible(files):
 
 def _process_communicate_handle_oserror(process, data, files):
     """Wrapper around process.communicate that checks for OSError."""
-
     try:
         output, err = process.communicate(data)
     except OSError as e:
         if e.errno != errno.EPIPE:
             raise
-        # OSError with EPIPE only occurs with Python 2.6.x/old 2.7.x
+        # OSError with EPIPE only occurs with old Python 2.7.x versions
         # http://bugs.python.org/issue10963
 
         # The quick exit is typically caused by the openssl command not being
@@ -110,12 +114,25 @@ def _process_communicate_handle_oserror(process, data, files):
         retcode, err = _check_files_accessible(files)
         if process.stderr:
             msg = process.stderr.read()
-            err = err + msg.decode('utf-8')
+            if isinstance(msg, six.binary_type):
+                msg = msg.decode('utf-8')
+            if err:
+                err = (_('Hit OSError in '
+                         '_process_communicate_handle_oserror(): '
+                         '%(stderr)s\nLikely due to %(file)s: %(error)s') %
+                       {'stderr': msg,
+                        'file': err[0],
+                        'error': err[1]})
+            else:
+                err = (_('Hit OSError in '
+                         '_process_communicate_handle_oserror(): %s') % msg)
+
         output = ''
     else:
         retcode = process.poll()
         if err is not None:
-            err = err.decode('utf-8')
+            if isinstance(err, six.binary_type):
+                err = err.decode('utf-8')
 
     return output, err, retcode
 
@@ -135,7 +152,7 @@ def _encoding_for_form(inform):
 
 def cms_verify(formatted, signing_cert_file_name, ca_file_name,
                inform=PKI_ASN1_FORM):
-    """Verifies the signature of the contents IAW CMS syntax.
+    """Verify the signature of the contents IAW CMS syntax.
 
     :raises subprocess.CalledProcessError:
     :raises keystoneclient.exceptions.CertificateConfigError: if certificate
@@ -168,8 +185,8 @@ def cms_verify(formatted, signing_cert_file_name, ca_file_name,
     # You can get more from
     # http://www.openssl.org/docs/apps/cms.html#EXIT_CODES
     #
-    # $ openssl cms -verify -certfile not_exist_file -CAfile \
-    #       not_exist_file -inform PEM -nosmimecap -nodetach \
+    # $ openssl cms -verify -certfile not_exist_file -CAfile
+    #       not_exist_file -inform PEM -nosmimecap -nodetach
     #       -nocerts -noattr
     # Error opening certificate file not_exist_file
     #
@@ -179,16 +196,12 @@ def cms_verify(formatted, signing_cert_file_name, ca_file_name,
         else:
             raise exceptions.CertificateConfigError(err)
     elif retcode != OpensslCmsExitStatus.SUCCESS:
-        # NOTE(dmllr): Python 2.6 compatibility:
-        # CalledProcessError did not have output keyword argument
-        e = subprocess.CalledProcessError(retcode, 'openssl')
-        e.output = err
-        raise e
+        raise subprocess.CalledProcessError(retcode, 'openssl', output=err)
     return output
 
 
 def is_pkiz(token_text):
-    """Determine if a token a cmsz token
+    """Determine if a token is PKIZ.
 
     Checks if the string has the prefix that indicates it is a
     Crypto Message Syntax, Z compressed token.
@@ -226,13 +239,15 @@ def pkiz_verify(signed_text, signing_cert_file_name, ca_file_name):
                       inform=PKIZ_CMS_FORM)
 
 
-# This function is deprecated and will be removed once the ASN1 token format
-# is no longer required. It is only here to be used for testing.
 def token_to_cms(signed_text):
+    """Convert a custom formatted token to a PEM-formatted token.
+
+    See documentation for cms_to_token() for details on the custom formatting.
+    """
     copy_of_text = signed_text.replace('-', '/')
 
     lines = ['-----BEGIN CMS-----']
-    lines += textwrap.wrap(copy_of_text, 64)
+    lines += [copy_of_text[n:n + 64] for n in range(0, len(copy_of_text), 64)]
     lines.append('-----END CMS-----\n')
     return '\n'.join(lines)
 
@@ -293,10 +308,14 @@ def is_asn1_token(token):
     return token[:3] == PKI_ASN1_PREFIX
 
 
+@removals.remove(message='Use is_asn1_token() instead.', version='1.7.0',
+                 removal_version='2.0.0')
 def is_ans1_token(token):
-    """Deprecated. Use is_asn1_token() instead."""
-    LOG.warning(_LW('The function is_ans1_token() is deprecated, '
-                    'use is_asn1_token() instead.'))
+    """Deprecated.
+
+    This function is deprecated as of the 1.7.0 release in favor of
+    :func:`is_asn1_token` and may be removed in the 2.0.0 release.
+    """
     return is_asn1_token(token)
 
 
@@ -309,7 +328,7 @@ def cms_sign_text(data_to_sign, signing_cert_file_name, signing_key_file_name,
 def cms_sign_data(data_to_sign, signing_cert_file_name, signing_key_file_name,
                   outform=PKI_ASN1_FORM,
                   message_digest=DEFAULT_TOKEN_DIGEST_ALGORITHM):
-    """Uses OpenSSL to sign a document.
+    """Use OpenSSL to sign a document.
 
     Produces a Base64 encoding of a DER formatted CMS Document
     http://en.wikipedia.org/wiki/Cryptographic_Message_Syntax
@@ -366,7 +385,25 @@ def cms_sign_token(text, signing_cert_file_name, signing_key_file_name,
 
 
 def cms_to_token(cms_text):
+    """Convert a CMS-signed token in PEM format to a custom URL-safe format.
 
+    The conversion consists of replacing '/' char in the PEM-formatted token
+    with the '-' char and doing other such textual replacements to make the
+    result marshallable via HTTP. The return value can thus be used as the
+    value of a HTTP header such as "X-Auth-Token".
+
+    This ad-hoc conversion is an unfortunate oversight since the returned
+    value now does not conform to any of the standard variants of base64
+    encoding. It would have been better to use base64url encoding (either on
+    the PEM formatted text or, perhaps even better, on the inner CMS-signed
+    binary value without any PEM formatting). In any case, the same conversion
+    is done in reverse in the other direction (for token verification), so
+    there are no correctness issues here. Note that the non-standard encoding
+    of the token will be preserved so as to not break backward compatibility.
+
+    The conversion issue is detailed by the code author in a blog post at
+    http://adam.younglogic.com/2014/02/compressed-tokens/.
+    """
     start_delim = '-----BEGIN CMS-----'
     end_delim = '-----END CMS-----'
     signed_text = cms_text

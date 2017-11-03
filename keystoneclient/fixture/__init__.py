@@ -11,27 +11,46 @@
 # under the License.
 
 """
-The generators in this directory produce keystone compliant structures for use
-in testing.
+Produce keystone compliant structures for testing.
 
+The generators in this directory produce keystone compliant structures for
+use in testing.
 They should be considered part of the public API because they may be relied
 upon to generate test tokens for other clients. However they should never be
 imported into the main client (keystoneclient or other). Because of this there
 may be dependencies from this module on libraries that are only available in
 testing.
+
+.. warning::
+
+   The keystoneclient.fixture package is deprecated in favor of
+   keystoneauth1.fixture and will not be supported.
+
 """
 
-from keystoneclient.fixture.discovery import *  # noqa
-from keystoneclient.fixture.exception import FixtureValidationError  # noqa
-from keystoneclient.fixture.v2 import Token as V2Token  # noqa
-from keystoneclient.fixture.v3 import Token as V3Token  # noqa
-from keystoneclient.fixture.v3 import V3FederationToken  # noqa
+import warnings
 
-__all__ = ['DiscoveryList',
+from keystoneclient.fixture.discovery import *  # noqa
+from keystoneclient.fixture import exception
+from keystoneclient.fixture import v2
+from keystoneclient.fixture import v3
+
+
+warnings.warn(
+    "The keystoneclient.fixture package is deprecated in favor of "
+    "keystoneauth1.fixture and will not be supported.", DeprecationWarning)
+
+
+FixtureValidationError = exception.FixtureValidationError
+V2Token = v2.Token
+V3Token = v3.Token
+V3FederationToken = v3.V3FederationToken
+
+__all__ = ('DiscoveryList',
            'FixtureValidationError',
            'V2Discovery',
            'V3Discovery',
            'V2Token',
            'V3Token',
            'V3FederationToken',
-           ]
+           )

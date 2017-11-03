@@ -10,9 +10,8 @@
 # License for the specific language governing permissions and limitations
 # under the License.
 
-import logging
-
 from oslo_config import cfg
+from positional import positional
 
 from keystoneclient import _discover
 from keystoneclient.auth.identity.generic import base
@@ -20,17 +19,15 @@ from keystoneclient.auth.identity import v2
 from keystoneclient.auth.identity import v3
 from keystoneclient import utils
 
-LOG = logging.getLogger(__name__)
-
 
 def get_options():
     return [
         cfg.StrOpt('user-id', help='User id'),
-        cfg.StrOpt('user-name', dest='username', help='Username',
-                   deprecated_name='username'),
+        cfg.StrOpt('username', dest='username', help='Username',
+                   deprecated_name='user-name'),
         cfg.StrOpt('user-domain-id', help="User's domain id"),
         cfg.StrOpt('user-domain-name', help="User's domain name"),
-        cfg.StrOpt('password', help="User's password"),
+        cfg.StrOpt('password', secret=True, help="User's password"),
     ]
 
 
@@ -45,7 +42,7 @@ class Password(base.BaseGenericPlugin):
 
     """
 
-    @utils.positional()
+    @positional()
     def __init__(self, auth_url, username=None, user_id=None, password=None,
                  user_domain_id=None, user_domain_name=None, **kwargs):
         super(Password, self).__init__(auth_url=auth_url, **kwargs)
@@ -82,3 +79,11 @@ class Password(base.BaseGenericPlugin):
         options = super(Password, cls).get_options()
         options.extend(get_options())
         return options
+
+    @classmethod
+    def load_from_argparse_arguments(cls, namespace, **kwargs):
+        if not (kwargs.get('password') or namespace.os_password):
+            kwargs['password'] = utils.prompt_user_password()
+
+        return super(Password, cls).load_from_argparse_arguments(namespace,
+                                                                 **kwargs)

@@ -18,6 +18,7 @@ from keystoneclient import base
 
 class EC2(base.Resource):
     def __repr__(self):
+        """Return string representation of EC2 resource information."""
         return "<EC2 %s>" % self._info
 
     def delete(self):
@@ -32,11 +33,10 @@ class CredentialsManager(base.ManagerWithFind):
 
         :rtype: object of type :class:`EC2`
         """
-
         params = {'tenant_id': tenant_id}
 
-        return self._create('/users/%s/credentials/OS-EC2' % user_id,
-                            params, "credential")
+        return self._post('/users/%s/credentials/OS-EC2' % user_id,
+                          params, "credential")
 
     def list(self, user_id):
         """Get a list of access/secret pairs for a user_id.

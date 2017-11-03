@@ -30,11 +30,14 @@ class KeystoneClientTest(utils.TestCase):
         token = client_fixtures.unscoped_token()
         self.stub_auth(json=token)
 
-        c = client.Client(username='exampleuser',
-                          password='password',
-                          auth_url=self.TEST_URL)
+        # Creating a HTTPClient not using session is deprecated.
+        with self.deprecations.expect_deprecations_here():
+            c = client.Client(username='exampleuser',
+                              password='password',
+                              auth_url=self.TEST_URL)
         self.assertIsNotNone(c.auth_ref)
-        self.assertFalse(c.auth_ref.scoped)
+        with self.deprecations.expect_deprecations_here():
+            self.assertFalse(c.auth_ref.scoped)
         self.assertFalse(c.auth_ref.domain_scoped)
         self.assertFalse(c.auth_ref.project_scoped)
         self.assertIsNone(c.auth_ref.trust_id)
@@ -46,12 +49,15 @@ class KeystoneClientTest(utils.TestCase):
         token = client_fixtures.project_scoped_token()
         self.stub_auth(json=token)
 
-        c = client.Client(username='exampleuser',
-                          password='password',
-                          tenant_name='exampleproject',
-                          auth_url=self.TEST_URL)
+        # Creating a HTTPClient not using session is deprecated.
+        with self.deprecations.expect_deprecations_here():
+            c = client.Client(username='exampleuser',
+                              password='password',
+                              project_name='exampleproject',
+                              auth_url=self.TEST_URL)
         self.assertIsNotNone(c.auth_ref)
-        self.assertTrue(c.auth_ref.scoped)
+        with self.deprecations.expect_deprecations_here():
+            self.assertTrue(c.auth_ref.scoped)
         self.assertTrue(c.auth_ref.project_scoped)
         self.assertFalse(c.auth_ref.domain_scoped)
         self.assertIsNone(c.auth_ref.trust_id)
@@ -63,14 +69,19 @@ class KeystoneClientTest(utils.TestCase):
     def test_auth_ref_load(self):
         self.stub_auth(json=client_fixtures.project_scoped_token())
 
-        cl = client.Client(username='exampleuser',
-                           password='password',
-                           tenant_name='exampleproject',
-                           auth_url=self.TEST_URL)
+        # Creating a HTTPClient not using session is deprecated.
+        with self.deprecations.expect_deprecations_here():
+            cl = client.Client(username='exampleuser',
+                               password='password',
+                               project_name='exampleproject',
+                               auth_url=self.TEST_URL)
         cache = json.dumps(cl.auth_ref)
-        new_client = client.Client(auth_ref=json.loads(cache))
+        # Creating a HTTPClient not using session is deprecated.
+        with self.deprecations.expect_deprecations_here():
+            new_client = client.Client(auth_ref=json.loads(cache))
         self.assertIsNotNone(new_client.auth_ref)
-        self.assertTrue(new_client.auth_ref.scoped)
+        with self.deprecations.expect_deprecations_here():
+            self.assertTrue(new_client.auth_ref.scoped)
         self.assertTrue(new_client.auth_ref.project_scoped)
         self.assertFalse(new_client.auth_ref.domain_scoped)
         self.assertIsNone(new_client.auth_ref.trust_id)
@@ -83,17 +94,21 @@ class KeystoneClientTest(utils.TestCase):
     def test_auth_ref_load_with_overridden_arguments(self):
         self.stub_auth(json=client_fixtures.project_scoped_token())
 
-        cl = client.Client(username='exampleuser',
-                           password='password',
-                           tenant_name='exampleproject',
-                           auth_url=self.TEST_URL)
+        # Creating a HTTPClient not using session is deprecated.
+        with self.deprecations.expect_deprecations_here():
+            cl = client.Client(username='exampleuser',
+                               password='password',
+                               project_name='exampleproject',
+                               auth_url=self.TEST_URL)
         cache = json.dumps(cl.auth_ref)
         new_auth_url = "http://new-public:5000/v2.0"
-        new_client = client.Client(auth_ref=json.loads(cache),
-                                   auth_url=new_auth_url)
+        # Creating a HTTPClient not using session is deprecated.
+        with self.deprecations.expect_deprecations_here():
+            new_client = client.Client(auth_ref=json.loads(cache),
+                                       auth_url=new_auth_url)
         self.assertIsNotNone(new_client.auth_ref)
-        self.assertTrue(new_client.auth_ref.scoped)
-        self.assertTrue(new_client.auth_ref.scoped)
+        with self.deprecations.expect_deprecations_here():
+            self.assertTrue(new_client.auth_ref.scoped)
         self.assertTrue(new_client.auth_ref.project_scoped)
         self.assertFalse(new_client.auth_ref.domain_scoped)
         self.assertIsNone(new_client.auth_ref.trust_id)
@@ -105,10 +120,12 @@ class KeystoneClientTest(utils.TestCase):
                          'http://admin:35357/v2.0')
 
     def test_init_err_no_auth_url(self):
-        self.assertRaises(exceptions.AuthorizationFailure,
-                          client.Client,
-                          username='exampleuser',
-                          password='password')
+        # Creating a HTTPClient not using session is deprecated.
+        with self.deprecations.expect_deprecations_here():
+            self.assertRaises(exceptions.AuthorizationFailure,
+                              client.Client,
+                              username='exampleuser',
+                              password='password')
 
     def test_management_url_is_updated(self):
         first = fixture.V2Token()
@@ -128,13 +145,16 @@ class KeystoneClientTest(utils.TestCase):
 
         self.stub_auth(response_list=[{'json': first}, {'json': second}])
 
-        cl = client.Client(username='exampleuser',
-                           password='password',
-                           tenant_name='exampleproject',
-                           auth_url=self.TEST_URL)
+        # Creating a HTTPClient not using session is deprecated.
+        with self.deprecations.expect_deprecations_here():
+            cl = client.Client(username='exampleuser',
+                               password='password',
+                               project_name='exampleproject',
+                               auth_url=self.TEST_URL)
         self.assertEqual(cl.management_url, admin_url)
 
-        cl.authenticate()
+        with self.deprecations.expect_deprecations_here():
+            cl.authenticate()
         self.assertEqual(cl.management_url, second_url)
 
     def test_client_with_region_name_passes_to_service_catalog(self):
@@ -142,30 +162,40 @@ class KeystoneClientTest(utils.TestCase):
         # removed ASAP, however must remain compatible.
         self.stub_auth(json=client_fixtures.auth_response_body())
 
-        cl = client.Client(username='exampleuser',
-                           password='password',
-                           tenant_name='exampleproject',
-                           auth_url=self.TEST_URL,
-                           region_name='North')
+        # Creating a HTTPClient not using session is deprecated.
+        with self.deprecations.expect_deprecations_here():
+            cl = client.Client(username='exampleuser',
+                               password='password',
+                               project_name='exampleproject',
+                               auth_url=self.TEST_URL,
+                               region_name='North')
         self.assertEqual(cl.service_catalog.url_for(service_type='image'),
                          'https://image.north.host/v1/')
 
-        cl = client.Client(username='exampleuser',
-                           password='password',
-                           tenant_name='exampleproject',
-                           auth_url=self.TEST_URL,
-                           region_name='South')
+        # Creating a HTTPClient not using session is deprecated.
+        with self.deprecations.expect_deprecations_here():
+            cl = client.Client(username='exampleuser',
+                               password='password',
+                               project_name='exampleproject',
+                               auth_url=self.TEST_URL,
+                               region_name='South')
         self.assertEqual(cl.service_catalog.url_for(service_type='image'),
                          'https://image.south.host/v1/')
 
     def test_client_without_auth_params(self):
-        self.assertRaises(exceptions.AuthorizationFailure,
-                          client.Client,
-                          tenant_name='exampleproject',
-                          auth_url=self.TEST_URL)
+        # Creating a HTTPClient not using session is deprecated.
+        with self.deprecations.expect_deprecations_here():
+            self.assertRaises(exceptions.AuthorizationFailure,
+                              client.Client,
+                              project_name='exampleproject',
+                              auth_url=self.TEST_URL)
 
     def test_client_params(self):
-        opts = {'auth': token_endpoint.Token('a', 'b'),
+        with self.deprecations.expect_deprecations_here():
+            sess = session.Session()
+            auth = token_endpoint.Token('a', 'b')
+
+        opts = {'auth': auth,
                 'connect_retries': 50,
                 'endpoint_override': uuid.uuid4().hex,
                 'interface': uuid.uuid4().hex,
@@ -174,11 +204,10 @@ class KeystoneClientTest(utils.TestCase):
                 'user_agent': uuid.uuid4().hex,
                 }
 
-        sess = session.Session()
         cl = client.Client(session=sess, **opts)
 
         for k, v in six.iteritems(opts):
             self.assertEqual(v, getattr(cl._adapter, k))
 
         self.assertEqual('identity', cl._adapter.service_type)
-        self.assertEqual('v2.0', cl._adapter.version)
+        self.assertEqual((2, 0), cl._adapter.version)

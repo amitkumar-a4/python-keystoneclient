@@ -14,6 +14,7 @@
 #    under the License.
 
 import logging
+import warnings
 
 from oslo_serialization import jsonutils
 
@@ -21,6 +22,7 @@ from keystoneclient.auth.identity import v3 as v3_auth
 from keystoneclient import exceptions
 from keystoneclient import httpclient
 from keystoneclient.i18n import _
+from keystoneclient.v3 import auth
 from keystoneclient.v3.contrib import endpoint_filter
 from keystoneclient.v3.contrib import endpoint_policy
 from keystoneclient.v3.contrib import federation
@@ -29,6 +31,7 @@ from keystoneclient.v3.contrib import simple_cert
 from keystoneclient.v3.contrib import trusts
 from keystoneclient.v3 import credentials
 from keystoneclient.v3 import domains
+from keystoneclient.v3 import ec2
 from keystoneclient.v3 import endpoints
 from keystoneclient.v3 import groups
 from keystoneclient.v3 import policies
@@ -45,8 +48,10 @@ _logger = logging.getLogger(__name__)
 
 
 class Client(httpclient.HTTPClient):
-    """Client for the OpenStack Identity API v3.
+    r"""Client for the OpenStack Identity API v3.
 
+    :param session: Session for requests. (optional)
+    :type session: keystoneauth1.session.Session
     :param string user_id: User ID for authentication. (optional)
     :param string username: Username for authentication. (optional)
     :param string user_domain_id: User's domain ID for authentication.
@@ -64,11 +69,13 @@ class Client(httpclient.HTTPClient):
     :param string project_domain_name: Project's domain name for project
                                        scoping. (optional)
     :param string tenant_name: Tenant name. (optional)
-                               The tenant_name keyword argument is deprecated,
-                               use project_name instead.
+                               The tenant_name keyword argument is deprecated
+                               as of the 1.7.0 release in favor of project_name
+                               and may be removed in the 2.0.0 release.
     :param string tenant_id: Tenant id. (optional)
-                             The tenant_id keyword argument is deprecated,
-                             use project_id instead.
+                             The tenant_id keyword argument is deprecated as of
+                             the 1.7.0 release in favor of project_id and may
+                             be removed in the 2.0.0 release.
     :param string auth_url: Identity service endpoint for authorization.
     :param string region_name: Name of a region to select when choosing an
                                endpoint from the service catalog.
@@ -79,16 +86,25 @@ class Client(httpclient.HTTPClient):
     :param integer timeout: Allows customization of the timeout for client
                             http requests. (optional)
 
+    .. warning::
+
+        Constructing an instance of this class without a session is
+        deprecated as of the 1.7.0 release and will be removed in the
+        2.0.0 release.
+
     Example::
 
+        >>> from keystoneauth1.identity import v3
+        >>> from keystoneauth1 import session
         >>> from keystoneclient.v3 import client
-        >>> keystone = client.Client(user_domain_name=DOMAIN_NAME,
-        ...                          username=USER,
-        ...                          password=PASS,
-        ...                          project_domain_name=PROJECT_DOMAIN_NAME,
-        ...                          project_name=PROJECT_NAME,
-        ...                          auth_url=KEYSTONE_URL)
-        ...
+        >>> auth = v3.Password(user_domain_name=DOMAIN_NAME,
+        ...                    username=USER,
+        ...                    password=PASS,
+        ...                    project_domain_name=PROJECT_DOMAIN_NAME,
+        ...                    project_name=PROJECT_NAME,
+        ...                    auth_url=KEYSTONE_URL)
+        >>> sess = session.Session(auth=auth)
+        >>> keystone = client.Client(session=sess)
         >>> keystone.projects.list()
         ...
         >>> user = keystone.users.get(USER_ID)
@@ -100,15 +116,19 @@ class Client(httpclient.HTTPClient):
 
         :py:class:`keystoneclient.v3.credentials.CredentialManager`
 
+    .. py:attribute:: ec2
+
+        :py:class:`keystoneclient.v3.ec2.EC2Manager`
+
     .. py:attribute:: endpoint_filter
 
         :py:class:`keystoneclient.v3.contrib.endpoint_filter.\
-EndpointFilterManager`
+        EndpointFilterManager`
 
     .. py:attribute:: endpoint_policy
 
         :py:class:`keystoneclient.v3.contrib.endpoint_policy.\
-EndpointPolicyManager`
+        EndpointPolicyManager`
 
     .. py:attribute:: endpoints
 
@@ -174,7 +194,16 @@ EndpointPolicyManager`
         """Initialize a new client for the Keystone v3 API."""
         super(Client, self).__init__(**kwargs)
 
+        if not kwargs.get('session'):
+            warnings.warn(
+                'Constructing an instance of the '
+                'keystoneclient.v3.client.Client class without a session is '
+                'deprecated as of the 1.7.0 release and may be removed in '
+                'the 2.0.0 release.', DeprecationWarning)
+
+        self.auth = auth.AuthManager(self._adapter)
         self.credentials = credentials.CredentialManager(self._adapter)
+        self.ec2 = ec2.EC2Manager(self._adapter)
         self.endpoint_filter = endpoint_filter.EndpointFilterManager(
             self._adapter)
         self.endpoint_policy = endpoint_policy.EndpointPolicyManager(
@@ -238,6 +267,7 @@ EndpointPolicyManager`
         be used in the request.
 
         :returns: access.AccessInfo if authentication was successful.
+        :rtype: :class:`keystoneclient.access.AccessInfoV3`
         :raises keystoneclient.exceptions.AuthorizationFailure: if unable to
             authenticate or validate the existing authorization token.
         :raises keystoneclient.exceptions.Unauthorized: if authentication fails

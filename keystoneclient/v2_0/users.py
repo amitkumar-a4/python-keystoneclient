@@ -21,7 +21,9 @@ from keystoneclient import base
 
 class User(base.Resource):
     """Represents a Keystone user."""
+
     def __repr__(self):
+        """Return string representation of user resource information."""
         return "<User %s>" % self._info
 
     def delete(self):
@@ -33,6 +35,7 @@ class User(base.Resource):
 
 class UserManager(base.ManagerWithFind):
     """Manager class for manipulating Keystone users."""
+
     resource_class = User
 
     def __init__(self, client, role_manager):
@@ -50,22 +53,19 @@ class UserManager(base.ManagerWithFind):
         # FIXME(gabriel): "tenantId" seems to be accepted by the API but
         #                 fails to actually update the default tenant.
         params = {"user": kwargs}
-        params['user']['id'] = base.getid(user)
         url = "/users/%s" % base.getid(user)
         return self._update(url, params, "user")
 
     def update_enabled(self, user, enabled):
         """Update enabled-ness."""
-        params = {"user": {"id": base.getid(user),
-                           "enabled": enabled}}
+        params = {"user": {"enabled": enabled}}
 
         self._update("/users/%s/OS-KSADM/enabled" % base.getid(user), params,
                      "user")
 
     def update_password(self, user, password):
         """Update password."""
-        params = {"user": {"id": base.getid(user),
-                           "password": password}}
+        params = {"user": {"password": password}}
 
         return self._update("/users/%s/OS-KSADM/password" % base.getid(user),
                             params, "user", log=False)
@@ -75,7 +75,8 @@ class UserManager(base.ManagerWithFind):
         params = {"user": {"password": passwd,
                            "original_password": origpasswd}}
 
-        return self._update("/OS-KSCRUD/users/%s" % self.api.user_id, params,
+        return self._update("/OS-KSCRUD/users/%s" % self.client.user_id,
+                            params,
                             response_key="access",
                             method="PATCH",
                             endpoint_filter={'interface': 'public'},
@@ -83,8 +84,7 @@ class UserManager(base.ManagerWithFind):
 
     def update_tenant(self, user, tenant):
         """Update default tenant."""
-        params = {"user": {"id": base.getid(user),
-                           "tenantId": base.getid(tenant)}}
+        params = {"user": {"tenantId": base.getid(tenant)}}
 
         # FIXME(ja): seems like a bad url - default tenant is an attribute
         #            not a subresource!???
@@ -99,7 +99,7 @@ class UserManager(base.ManagerWithFind):
                            "tenantId": tenant_id,
                            "email": email,
                            "enabled": enabled}}
-        return self._create('/users', params, "user", log=not bool(password))
+        return self._post('/users', params, "user", log=not bool(password))
 
     def delete(self, user):
         """Delete a user."""
@@ -110,7 +110,6 @@ class UserManager(base.ManagerWithFind):
 
         :rtype: list of :class:`User`
         """
-
         params = {}
         if limit:
             params['limit'] = int(limit)

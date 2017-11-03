@@ -10,12 +10,13 @@
 #    License for the specific language governing permissions and limitations
 #    under the License.
 
+from positional import positional
+
 from keystoneclient import base
-from keystoneclient import utils
 
 
 class ServiceProvider(base.Resource):
-    """Object representing Service Provider container
+    """Object representing Service Provider container.
 
     Attributes:
         * id: user-defined unique string identifying Service Provider.
@@ -23,6 +24,7 @@ class ServiceProvider(base.Resource):
         * auth_url: the authentication url of Service Provider.
 
     """
+
     pass
 
 
@@ -40,7 +42,7 @@ class ServiceProviderManager(base.CrudManager):
         return self._update(url, body=body, response_key=self.key,
                             method='PUT')
 
-    @utils.positional.method(0)
+    @positional.method(0)
     def create(self, id, **kwargs):
         """Create Service Provider object.
 
@@ -54,7 +56,7 @@ class ServiceProviderManager(base.CrudManager):
                                        **kwargs)
 
     def get(self, service_provider):
-        """Fetch Service Provider object
+        """Fetch Service Provider object.
 
         Utilize Keystone URI:
         ``GET /OS-FEDERATION/service_providers/{id}``

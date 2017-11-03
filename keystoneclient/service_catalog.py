@@ -17,21 +17,38 @@
 # limitations under the License.
 
 import abc
+import warnings
 
+from positional import positional
 import six
 
 from keystoneclient import exceptions
 from keystoneclient.i18n import _
-from keystoneclient import utils
 
 
 @six.add_metaclass(abc.ABCMeta)
 class ServiceCatalog(object):
-    """Helper methods for dealing with a Keystone Service Catalog."""
+    """Helper methods for dealing with a Keystone Service Catalog.
+
+    .. warning::
+
+        Setting region_name is deprecated in favor of passing the region name
+        as a parameter to calls made to the service catalog as of the 1.7.0
+        release and may be removed in the 2.0.0 release.
+
+    """
 
     @classmethod
     def factory(cls, resource_dict, token=None, region_name=None):
-        """Create ServiceCatalog object given an auth token."""
+        """Create ServiceCatalog object given an auth token.
+
+        .. warning::
+
+            Setting region_name is deprecated in favor of passing the region
+            name as a parameter to calls made to the service catalog as of the
+            1.7.0 release and may be removed in the 2.0.0 release.
+
+        """
         if ServiceCatalogV3.is_valid(resource_dict):
             return ServiceCatalogV3(token, resource_dict, region_name)
         elif ServiceCatalogV2.is_valid(resource_dict):
@@ -40,13 +57,32 @@ class ServiceCatalog(object):
             raise NotImplementedError(_('Unrecognized auth response'))
 
     def __init__(self, region_name=None):
+        if region_name:
+            warnings.warn(
+                'Setting region_name on the service catalog is deprecated in '
+                'favor of passing the region name as a parameter to calls '
+                'made to the service catalog as of the 1.7.0 release and may '
+                'be removed in the 2.0.0 release.',
+                DeprecationWarning)
+
         self._region_name = region_name
 
     @property
     def region_name(self):
-        # FIXME(jamielennox): Having region_name set on the service catalog
-        # directly is deprecated. It should instead be provided as a parameter
-        # to calls made to the service_catalog. Provide appropriate warning.
+        """Region name.
+
+        .. warning::
+
+            region_name is deprecated in favor of passing the region name as a
+            parameter to calls made to the service catalog as of the 1.7.0
+            release and may be removed in the 2.0.0 release.
+
+        """
+        warnings.warn(
+            'region_name is deprecated in favor of passing the region name as '
+            'a parameter to calls made to the service catalog as of the 1.7.0 '
+            'release and may be removed in the 2.0.0 release.',
+            DeprecationWarning)
         return self._region_name
 
     def _get_endpoint_region(self, endpoint):
@@ -65,7 +101,7 @@ class ServiceCatalog(object):
         - `domain_id`: Authorized domain's ID
 
         """
-        raise NotImplementedError()
+        raise NotImplementedError()  # pragma: no cover
 
     @abc.abstractmethod
     def _is_endpoint_type_match(self, endpoint, endpoint_type):
@@ -74,6 +110,7 @@ class ServiceCatalog(object):
         :returns: True if the provided endpoint matches the required
         endpoint_type otherwise False.
         """
+        pass  # pragma: no cover
 
     @abc.abstractmethod
     def _normalize_endpoint_type(self, endpoint_type):
@@ -86,6 +123,7 @@ class ServiceCatalog(object):
         :returns: the endpoint string in the format appropriate for this
                   service catalog.
         """
+        pass  # pragma: no cover
 
     def get_endpoints(self, service_type=None, endpoint_type=None,
                       region_name=None, service_name=None):
@@ -119,7 +157,7 @@ class ServiceCatalog(object):
             if service_name:
                 try:
                     sn = service['name']
-                except KeyError:
+                except KeyError:  # nosec(cjschaef)
                     # assume that we're in v3.0-v3.2 and don't have the name in
                     # the catalog. Skip the check.
                     pass
@@ -142,8 +180,10 @@ class ServiceCatalog(object):
 
     def _get_service_endpoints(self, attr, filter_value, service_type,
                                endpoint_type, region_name, service_name):
-        """Fetch the endpoints of a particular service_type and handle
-        the filtering.
+        """Fetch the endpoints of a particular service_type.
+
+        Endpoints returned are also filtered based on the attr and
+        filter_value provided.
         """
         sc_endpoints = self.get_endpoints(service_type=service_type,
                                           endpoint_type=endpoint_type,
@@ -155,10 +195,13 @@ class ServiceCatalog(object):
         except KeyError:
             return
 
-        # TODO(jamielennox): at least swiftclient is known to set attr and not
-        # filter_value and expects that to mean that filtering is ignored, so
-        # we can't check for the presence of attr. This behaviour should be
-        # deprecated and an appropriate warning provided.
+        if attr and not filter_value:
+            warnings.warn(
+                'Providing attr without filter_value to get_urls() is '
+                'deprecated as of the 1.7.0 release and may be removed in the '
+                '2.0.0 release. Either both should be provided or neither '
+                'should be provided.')
+
         if filter_value:
             return [endpoint for endpoint in endpoints
                     if endpoint.get(attr) == filter_value]
@@ -166,7 +209,7 @@ class ServiceCatalog(object):
         return endpoints
 
     @abc.abstractmethod
-    @utils.positional(enforcement=utils.positional.WARN)
+    @positional(enforcement=positional.WARN)
     def get_urls(self, attr=None, filter_value=None,
                  service_type='identity', endpoint_type='publicURL',
                  region_name=None, service_name=None):
@@ -188,9 +231,9 @@ class ServiceCatalog(object):
 
         :returns: tuple of urls or None (if no match found)
         """
-        raise NotImplementedError()
+        raise NotImplementedError()  # pragma: no cover
 
-    @utils.positional(3, enforcement=utils.positional.WARN)
+    @positional(3, enforcement=positional.WARN)
     def url_for(self, attr=None, filter_value=None,
                 service_type='identity', endpoint_type='publicURL',
                 region_name=None, service_name=None):
@@ -225,33 +268,33 @@ class ServiceCatalog(object):
         try:
             return urls[0]
         except Exception:
-            pass
+            if service_name and region_name:
+                msg = (_('%(endpoint_type)s endpoint for %(service_type)s '
+                         'service named %(service_name)s in %(region_name)s '
+                         'region not found') %
+                       {'endpoint_type': endpoint_type,
+                        'service_type': service_type,
+                        'service_name': service_name,
+                        'region_name': region_name})
+            elif service_name:
+                msg = (_('%(endpoint_type)s endpoint for %(service_type)s '
+                         'service named %(service_name)s not found') %
+                       {'endpoint_type': endpoint_type,
+                        'service_type': service_type,
+                        'service_name': service_name})
+            elif region_name:
+                msg = (_('%(endpoint_type)s endpoint for %(service_type)s '
+                         'service in %(region_name)s region not found') %
+                       {'endpoint_type': endpoint_type,
+                        'service_type': service_type,
+                        'region_name': region_name})
+            else:
+                msg = (_('%(endpoint_type)s endpoint for %(service_type)s '
+                         'service not found') %
+                       {'endpoint_type': endpoint_type,
+                        'service_type': service_type})
 
-        if service_name and region_name:
-            msg = (_('%(endpoint_type)s endpoint for %(service_type)s service '
-                     'named %(service_name)s in %(region_name)s region not '
-                     'found') %
-                   {'endpoint_type': endpoint_type,
-                    'service_type': service_type, 'service_name': service_name,
-                    'region_name': region_name})
-        elif service_name:
-            msg = (_('%(endpoint_type)s endpoint for %(service_type)s service '
-                     'named %(service_name)s not found') %
-                   {'endpoint_type': endpoint_type,
-                    'service_type': service_type,
-                    'service_name': service_name})
-        elif region_name:
-            msg = (_('%(endpoint_type)s endpoint for %(service_type)s service '
-                     'in %(region_name)s region not found') %
-                   {'endpoint_type': endpoint_type,
-                    'service_type': service_type, 'region_name': region_name})
-        else:
-            msg = (_('%(endpoint_type)s endpoint for %(service_type)s service '
-                     'not found') %
-                   {'endpoint_type': endpoint_type,
-                    'service_type': service_type})
-
-        raise exceptions.EndpointNotFound(msg)
+            raise exceptions.EndpointNotFound(msg)
 
     @abc.abstractmethod
     def get_data(self):
@@ -262,12 +305,13 @@ class ServiceCatalog(object):
 
         :returns: list containing raw catalog data entries or None
         """
-        raise NotImplementedError()
+        raise NotImplementedError()  # pragma: no cover
 
 
 class ServiceCatalogV2(ServiceCatalog):
-    """An object for encapsulating the service catalog using raw v2 auth token
-    from Keystone.
+    """An object for encapsulating the v2 service catalog.
+
+    The object is created using raw v2 auth token from Keystone.
     """
 
     def __init__(self, resource_dict, region_name=None):
@@ -299,12 +343,12 @@ class ServiceCatalogV2(ServiceCatalog):
         try:
             token['user_id'] = self.catalog['user']['id']
             token['tenant_id'] = self.catalog['token']['tenant']['id']
-        except Exception:
+        except KeyError:  # nosec(cjschaef)
             # just leave the tenant and user out if it doesn't exist
             pass
         return token
 
-    @utils.positional(enforcement=utils.positional.WARN)
+    @positional(enforcement=positional.WARN)
     def get_urls(self, attr=None, filter_value=None,
                  service_type='identity', endpoint_type='publicURL',
                  region_name=None, service_name=None):
@@ -323,8 +367,9 @@ class ServiceCatalogV2(ServiceCatalog):
 
 
 class ServiceCatalogV3(ServiceCatalog):
-    """An object for encapsulating the service catalog using raw v3 auth token
-    from Keystone.
+    """An object for encapsulating the v3 service catalog.
+
+    The object is created using raw v3 auth token from Keystone.
     """
 
     def __init__(self, token, resource_dict, region_name=None):
@@ -365,12 +410,12 @@ class ServiceCatalogV3(ServiceCatalog):
             project = self.catalog.get('project')
             if project:
                 token['tenant_id'] = project['id']
-        except Exception:
+        except KeyError:  # nosec(cjschaef)
             # just leave the domain, project and user out if it doesn't exist
             pass
         return token
 
-    @utils.positional(enforcement=utils.positional.WARN)
+    @positional(enforcement=positional.WARN)
     def get_urls(self, attr=None, filter_value=None,
                  service_type='identity', endpoint_type='public',
                  region_name=None, service_name=None):

@@ -16,7 +16,6 @@ from keystoneclient.i18n import _
 
 
 class RoleAssignment(base.Resource):
-
     """Represents an Identity role assignment.
 
     Attributes:
@@ -26,12 +25,13 @@ class RoleAssignment(base.Resource):
         * scope: an object which has either a project or domain object
                  containing an uuid
     """
+
     pass
 
 
 class RoleAssignmentManager(base.CrudManager):
-
     """Manager class for manipulating Identity roles assignments."""
+
     resource_class = RoleAssignment
     collection_key = 'role_assignments'
     key = 'role_assignment'
@@ -47,8 +47,9 @@ class RoleAssignmentManager(base.CrudManager):
             raise exceptions.ValidationError(msg)
 
     def list(self, user=None, group=None, project=None, domain=None, role=None,
-             effective=False, os_inherit_extension_inherited_to=None):
-        """Lists role assignments.
+             effective=False, os_inherit_extension_inherited_to=None,
+             include_subtree=False, include_names=False):
+        """List role assignments.
 
         If no arguments are provided, all role assignments in the
         system will be listed.
@@ -69,8 +70,10 @@ class RoleAssignmentManager(base.CrudManager):
         :param string os_inherit_extension_inherited_to:
             return inherited role assignments for either 'projects' or
             'domains'. (optional)
+        :param boolean include_subtree: Include subtree (optional)
+        :param boolean include_names: Display names instead
+                                      of IDs. (optional)
         """
-
         self._check_not_user_and_group(user, group)
         self._check_not_domain_and_project(domain, project)
 
@@ -87,9 +90,13 @@ class RoleAssignmentManager(base.CrudManager):
             query_params['role.id'] = base.getid(role)
         if effective:
             query_params['effective'] = effective
+        if include_names:
+            query_params['include_names'] = include_names
         if os_inherit_extension_inherited_to:
             query_params['scope.OS-INHERIT:inherited_to'] = (
                 os_inherit_extension_inherited_to)
+        if include_subtree:
+            query_params['include_subtree'] = include_subtree
 
         return super(RoleAssignmentManager, self).list(**query_params)
 

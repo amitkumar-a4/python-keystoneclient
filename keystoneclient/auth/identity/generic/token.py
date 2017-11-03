@@ -10,8 +10,6 @@
 # License for the specific language governing permissions and limitations
 # under the License.
 
-import logging
-
 from oslo_config import cfg
 
 from keystoneclient import _discover
@@ -19,12 +17,10 @@ from keystoneclient.auth.identity.generic import base
 from keystoneclient.auth.identity import v2
 from keystoneclient.auth.identity import v3
 
-LOG = logging.getLogger(__name__)
-
 
 def get_options():
     return [
-        cfg.StrOpt('token', help='Token to authenticate with'),
+        cfg.StrOpt('token', secret=True, help='Token to authenticate with'),
     ]
 
 

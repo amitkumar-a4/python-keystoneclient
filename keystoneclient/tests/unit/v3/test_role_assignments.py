@@ -15,7 +15,7 @@ from keystoneclient.tests.unit.v3 import utils
 from keystoneclient.v3 import role_assignments
 
 
-class RoleAssignmentsTests(utils.TestCase, utils.CrudTests):
+class RoleAssignmentsTests(utils.ClientTestCase, utils.CrudTests):
 
     def setUp(self):
         super(RoleAssignmentsTests, self).setUp()
@@ -71,6 +71,15 @@ class RoleAssignmentsTests(utils.TestCase, utils.CrudTests):
         self.assertEqual(len(ref_list), len(returned_list))
         [self.assertIsInstance(r, self.model) for r in returned_list]
 
+    def test_list_by_id(self):
+        # It doesn't make sense to "list role assignments by ID" at all, given
+        # that they don't have globally unique IDs in the first place. But
+        # calling RoleAssignmentsManager.list(id=...) should still raise a
+        # TypeError when given an unexpected keyword argument 'id', so we don't
+        # actually have to modify the test in the superclass... I just wanted
+        # to make a note here in case the superclass changes.
+        super(RoleAssignmentsTests, self).test_list_by_id()
+
     def test_list_params(self):
         ref_list = self.TEST_USER_PROJECT_LIST
         self.stub_entity('GET',
@@ -110,6 +119,22 @@ class RoleAssignmentsTests(utils.TestCase, utils.CrudTests):
         self._assert_returned_list(ref_list, returned_list)
 
         kwargs = {'scope.project.id': self.TEST_TENANT_ID}
+        self.assertQueryStringContains(**kwargs)
+
+    def test_project_assignments_list_include_subtree(self):
+        ref_list = self.TEST_GROUP_PROJECT_LIST + self.TEST_USER_PROJECT_LIST
+        self.stub_entity('GET',
+                         [self.collection_key,
+                          '?scope.project.id=%s&include_subtree=True' %
+                          self.TEST_TENANT_ID],
+                         entity=ref_list)
+
+        returned_list = self.manager.list(project=self.TEST_TENANT_ID,
+                                          include_subtree=True)
+        self._assert_returned_list(ref_list, returned_list)
+
+        kwargs = {'scope.project.id': self.TEST_TENANT_ID,
+                  'include_subtree': 'True'}
         self.assertQueryStringContains(**kwargs)
 
     def test_domain_assignments_list(self):
@@ -162,6 +187,18 @@ class RoleAssignmentsTests(utils.TestCase, utils.CrudTests):
         self._assert_returned_list(ref_list, returned_list)
 
         kwargs = {'effective': 'True'}
+        self.assertQueryStringContains(**kwargs)
+
+    def test_include_names_assignments_list(self):
+        ref_list = self.TEST_ALL_RESPONSE_LIST
+        self.stub_entity('GET',
+                         [self.collection_key,
+                          '?include_names'],
+                         entity=ref_list)
+
+        returned_list = self.manager.list(include_names=True)
+        self._assert_returned_list(ref_list, returned_list)
+        kwargs = {'include_names': 'True'}
         self.assertQueryStringContains(**kwargs)
 
     def test_role_assignments_list(self):

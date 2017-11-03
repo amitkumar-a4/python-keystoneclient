@@ -14,8 +14,9 @@
 #    License for the specific language governing permissions and limitations
 #    under the License.
 
+from positional import positional
+
 from keystoneclient import base
-from keystoneclient import utils
 
 
 class Policy(base.Resource):
@@ -24,10 +25,11 @@ class Policy(base.Resource):
     Attributes:
         * id: a uuid that identifies the policy
         * blob: a policy document (blob)
-        * type: the mime type of the policy blob
+        * type: the MIME type of the policy blob
 
     """
-    @utils.positional(enforcement=utils.positional.WARN)
+
+    @positional(enforcement=positional.WARN)
     def update(self, blob=None, type=None):
         kwargs = {
             'blob': blob if blob is not None else self.blob,
@@ -45,37 +47,84 @@ class Policy(base.Resource):
 
 class PolicyManager(base.CrudManager):
     """Manager class for manipulating Identity policies."""
+
     resource_class = Policy
     collection_key = 'policies'
     key = 'policy'
 
-    @utils.positional(1, enforcement=utils.positional.WARN)
+    @positional(1, enforcement=positional.WARN)
     def create(self, blob, type='application/json', **kwargs):
+        """Create a policy.
+
+        :param str blob: the policy document.
+        :param str type: the MIME type of the policy blob.
+        :param kwargs: any other attribute provided will be passed to the
+                       server.
+
+        :returns: the created policy returned from server.
+        :rtype: :class:`keystoneclient.v3.policies.Policy`
+
+        """
         return super(PolicyManager, self).create(
             blob=blob,
             type=type,
             **kwargs)
 
     def get(self, policy):
+        """Retrieve a policy.
+
+        :param policy: the policy to be retrieved from the server.
+        :type policy: str or :class:`keystoneclient.v3.policies.Policy`
+
+        :returns: the specified policy returned from server.
+        :rtype: :class:`keystoneclient.v3.policies.Policy`
+
+        """
         return super(PolicyManager, self).get(
             policy_id=base.getid(policy))
 
     def list(self, **kwargs):
         """List policies.
 
-        ``**kwargs`` allows filter criteria to be passed where
-         supported by the server.
+        :param kwargs: allows filter criteria to be passed where
+                       supported by the server.
+
+        :returns: a list of policies.
+        :rtype: list of :class:`keystoneclient.v3.policies.Policy`.
+
         """
         return super(PolicyManager, self).list(**kwargs)
 
-    @utils.positional(enforcement=utils.positional.WARN)
-    def update(self, entity, blob=None, type=None, **kwargs):
+    @positional(enforcement=positional.WARN)
+    def update(self, policy, blob=None, type=None, **kwargs):
+        """Update a policy.
+
+        :param policy: the policy to be updated on the server.
+        :type policy: str or :class:`keystoneclient.v3.policies.Policy`
+        :param str blob: the new policy document.
+        :param str type: the new MIME type of the policy blob.
+        :param kwargs: any other attribute provided will be passed to the
+                       server.
+
+        :returns: the updated policy returned from server.
+        :rtype: :class:`keystoneclient.v3.policies.Policy`
+
+        """
         return super(PolicyManager, self).update(
-            policy_id=base.getid(entity),
+            policy_id=base.getid(policy),
             blob=blob,
             type=type,
             **kwargs)
 
     def delete(self, policy):
+        """"Delete a policy.
+
+        :param policy: the policy to be deleted on the server.
+        :type policy: str or :class:`keystoneclient.v3.policies.Policy`
+
+        :returns: Response object with 204 status.
+        :rtype: :class:`requests.models.Response`
+
+        """
         return super(PolicyManager, self).delete(
             policy_id=base.getid(policy))

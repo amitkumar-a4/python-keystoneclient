@@ -29,6 +29,7 @@ class AccessToken(base.Resource):
 
 class AccessTokenManager(base.CrudManager):
     """Manager class for manipulating identity OAuth access tokens."""
+
     resource_class = AccessToken
 
     def create(self, consumer_key, consumer_secret, request_key,
@@ -40,7 +41,8 @@ class AccessTokenManager(base.CrudManager):
                                      resource_owner_secret=request_secret,
                                      signature_method=oauth1.SIGNATURE_HMAC,
                                      verifier=verifier)
-        url = self.api.get_endpoint(interface=auth.AUTH_INTERFACE).rstrip('/')
+        url = self.client.get_endpoint(interface=auth.AUTH_INTERFACE).rstrip(
+            '/')
         url, headers, body = oauth_client.sign(url + endpoint,
                                                http_method='POST')
         resp, body = self.client.post(endpoint, headers=headers)

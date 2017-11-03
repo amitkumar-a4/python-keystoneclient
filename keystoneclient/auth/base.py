@@ -12,6 +12,8 @@
 
 import os
 
+from debtcollector import removals
+from keystoneauth1 import plugin
 import six
 import stevedore
 
@@ -21,12 +23,55 @@ from keystoneclient import exceptions
 # NOTE(jamielennox): The AUTH_INTERFACE is a special value that can be
 # requested from get_endpoint. If a plugin receives this as the value of
 # 'interface' it should return the initial URL that was passed to the plugin.
-AUTH_INTERFACE = object()
+AUTH_INTERFACE = plugin.AUTH_INTERFACE
 
 PLUGIN_NAMESPACE = 'keystoneclient.auth.plugin'
 IDENTITY_AUTH_HEADER_NAME = 'X-Auth-Token'
 
 
+@removals.remove(
+    message='keystoneclient auth plugins are deprecated. Use keystoneauth.',
+    version='2.1.0',
+    removal_version='3.0.0'
+)
+def get_available_plugin_names():
+    """Get the names of all the plugins that are available on the system.
+
+    This is particularly useful for help and error text to prompt a user for
+    example what plugins they may specify.
+
+    :returns: A list of names.
+    :rtype: frozenset
+    """
+    mgr = stevedore.ExtensionManager(namespace=PLUGIN_NAMESPACE,
+                                     invoke_on_load=False)
+    return frozenset(mgr.names())
+
+
+@removals.remove(
+    message='keystoneclient auth plugins are deprecated. Use keystoneauth.',
+    version='2.1.0',
+    removal_version='3.0.0'
+)
+def get_available_plugin_classes():
+    """Retrieve all the plugin classes available on the system.
+
+    :returns: A dict with plugin entrypoint name as the key and the plugin
+              class as the value.
+    :rtype: dict
+    """
+    mgr = stevedore.ExtensionManager(namespace=PLUGIN_NAMESPACE,
+                                     propagate_map_exceptions=True,
+                                     invoke_on_load=False)
+
+    return dict(mgr.map(lambda ext: (ext.entry_point.name, ext.plugin)))
+
+
+@removals.remove(
+    message='keystoneclient auth plugins are deprecated. Use keystoneauth.',
+    version='2.1.0',
+    removal_version='3.0.0'
+)
 def get_plugin_class(name):
     """Retrieve a plugin class by its entrypoint name.
 
@@ -140,6 +185,19 @@ class BaseAuthPlugin(object):
         """
         return None
 
+    def get_connection_params(self, session, **kwargs):
+        """Return any additional connection parameters required for the plugin.
+
+        :param session: The session object that the auth_plugin belongs to.
+        :type session: keystoneclient.session.Session
+
+        :returns: Headers that are set to authenticate a message or None for
+                  failure. Note that when checking this value that the empty
+                  dict is a valid, non-failure response.
+        :rtype: dict
+        """
+        return {}
+
     def invalidate(self):
         """Invalidate the current authentication data.
 
@@ -218,7 +276,6 @@ class BaseAuthPlugin(object):
         :param parser: the parser to attach argparse options.
         :type parser: argparse.ArgumentParser
         """
-
         # NOTE(jamielennox): ideally oslo_config would be smart enough to
         # handle all the Opt manipulation that goes on in this file. However it
         # is currently not.  Options are handled in as similar a way as
@@ -255,13 +312,10 @@ class BaseAuthPlugin(object):
         :returns: An auth plugin, or None if a name is not provided.
         :rtype: :py:class:`keystoneclient.auth.BaseAuthPlugin`
         """
-        for opt in cls.get_options():
-            val = getattr(namespace, 'os_%s' % opt.dest)
-            if val is not None:
-                val = opt.type(val)
-            kwargs.setdefault(opt.dest, val)
+        def _getter(opt):
+            return getattr(namespace, 'os_%s' % opt.dest)
 
-        return cls.load_from_options(**kwargs)
+        return cls.load_from_options_getter(_getter, **kwargs)
 
     @classmethod
     def register_conf_options(cls, conf, group):
@@ -287,10 +341,32 @@ class BaseAuthPlugin(object):
         :returns: An authentication Plugin.
         :rtype: :py:class:`keystoneclient.auth.BaseAuthPlugin`
         """
+        def _getter(opt):
+            return conf[group][opt.dest]
+
+        return cls.load_from_options_getter(_getter, **kwargs)
+
+    @classmethod
+    def load_from_options_getter(cls, getter, **kwargs):
+        """Load a plugin from a getter function returning appropriate values.
+
+        To handle cases other than the provided CONF and CLI loading you can
+        specify a custom loader function that will be queried for the option
+        value.
+
+        The getter is a function that takes one value, an
+        :py:class:`oslo_config.cfg.Opt` and returns a value to load with.
+
+        :param getter: A function that returns a value for the given opt.
+        :type getter: callable
+
+        :returns: An authentication Plugin.
+        :rtype: :py:class:`keystoneclient.auth.BaseAuthPlugin`
+        """
         plugin_opts = cls.get_options()
 
         for opt in plugin_opts:
-            val = conf[group][opt.dest]
+            val = getter(opt)
             if val is not None:
                 val = opt.type(val)
             kwargs.setdefault(opt.dest, val)

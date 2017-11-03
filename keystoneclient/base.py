@@ -15,20 +15,20 @@
 #    License for the specific language governing permissions and limitations
 #    under the License.
 
-"""
-Base utilities to build API operation managers and objects on top of.
-"""
+"""Base utilities to build API operation managers and objects on top of."""
 
 import abc
+import copy
 import functools
+import warnings
 
+from oslo_utils import strutils
 import six
 from six.moves import urllib
 
 from keystoneclient import auth
 from keystoneclient import exceptions
 from keystoneclient.i18n import _
-from keystoneclient.openstack.common.apiclient import base
 
 
 def getid(obj):
@@ -40,7 +40,8 @@ def getid(obj):
     try:
         if obj.uuid:
             return obj.uuid
-    except AttributeError:
+    except AttributeError:  # nosec(cjschaef): 'obj' doesn't contain attribute
+        # 'uuid', return attribute 'id' or the 'obj'
         pass
     try:
         return obj.id
@@ -83,6 +84,7 @@ class Manager(object):
     :param client: instance of BaseClient descendant for HTTP requests
 
     """
+
     resource_class = None
 
     def __init__(self, client):
@@ -91,8 +93,17 @@ class Manager(object):
 
     @property
     def api(self):
-        """Deprecated. Use `client` instead.
+        """The client.
+
+        .. warning::
+
+            This property is deprecated as of the 1.7.0 release in favor of
+            :meth:`client` and may be removed in the 2.0.0 release.
+
         """
+        warnings.warn(
+            'api is deprecated as of the 1.7.0 release in favor of client and '
+            'may be removed in the 2.0.0 release', DeprecationWarning)
         return self.client
 
     def _list(self, url, response_key, obj_class=None, body=None, **kwargs):
@@ -120,7 +131,9 @@ class Manager(object):
         #           unlike other services which just return the list...
         try:
             data = data['values']
-        except (KeyError, TypeError):
+        except (KeyError, TypeError):  # nosec(cjschaef): keystone data values
+            # not as expected (see comment above), assumption is that values
+            # are already returned in a list (so simply utilize that list)
             pass
 
         return [obj_class(self, res, loaded=True) for res in data if res]
@@ -144,11 +157,6 @@ class Manager(object):
         """
         resp, body = self.client.head(url, **kwargs)
         return resp.status_code == 204
-
-    def _create(self, url, body, response_key, return_raw=False, **kwargs):
-        """Deprecated. Use `_post` instead.
-        """
-        return self._post(url, body, response_key, return_raw, **kwargs)
 
     def _post(self, url, body, response_key, return_raw=False, **kwargs):
         """Create an object.
@@ -231,7 +239,7 @@ class ManagerWithFind(Manager):
 
     @abc.abstractmethod
     def list(self):
-        pass
+        pass  # pragma: no cover
 
     def find(self, **kwargs):
         """Find a single item with attributes matching ``**kwargs``.
@@ -284,12 +292,13 @@ class CrudManager(Manager):
       refer to an individual member of the collection.
 
     """
+
     collection_key = None
     key = None
     base_url = None
 
     def build_url(self, dict_args_in_out=None):
-        """Builds a resource URL for the given kwargs.
+        """Build a resource URL for the given kwargs.
 
         Given an example collection where `collection_key = 'entities'` and
         `key = 'entity'`, the following URL's could be generated.
@@ -305,6 +314,8 @@ class CrudManager(Manager):
 
         If a `base_url` is provided, the generated URL will be appended to it.
 
+        If a 'tail' is provided, it will be appended to the end of the URL.
+
         """
         if dict_args_in_out is None:
             dict_args_in_out = {}
@@ -317,12 +328,15 @@ class CrudManager(Manager):
         if entity_id is not None:
             url += '/%s' % entity_id
 
+        if dict_args_in_out.get('tail'):
+            url += dict_args_in_out['tail']
+
         return url
 
     @filter_kwargs
     def create(self, **kwargs):
         url = self.build_url(dict_args_in_out=kwargs)
-        return self._create(
+        return self._post(
             url,
             {self.key: kwargs},
             self.key)
@@ -341,7 +355,7 @@ class CrudManager(Manager):
         return '?%s' % urllib.parse.urlencode(params) if params else ''
 
     def build_key_only_query(self, params_list):
-        """Builds a query that does not include values, just keys.
+        """Build a query that does not include values, just keys.
 
         The Identity API has some calls that define queries without values,
         this can not be accomplished by using urllib.parse.urlencode(). This
@@ -351,6 +365,17 @@ class CrudManager(Manager):
 
     @filter_kwargs
     def list(self, fallback_to_auth=False, **kwargs):
+        if 'id' in kwargs.keys():
+            # Ensure that users are not trying to call things like
+            # ``domains.list(id='default')`` when they should have used
+            # ``[domains.get(domain_id='default')]`` instead. Keystone supports
+            # ``GET /v3/domains/{domain_id}``, not ``GET
+            # /v3/domains?id={domain_id}``.
+            raise TypeError(
+                _("list() got an unexpected keyword argument 'id'. To "
+                  "retrieve a single object using a globally unique "
+                  "identifier, try using get() instead."))
+
         url = self.build_url(dict_args_in_out=kwargs)
 
         try:
@@ -413,11 +438,103 @@ class CrudManager(Manager):
             return rl[0]
 
 
-class Resource(base.Resource):
+class Resource(object):
     """Base class for OpenStack resources (tenant, user, etc.).
 
     This is pretty much just a bag for attributes.
     """
+
+    HUMAN_ID = False
+    NAME_ATTR = 'name'
+
+    def __init__(self, manager, info, loaded=False):
+        """Populate and bind to a manager.
+
+        :param manager: BaseManager object
+        :param info: dictionary representing resource attributes
+        :param loaded: prevent lazy-loading if set to True
+        """
+        self.manager = manager
+        self._info = info
+        self._add_details(info)
+        self._loaded = loaded
+
+    def __repr__(self):
+        """Return string representation of resource attributes."""
+        reprkeys = sorted(k
+                          for k in self.__dict__.keys()
+                          if k[0] != '_' and k != 'manager')
+        info = ", ".join("%s=%s" % (k, getattr(self, k)) for k in reprkeys)
+        return "<%s %s>" % (self.__class__.__name__, info)
+
+    @property
+    def human_id(self):
+        """Human-readable ID which can be used for bash completion."""
+        if self.HUMAN_ID:
+            name = getattr(self, self.NAME_ATTR, None)
+            if name is not None:
+                return strutils.to_slug(name)
+        return None
+
+    def _add_details(self, info):
+        for (k, v) in six.iteritems(info):
+            try:
+                setattr(self, k, v)
+                self._info[k] = v
+            except AttributeError:  # nosec(cjschaef): we already defined the
+                # attribute on the class
+                pass
+
+    def __getattr__(self, k):
+        """Checking attrbiute existence."""
+        if k not in self.__dict__:
+            # NOTE(bcwaldon): disallow lazy-loading if already loaded once
+            if not self.is_loaded():
+                self.get()
+                return self.__getattr__(k)
+
+            raise AttributeError(k)
+        else:
+            return self.__dict__[k]
+
+    def get(self):
+        """Support for lazy loading details.
+
+        Some clients, such as novaclient have the option to lazy load the
+        details, details which can be loaded with this function.
+        """
+        # set_loaded() first ... so if we have to bail, we know we tried.
+        self.set_loaded(True)
+        if not hasattr(self.manager, 'get'):
+            return
+
+        new = self.manager.get(self.id)
+        if new:
+            self._add_details(new._info)
+            self._add_details(
+                {'x_request_id': self.manager.client.last_request_id})
+
+    def __eq__(self, other):
+        """Define equality for resources."""
+        if not isinstance(other, Resource):
+            return NotImplemented
+        # two resources of different types are not equal
+        if not isinstance(other, self.__class__):
+            return False
+        return self._info == other._info
+
+    def __ne__(self, other):
+        """Define inequality for resources."""
+        return not self == other
+
+    def is_loaded(self):
+        return self._loaded
+
+    def set_loaded(self, val):
+        self._loaded = val
+
+    def to_dict(self):
+        return copy.deepcopy(self._info)
 
     def delete(self):
         return self.manager.delete(self)

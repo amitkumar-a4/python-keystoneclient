@@ -25,6 +25,7 @@ from keystoneclient import session
 from keystoneclient.tests.unit.v3 import client_fixtures
 from keystoneclient.tests.unit.v3 import saml2_fixtures
 from keystoneclient.tests.unit.v3 import utils
+from keystoneclient.v3.contrib.federation import saml as saml_manager
 
 ROOTDIR = os.path.dirname(os.path.abspath(__file__))
 XMLDIR = os.path.join(ROOTDIR, 'examples', 'xml/')
@@ -61,6 +62,8 @@ class AuthenticateviaSAML2Tests(utils.TestCase):
 
     def setUp(self):
         super(AuthenticateviaSAML2Tests, self).setUp()
+
+        self.deprecations.expect_deprecations()
 
         self.conf_fixture = self.useFixture(config.Config())
         conf.register_conf_options(self.conf_fixture.conf, group=self.GROUP)
@@ -437,8 +440,11 @@ class AuthenticateviaADFSTests(utils.TestCase):
     def setUp(self):
         super(AuthenticateviaADFSTests, self).setUp()
 
+        self.deprecations.expect_deprecations()
+
         self.conf_fixture = self.useFixture(config.Config())
         conf.register_conf_options(self.conf_fixture.conf, group=self.GROUP)
+
         self.session = session.Session(session=requests.Session())
 
         self.IDENTITY_PROVIDER = 'adfs'
@@ -487,7 +493,6 @@ class AuthenticateviaADFSTests(utils.TestCase):
 
     def test_get_adfs_security_token(self):
         """Test ADFSUnscopedToken._get_adfs_security_token()."""
-
         self.requests_mock.post(
             self.IDENTITY_PROVIDER_URL,
             content=make_oneline(self.ADFS_SECURITY_TOKEN_RESPONSE),
@@ -607,9 +612,8 @@ class AuthenticateviaADFSTests(utils.TestCase):
             self.session)
 
     def test_access_sp_no_cookies_fail(self):
-        # clean cookie jar
-        self.session.session.cookies = []
-
+        # There are no cookies in the session initially, and
+        # _access_service_provider requires a cookie in the session.
         self.assertRaises(exceptions.AuthorizationFailure,
                           self.adfsplugin._access_service_provider,
                           self.session)
@@ -619,7 +623,11 @@ class AuthenticateviaADFSTests(utils.TestCase):
                                json=saml2_fixtures.UNSCOPED_TOKEN,
                                headers=client_fixtures.AUTH_RESPONSE_HEADERS)
 
-        self.session.session.cookies = [object()]
+        # _access_service_provider requires a cookie in the session.
+        cookie = requests.cookies.create_cookie(
+            name=self.getUniqueString(), value=self.getUniqueString())
+        self.session.session.cookies.set_cookie(cookie)
+
         self.adfsplugin._access_service_provider(self.session)
         response = self.adfsplugin.authenticated_response
 
@@ -642,7 +650,65 @@ class AuthenticateviaADFSTests(utils.TestCase):
 
         # NOTE(marek-denis): We need to mimic this until self.requests_mock can
         # issue cookies properly.
-        self.session.session.cookies = [object()]
+        cookie = requests.cookies.create_cookie(
+            name=self.getUniqueString(), value=self.getUniqueString())
+        self.session.session.cookies.set_cookie(cookie)
+
         token, token_json = self.adfsplugin._get_unscoped_token(self.session)
         self.assertEqual(token, client_fixtures.AUTH_SUBJECT_TOKEN)
         self.assertEqual(saml2_fixtures.UNSCOPED_TOKEN['token'], token_json)
+
+
+class SAMLGenerationTests(utils.ClientTestCase):
+
+    def setUp(self):
+        super(SAMLGenerationTests, self).setUp()
+        self.manager = self.client.federation.saml
+        self.SAML2_FULL_URL = ''.join([self.TEST_URL,
+                                       saml_manager.SAML2_ENDPOINT])
+        self.ECP_FULL_URL = ''.join([self.TEST_URL,
+                                     saml_manager.ECP_ENDPOINT])
+
+    def test_saml_create(self):
+        """Test that a token can be exchanged for a SAML assertion."""
+        token_id = uuid.uuid4().hex
+        service_provider_id = uuid.uuid4().hex
+
+        # Mock the returned text for '/auth/OS-FEDERATION/saml2
+        self.requests_mock.post(self.SAML2_FULL_URL,
+                                text=saml2_fixtures.TOKEN_BASED_SAML)
+
+        text = self.manager.create_saml_assertion(service_provider_id,
+                                                  token_id)
+
+        # Ensure returned text is correct
+        self.assertEqual(saml2_fixtures.TOKEN_BASED_SAML, text)
+
+        # Ensure request headers and body are correct
+        req_json = self.requests_mock.last_request.json()
+        self.assertEqual(token_id, req_json['auth']['identity']['token']['id'])
+        self.assertEqual(service_provider_id,
+                         req_json['auth']['scope']['service_provider']['id'])
+        self.assertRequestHeaderEqual('Content-Type', 'application/json')
+
+    def test_ecp_create(self):
+        """Test that a token can be exchanged for an ECP wrapped assertion."""
+        token_id = uuid.uuid4().hex
+        service_provider_id = uuid.uuid4().hex
+
+        # Mock returned text for '/auth/OS-FEDERATION/saml2/ecp
+        self.requests_mock.post(self.ECP_FULL_URL,
+                                text=saml2_fixtures.TOKEN_BASED_ECP)
+
+        text = self.manager.create_ecp_assertion(service_provider_id,
+                                                 token_id)
+
+        # Ensure returned text is correct
+        self.assertEqual(saml2_fixtures.TOKEN_BASED_ECP, text)
+
+        # Ensure request headers and body are correct
+        req_json = self.requests_mock.last_request.json()
+        self.assertEqual(token_id, req_json['auth']['identity']['token']['id'])
+        self.assertEqual(service_provider_id,
+                         req_json['auth']['scope']['service_provider']['id'])
+        self.assertRequestHeaderEqual('Content-Type', 'application/json')

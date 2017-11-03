@@ -10,8 +10,9 @@
 #    License for the specific language governing permissions and limitations
 #    under the License.
 
+from positional import positional
+
 from keystoneclient import base
-from keystoneclient import utils
 
 
 class Protocol(base.Resource):
@@ -22,6 +23,7 @@ class Protocol(base.Resource):
               federation protocol.
 
     """
+
     pass
 
 
@@ -35,7 +37,6 @@ class ProtocolManager(base.CrudManager):
 
     def build_url(self, dict_args_in_out=None):
         """Build URL for federation protocols."""
-
         if dict_args_in_out is None:
             dict_args_in_out = {}
 
@@ -56,7 +57,7 @@ class ProtocolManager(base.CrudManager):
                             response_key=self.key,
                             method='PUT')
 
-    @utils.positional.method(3)
+    @positional.method(3)
     def create(self, protocol_id, identity_provider, mapping, **kwargs):
         """Create federation protocol object and tie to the Identity Provider.
 

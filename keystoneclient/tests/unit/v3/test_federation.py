@@ -13,10 +13,18 @@
 import copy
 import uuid
 
+from keystoneauth1 import fixture as auth_fixture
+from keystoneauth1.identity import v3
+from keystoneauth1 import session
+from keystoneauth1.tests.unit import k2k_fixtures
+import six
+from testtools import matchers
+
 from keystoneclient import access
 from keystoneclient import exceptions
 from keystoneclient import fixture
 from keystoneclient.tests.unit.v3 import utils
+from keystoneclient.v3 import client
 from keystoneclient.v3.contrib.federation import base
 from keystoneclient.v3.contrib.federation import identity_providers
 from keystoneclient.v3.contrib.federation import mappings
@@ -26,7 +34,7 @@ from keystoneclient.v3 import domains
 from keystoneclient.v3 import projects
 
 
-class IdentityProviderTests(utils.TestCase, utils.CrudTests):
+class IdentityProviderTests(utils.ClientTestCase, utils.CrudTests):
     def setUp(self):
         super(IdentityProviderTests, self).setUp()
         self.key = 'identity_provider'
@@ -88,7 +96,7 @@ class IdentityProviderTests(utils.TestCase, utils.CrudTests):
         self.assertEntityRequestBodyIs(req_ref)
 
 
-class MappingTests(utils.TestCase, utils.CrudTests):
+class MappingTests(utils.ClientTestCase, utils.CrudTests):
     def setUp(self):
         super(MappingTests, self).setUp()
         self.key = 'mapping'
@@ -122,7 +130,7 @@ class MappingTests(utils.TestCase, utils.CrudTests):
         self.assertEntityRequestBodyIs(manager_ref)
 
 
-class ProtocolTests(utils.TestCase, utils.CrudTests):
+class ProtocolTests(utils.ClientTestCase, utils.CrudTests):
     def setUp(self):
         super(ProtocolTests, self).setUp()
         self.key = 'protocol'
@@ -132,22 +140,18 @@ class ProtocolTests(utils.TestCase, utils.CrudTests):
         self.path_prefix = 'OS-FEDERATION/identity_providers'
 
     def _transform_to_response(self, ref):
-        """Rebuild dictionary so it can be used as a
-        reference response body.
-
-        """
+        """Construct a response body from a dictionary."""
         response = copy.deepcopy(ref)
-        response['id'] = response.pop('protocol_id')
         del response['identity_provider']
         return response
 
     def new_ref(self, **kwargs):
-        kwargs.setdefault('mapping', uuid.uuid4().hex)
+        kwargs.setdefault('id', uuid.uuid4().hex)
+        kwargs.setdefault('mapping_id', uuid.uuid4().hex)
         kwargs.setdefault('identity_provider', uuid.uuid4().hex)
-        kwargs.setdefault('protocol_id', uuid.uuid4().hex)
         return kwargs
 
-    def build_parts(self, identity_provider, protocol_id=None):
+    def build_parts(self, idp_id, protocol_id=None):
         """Build array used to construct mocking URL.
 
         Construct and return array with URL parts later used
@@ -158,7 +162,7 @@ class ProtocolTests(utils.TestCase, utils.CrudTests):
 
         """
         parts = ['OS-FEDERATION', 'identity_providers',
-                 identity_provider, 'protocols']
+                 idp_id, 'protocols']
         if protocol_id:
             parts.append(protocol_id)
         return parts
@@ -170,7 +174,7 @@ class ProtocolTests(utils.TestCase, utils.CrudTests):
         self.assertEqual('/'.join([base_url, self.collection_key]), url)
 
     def test_build_url_w_idp_id(self):
-        """Test whether kwargs ``base_url`` discards object's base_url
+        """Test whether kwargs ``base_url`` discards object's base_url.
 
         This test shows, that when ``base_url`` is specified in the
         dict_args_in_out dictionary,  values like ``identity_provider_id``
@@ -203,15 +207,19 @@ class ProtocolTests(utils.TestCase, utils.CrudTests):
         $identity_provider/protocols/$protocol
 
         """
-        request_args = self.new_ref()
-        expected = self._transform_to_response(request_args)
-        parts = self.build_parts(request_args['identity_provider'],
-                                 request_args['protocol_id'])
+        ref = self.new_ref()
+        expected = self._transform_to_response(ref)
+        parts = self.build_parts(
+            idp_id=ref['identity_provider'],
+            protocol_id=ref['id'])
         self.stub_entity('PUT', entity=expected,
                          parts=parts, status_code=201)
-        returned = self.manager.create(**request_args)
+        returned = self.manager.create(
+            protocol_id=ref['id'],
+            identity_provider=ref['identity_provider'],
+            mapping=ref['mapping_id'])
         self.assertEqual(expected, returned.to_dict())
-        request_body = {'mapping_id': request_args['mapping']}
+        request_body = {'mapping_id': ref['mapping_id']}
         self.assertEntityRequestBodyIs(request_body)
 
     def test_get(self):
@@ -221,16 +229,17 @@ class ProtocolTests(utils.TestCase, utils.CrudTests):
         $identity_provider/protocols/$protocol
 
         """
-        request_args = self.new_ref()
-        expected = self._transform_to_response(request_args)
+        ref = self.new_ref()
+        expected = self._transform_to_response(ref)
 
-        parts = self.build_parts(request_args['identity_provider'],
-                                 request_args['protocol_id'])
+        parts = self.build_parts(
+            idp_id=ref['identity_provider'],
+            protocol_id=ref['id'])
         self.stub_entity('GET', entity=expected,
                          parts=parts, status_code=201)
 
-        returned = self.manager.get(request_args['identity_provider'],
-                                    request_args['protocol_id'])
+        returned = self.manager.get(ref['identity_provider'],
+                                    ref['id'])
         self.assertIsInstance(returned, self.model)
         self.assertEqual(expected, returned.to_dict())
 
@@ -241,14 +250,15 @@ class ProtocolTests(utils.TestCase, utils.CrudTests):
         $identity_provider/protocols/$protocol
 
         """
-        request_args = self.new_ref()
-        parts = self.build_parts(request_args['identity_provider'],
-                                 request_args['protocol_id'])
+        ref = self.new_ref()
+        parts = self.build_parts(
+            idp_id=ref['identity_provider'],
+            protocol_id=ref['id'])
 
         self.stub_entity('DELETE', parts=parts, status_code=204)
 
-        self.manager.delete(request_args['identity_provider'],
-                            request_args['protocol_id'])
+        self.manager.delete(ref['identity_provider'],
+                            ref['id'])
 
     def test_list(self):
         """Test listing all federation protocols tied to the Identity Provider.
@@ -263,15 +273,25 @@ class ProtocolTests(utils.TestCase, utils.CrudTests):
                 'mapping_id': uuid.uuid4().hex
             }
 
-        request_args = self.new_ref()
+        ref = self.new_ref()
         expected = [_ref_protocols() for _ in range(3)]
-        parts = self.build_parts(request_args['identity_provider'])
+        parts = self.build_parts(idp_id=ref['identity_provider'])
         self.stub_entity('GET', parts=parts,
                          entity=expected, status_code=200)
 
-        returned = self.manager.list(request_args['identity_provider'])
+        returned = self.manager.list(ref['identity_provider'])
         for obj, ref_obj in zip(returned, expected):
             self.assertEqual(obj.to_dict(), ref_obj)
+
+    def test_list_by_id(self):
+        # The test in the parent class needs to be overridden because it
+        # assumes globally unique IDs, which is not the case with protocol IDs
+        # (which are contextualized per identity provider).
+        ref = self.new_ref()
+        super(ProtocolTests, self).test_list_by_id(
+            ref=ref,
+            identity_provider=ref['identity_provider'],
+            id=ref['id'])
 
     def test_list_params(self):
         request_args = self.new_ref()
@@ -287,38 +307,39 @@ class ProtocolTests(utils.TestCase, utils.CrudTests):
         self.assertQueryStringContains(**filter_kwargs)
 
     def test_update(self):
-        """Test updating federation protocol
+        """Test updating federation protocol.
 
         URL to be tested: PATCH /OS-FEDERATION/identity_providers/
         $identity_provider/protocols/$protocol
 
         """
-        request_args = self.new_ref()
-        expected = self._transform_to_response(request_args)
+        ref = self.new_ref()
+        expected = self._transform_to_response(ref)
 
-        parts = self.build_parts(request_args['identity_provider'],
-                                 request_args['protocol_id'])
+        parts = self.build_parts(
+            idp_id=ref['identity_provider'],
+            protocol_id=ref['id'])
 
         self.stub_entity('PATCH', parts=parts,
                          entity=expected, status_code=200)
 
-        returned = self.manager.update(request_args['identity_provider'],
-                                       request_args['protocol_id'],
-                                       mapping=request_args['mapping'])
+        returned = self.manager.update(ref['identity_provider'],
+                                       ref['id'],
+                                       mapping=ref['mapping_id'])
         self.assertIsInstance(returned, self.model)
         self.assertEqual(expected, returned.to_dict())
-        request_body = {'mapping_id': request_args['mapping']}
+        request_body = {'mapping_id': ref['mapping_id']}
         self.assertEntityRequestBodyIs(request_body)
 
 
-class EntityManagerTests(utils.TestCase):
+class EntityManagerTests(utils.ClientTestCase):
     def test_create_object_expect_fail(self):
         self.assertRaises(TypeError,
                           base.EntityManager,
                           self.client)
 
 
-class FederationProjectTests(utils.TestCase):
+class FederationProjectTests(utils.ClientTestCase):
 
     def setUp(self):
         super(FederationProjectTests, self).setUp()
@@ -326,7 +347,7 @@ class FederationProjectTests(utils.TestCase):
         self.collection_key = 'projects'
         self.model = projects.Project
         self.manager = self.client.federation.projects
-        self.URL = "%s%s" % (self.TEST_URL, '/OS-FEDERATION/projects')
+        self.URL = "%s%s" % (self.TEST_URL, '/auth/projects')
 
     def new_ref(self, **kwargs):
         kwargs.setdefault('id', uuid.uuid4().hex)
@@ -348,7 +369,102 @@ class FederationProjectTests(utils.TestCase):
             self.assertIsInstance(project, self.model)
 
 
-class FederationDomainTests(utils.TestCase):
+class K2KFederatedProjectTests(utils.TestCase):
+
+    TEST_ROOT_URL = 'http://127.0.0.1:5000/'
+    TEST_URL = '%s%s' % (TEST_ROOT_URL, 'v3')
+    TEST_PASS = 'password'
+    REQUEST_ECP_URL = TEST_URL + '/auth/OS-FEDERATION/saml2/ecp'
+
+    SP_ID = 'sp1'
+    SP_ROOT_URL = 'https://example.com/v3'
+    SP_URL = 'https://example.com/Shibboleth.sso/SAML2/ECP'
+    SP_AUTH_URL = (SP_ROOT_URL +
+                   '/OS-FEDERATION/identity_providers'
+                   '/testidp/protocols/saml2/auth')
+
+    def setUp(self):
+        super(K2KFederatedProjectTests, self).setUp()
+        self.token_v3 = auth_fixture.V3Token()
+        self.token_v3.add_service_provider(
+            self.SP_ID, self.SP_AUTH_URL, self.SP_URL)
+        self.session = session.Session()
+        self.collection_key = 'projects'
+        self.model = projects.Project
+        self.URL = '%s%s' % (self.SP_ROOT_URL, '/auth/projects')
+        self.k2kplugin = self.get_plugin()
+        self._mock_k2k_flow_urls()
+
+    def new_ref(self, **kwargs):
+        kwargs.setdefault('id', uuid.uuid4().hex)
+        kwargs.setdefault('domain_id', uuid.uuid4().hex)
+        kwargs.setdefault('enabled', True)
+        kwargs.setdefault('name', uuid.uuid4().hex)
+        return kwargs
+
+    def _get_base_plugin(self):
+        self.stub_url('POST', ['auth', 'tokens'],
+                      headers={'X-Subject-Token': uuid.uuid4().hex},
+                      json=self.token_v3)
+        return v3.Password(self.TEST_URL,
+                           username=self.TEST_USER,
+                           password=self.TEST_PASS)
+
+    def _mock_k2k_flow_urls(self):
+        # We need to check the auth versions available
+        self.requests_mock.get(
+            self.TEST_URL,
+            json={'version': auth_fixture.V3Discovery(self.TEST_URL)},
+            headers={'Content-Type': 'application/json'})
+
+        # The identity provider receives a request for an ECP wrapped
+        # assertion. This assertion contains the user authentication info
+        # and will be presented to the service provider
+        self.requests_mock.register_uri(
+            'POST',
+            self.REQUEST_ECP_URL,
+            content=six.b(k2k_fixtures.ECP_ENVELOPE),
+            headers={'Content-Type': 'application/vnd.paos+xml'},
+            status_code=200)
+
+        # The service provider is presented with the ECP wrapped assertion
+        # generated by the identity provider and should return a redirect
+        # (302 or 303) upon successful authentication
+        self.requests_mock.register_uri(
+            'POST',
+            self.SP_URL,
+            content=six.b(k2k_fixtures.TOKEN_BASED_ECP),
+            headers={'Content-Type': 'application/vnd.paos+xml'},
+            status_code=302)
+
+        # Should not follow the redirect URL, but use the auth_url attribute
+        self.requests_mock.register_uri(
+            'GET',
+            self.SP_AUTH_URL,
+            json=k2k_fixtures.UNSCOPED_TOKEN,
+            headers={'X-Subject-Token': k2k_fixtures.UNSCOPED_TOKEN_HEADER})
+
+    def get_plugin(self, **kwargs):
+        kwargs.setdefault('base_plugin', self._get_base_plugin())
+        kwargs.setdefault('service_provider', self.SP_ID)
+        return v3.Keystone2Keystone(**kwargs)
+
+    def test_list_projects(self):
+        k2k_client = client.Client(session=self.session, auth=self.k2kplugin)
+        self.requests_mock.get(self.URL, json={
+            self.collection_key: [self.new_ref(), self.new_ref()]
+        })
+        self.requests_mock.get(self.SP_ROOT_URL, json={
+            'version': auth_fixture.discovery.V3Discovery(self.SP_ROOT_URL)
+        })
+        returned_list = k2k_client.federation.projects.list()
+
+        self.assertThat(returned_list, matchers.HasLength(2))
+        for project in returned_list:
+            self.assertIsInstance(project, self.model)
+
+
+class FederationDomainTests(utils.ClientTestCase):
 
     def setUp(self):
         super(FederationDomainTests, self).setUp()
@@ -357,7 +473,7 @@ class FederationDomainTests(utils.TestCase):
         self.model = domains.Domain
         self.manager = self.client.federation.domains
 
-        self.URL = "%s%s" % (self.TEST_URL, '/OS-FEDERATION/domains')
+        self.URL = "%s%s" % (self.TEST_URL, '/auth/domains')
 
     def new_ref(self, **kwargs):
         kwargs.setdefault('id', uuid.uuid4().hex)
@@ -378,7 +494,7 @@ class FederationDomainTests(utils.TestCase):
             self.assertIsInstance(domain, self.model)
 
 
-class FederatedTokenTests(utils.TestCase):
+class FederatedTokenTests(utils.ClientTestCase):
 
     def setUp(self):
         super(FederatedTokenTests, self).setUp()
@@ -397,10 +513,10 @@ class FederatedTokenTests(utils.TestCase):
 
     def test_get_user_domain_id(self):
         """Ensure a federated user's domain ID does not exist."""
-        self.assertIsNone(self.federated_token.user_domain_id)
+        self.assertEqual('Federated', self.federated_token.user_domain_id)
 
 
-class ServiceProviderTests(utils.TestCase, utils.CrudTests):
+class ServiceProviderTests(utils.ClientTestCase, utils.CrudTests):
     def setUp(self):
         super(ServiceProviderTests, self).setUp()
         self.key = 'service_provider'

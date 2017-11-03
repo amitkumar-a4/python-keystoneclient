@@ -12,49 +12,42 @@
 
 import logging
 import sys
-import time
 import uuid
 
 import fixtures
-import mock
-from mox3 import mox
 from oslo_serialization import jsonutils
 import requests
+import requests_mock
 from requests_mock.contrib import fixture
 import six
 from six.moves.urllib import parse as urlparse
+import testscenarios
 import testtools
+
+from keystoneclient.tests.unit import client_fixtures
 
 
 class TestCase(testtools.TestCase):
 
-    TEST_DOMAIN_ID = '1'
-    TEST_DOMAIN_NAME = 'aDomain'
+    TEST_DOMAIN_ID = uuid.uuid4().hex
+    TEST_DOMAIN_NAME = uuid.uuid4().hex
     TEST_GROUP_ID = uuid.uuid4().hex
     TEST_ROLE_ID = uuid.uuid4().hex
-    TEST_TENANT_ID = '1'
-    TEST_TENANT_NAME = 'aTenant'
-    TEST_TOKEN = 'aToken'
-    TEST_TRUST_ID = 'aTrust'
-    TEST_USER = 'test'
+    TEST_TENANT_ID = uuid.uuid4().hex
+    TEST_TENANT_NAME = uuid.uuid4().hex
+    TEST_TOKEN = uuid.uuid4().hex
+    TEST_TRUST_ID = uuid.uuid4().hex
+    TEST_USER = uuid.uuid4().hex
     TEST_USER_ID = uuid.uuid4().hex
 
     TEST_ROOT_URL = 'http://127.0.0.1:5000/'
 
     def setUp(self):
         super(TestCase, self).setUp()
-        self.mox = mox.Mox()
+        self.deprecations = self.useFixture(client_fixtures.Deprecations())
+
         self.logger = self.useFixture(fixtures.FakeLogger(level=logging.DEBUG))
-        self.time_patcher = mock.patch.object(time, 'time', lambda: 1234)
-        self.time_patcher.start()
-
         self.requests_mock = self.useFixture(fixture.Fixture())
-
-    def tearDown(self):
-        self.time_patcher.stop()
-        self.mox.UnsetStubs()
-        self.mox.VerifyAll()
-        super(TestCase, self).tearDown()
 
     def stub_url(self, method, parts=None, base_url=None, json=None, **kwargs):
         if not base_url:
@@ -82,7 +75,7 @@ class TestCase(testtools.TestCase):
             self.assertEqual(body, last_request_body)
 
     def assertQueryStringIs(self, qs=''):
-        """Verify the QueryString matches what is expected.
+        r"""Verify the QueryString matches what is expected.
 
         The qs parameter should be of the format \'foo=bar&abc=xyz\'
         """
@@ -109,7 +102,7 @@ class TestCase(testtools.TestCase):
             self.assertIn(v, qs[k])
 
     def assertRequestHeaderEqual(self, name, val):
-        """Verify that the last request made contains a header and its value
+        """Verify that the last request made contains a header and its value.
 
         The request must have already been made.
         """
@@ -117,49 +110,9 @@ class TestCase(testtools.TestCase):
         self.assertEqual(headers.get(name), val)
 
 
-if tuple(sys.version_info)[0:2] < (2, 7):
-
-    def assertDictEqual(self, d1, d2, msg=None):
-        # Simple version taken from 2.7
-        self.assertIsInstance(d1, dict,
-                              'First argument is not a dictionary')
-        self.assertIsInstance(d2, dict,
-                              'Second argument is not a dictionary')
-        if d1 != d2:
-            if msg:
-                self.fail(msg)
-            else:
-                standardMsg = '%r != %r' % (d1, d2)
-                self.fail(standardMsg)
-
-    TestCase.assertDictEqual = assertDictEqual
-
-
-class TestResponse(requests.Response):
-    """Class used to wrap requests.Response and provide some
-       convenience to initialize with a dict.
-    """
-
-    def __init__(self, data):
-        self._text = None
-        super(TestResponse, self).__init__()
-        if isinstance(data, dict):
-            self.status_code = data.get('status_code', 200)
-            headers = data.get('headers')
-            if headers:
-                self.headers.update(headers)
-            # Fake the text attribute to streamline Response creation
-            # _content is defined by requests.Response
-            self._content = data.get('text')
-        else:
-            self.status_code = data
-
-    def __eq__(self, other):
-        return self.__dict__ == other.__dict__
-
-    @property
-    def text(self):
-        return self.content
+def test_response(**kwargs):
+    r = requests.Request(method='GET', url='http://localhost:5000').prepare()
+    return requests_mock.create_response(r, **kwargs)
 
 
 class DisableModuleFixture(fixtures.Fixture):
@@ -179,7 +132,7 @@ class DisableModuleFixture(fixtures.Fixture):
 
     def clear_module(self):
         cleared_modules = {}
-        for fullname in sys.modules.keys():
+        for fullname in list(sys.modules):
             if (fullname == self.module or
                     fullname.startswith(self.module + '.')):
                 cleared_modules[fullname] = sys.modules.pop(fullname)
@@ -187,7 +140,6 @@ class DisableModuleFixture(fixtures.Fixture):
 
     def setUp(self):
         """Ensure ImportError for the specified module."""
-
         super(DisableModuleFixture, self).setUp()
 
         # Clear 'module' references in sys.modules
@@ -196,6 +148,30 @@ class DisableModuleFixture(fixtures.Fixture):
         finder = NoModuleFinder(self.module)
         self._finders.append(finder)
         sys.meta_path.insert(0, finder)
+
+
+class ClientTestCaseMixin(testscenarios.WithScenarios):
+
+    client_fixture_class = None
+    data_fixture_class = None
+
+    def setUp(self):
+        super(ClientTestCaseMixin, self).setUp()
+
+        self.data_fixture = None
+        self.client_fixture = None
+        self.client = None
+
+        if self.client_fixture_class:
+            fix = self.client_fixture_class(self.requests_mock,
+                                            self.deprecations)
+            self.client_fixture = self.useFixture(fix)
+            self.client = self.client_fixture.client
+            self.TEST_USER_ID = self.client_fixture.user_id
+
+        if self.data_fixture_class:
+            fix = self.data_fixture_class(self.requests_mock)
+            self.data_fixture = self.useFixture(fix)
 
 
 class NoModuleFinder(object):

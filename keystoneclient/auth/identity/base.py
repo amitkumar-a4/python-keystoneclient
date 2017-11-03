@@ -12,15 +12,17 @@
 
 import abc
 import logging
+import threading
+import warnings
 
 from oslo_config import cfg
+from positional import positional
 import six
 
 from keystoneclient import _discover
 from keystoneclient.auth import base
 from keystoneclient import exceptions
 from keystoneclient.i18n import _LW
-from keystoneclient import utils
 
 LOG = logging.getLogger(__name__)
 
@@ -34,8 +36,9 @@ def get_options():
 @six.add_metaclass(abc.ABCMeta)
 class BaseIdentityPlugin(base.BaseAuthPlugin):
 
-    # we count a token as valid if it is valid for at least this many seconds
-    MIN_TOKEN_LIFE_SECONDS = 1
+    # we count a token as valid (not needing refreshing) if it is valid for at
+    # least this many seconds before the token expiry time
+    MIN_TOKEN_LIFE_SECONDS = 120
 
     def __init__(self,
                  auth_url=None,
@@ -47,18 +50,118 @@ class BaseIdentityPlugin(base.BaseAuthPlugin):
 
         super(BaseIdentityPlugin, self).__init__()
 
+        warnings.warn(
+            'keystoneclient auth plugins are deprecated as of the 2.1.0 '
+            'release in favor of keystoneauth1 plugins. They will be removed '
+            'in future releases.', DeprecationWarning)
+
         self.auth_url = auth_url
         self.auth_ref = None
         self.reauthenticate = reauthenticate
 
         self._endpoint_cache = {}
+        self._lock = threading.Lock()
 
-        # NOTE(jamielennox): DEPRECATED. The following should not really be set
-        # here but handled by the individual auth plugin.
-        self.username = username
-        self.password = password
-        self.token = token
-        self.trust_id = trust_id
+        self._username = username
+        self._password = password
+        self._token = token
+        self._trust_id = trust_id
+
+    @property
+    def username(self):
+        """Deprecated as of the 1.7.0 release.
+
+        It may be removed in the 2.0.0 release.
+        """
+        warnings.warn(
+            'username is deprecated as of the 1.7.0 release and may be '
+            'removed in the 2.0.0 release.', DeprecationWarning)
+
+        return self._username
+
+    @username.setter
+    def username(self, value):
+        """Deprecated as of the 1.7.0 release.
+
+        It may be removed in the 2.0.0 release.
+        """
+        warnings.warn(
+            'username is deprecated as of the 1.7.0 release and may be '
+            'removed in the 2.0.0 release.', DeprecationWarning)
+
+        self._username = value
+
+    @property
+    def password(self):
+        """Deprecated as of the 1.7.0 release.
+
+        It may be removed in the 2.0.0 release.
+        """
+        warnings.warn(
+            'password is deprecated as of the 1.7.0 release and may be '
+            'removed in the 2.0.0 release.', DeprecationWarning)
+
+        return self._password
+
+    @password.setter
+    def password(self, value):
+        """Deprecated as of the 1.7.0 release.
+
+        It may be removed in the 2.0.0 release.
+        """
+        warnings.warn(
+            'password is deprecated as of the 1.7.0 release and may be '
+            'removed in the 2.0.0 release.', DeprecationWarning)
+
+        self._password = value
+
+    @property
+    def token(self):
+        """Deprecated as of the 1.7.0 release.
+
+        It may be removed in the 2.0.0 release.
+        """
+        warnings.warn(
+            'token is deprecated as of the 1.7.0 release and may be '
+            'removed in the 2.0.0 release.', DeprecationWarning)
+
+        return self._token
+
+    @token.setter
+    def token(self, value):
+        """Deprecated as of the 1.7.0 release.
+
+        It may be removed in the 2.0.0 release.
+        """
+        warnings.warn(
+            'token is deprecated as of the 1.7.0 release and may be '
+            'removed in the 2.0.0 release.', DeprecationWarning)
+
+        self._token = value
+
+    @property
+    def trust_id(self):
+        """Deprecated as of the 1.7.0 release.
+
+        It may be removed in the 2.0.0 release.
+        """
+        warnings.warn(
+            'trust_id is deprecated as of the 1.7.0 release and may be '
+            'removed in the 2.0.0 release.', DeprecationWarning)
+
+        return self._trust_id
+
+    @trust_id.setter
+    def trust_id(self, value):
+        """Deprecated as of the 1.7.0 release.
+
+        It may be removed in the 2.0.0 release.
+        """
+        warnings.warn(
+            'trust_id is deprecated as of the 1.7.0 release and may be '
+            'removed in the 2.0.0 release.', DeprecationWarning)
+
+        self._trust_id = value
 
     @abc.abstractmethod
     def get_auth_ref(self, session, **kwargs):
@@ -66,13 +169,13 @@ class BaseIdentityPlugin(base.BaseAuthPlugin):
 
         This method is overridden by the various token version plugins.
 
-        This function should not be called independently and is expected to be
-        invoked via the do_authenticate function.
+        This method should not be called independently and is expected to be
+        invoked via the do_authenticate() method.
 
-        This function will be invoked if the AcessInfo object cached by the
+        This method will be invoked if the AccessInfo object cached by the
         plugin is not valid. Thus plugins should always fetch a new AccessInfo
-        when invoked. If you are looking to just retrieve the current auth
-        data then you should use get_access.
+        when invoked. If you are looking to just retrieve the current auth data
+        then you should use get_access().
 
         :param session: A session object that can be used for communication.
         :type session: keystoneclient.session.Session
@@ -86,6 +189,7 @@ class BaseIdentityPlugin(base.BaseAuthPlugin):
         :returns: Token access information.
         :rtype: :py:class:`keystoneclient.access.AccessInfo`
         """
+        pass  # pragma: no cover
 
     def get_token(self, session, **kwargs):
         """Return a valid auth token.
@@ -140,8 +244,14 @@ class BaseIdentityPlugin(base.BaseAuthPlugin):
         :returns: Valid AccessInfo
         :rtype: :py:class:`keystoneclient.access.AccessInfo`
         """
-        if self._needs_reauthenticate():
-            self.auth_ref = self.get_auth_ref(session)
+        # Hey Kids! Thread safety is important particularly in the case where
+        # a service is creating an admin style plugin that will then proceed
+        # to make calls from many threads. As a token expires all the threads
+        # will try and fetch a new token at once, so we want to ensure that
+        # only one thread tries to actually fetch from keystone at once.
+        with self._lock:
+            if self._needs_reauthenticate():
+                self.auth_ref = self.get_auth_ref(session)
 
         return self.auth_ref
 
@@ -197,26 +307,30 @@ class BaseIdentityPlugin(base.BaseAuthPlugin):
         :rtype: string or None
         """
         # NOTE(jamielennox): if you specifically ask for requests to be sent to
-        # the auth url then we can ignore the rest of the checks. Typically if
-        # you are asking for the auth endpoint it means that there is no
-        # catalog to query anyway.
+        # the auth url then we can ignore many of the checks. Typically if you
+        # are asking for the auth endpoint it means that there is no catalog to
+        # query however we still need to support asking for a specific version
+        # of the auth_url for generic plugins.
         if interface is base.AUTH_INTERFACE:
-            return self.auth_url
+            url = self.auth_url
+            service_type = service_type or 'identity'
 
-        if not service_type:
-            LOG.warn(_LW('Plugin cannot return an endpoint without knowing '
-                         'the service type that is required. Add service_type '
-                         'to endpoint filtering data.'))
-            return None
+        else:
+            if not service_type:
+                LOG.warning(_LW(
+                    'Plugin cannot return an endpoint without knowing the '
+                    'service type that is required. Add service_type to '
+                    'endpoint filtering data.'))
+                return None
 
-        if not interface:
-            interface = 'public'
+            if not interface:
+                interface = 'public'
 
-        service_catalog = self.get_access(session).service_catalog
-        url = service_catalog.url_for(service_type=service_type,
-                                      endpoint_type=interface,
-                                      region_name=region_name,
-                                      service_name=service_name)
+            service_catalog = self.get_access(session).service_catalog
+            url = service_catalog.url_for(service_type=service_type,
+                                          endpoint_type=interface,
+                                          region_name=region_name,
+                                          service_name=service_name)
 
         if not version:
             # NOTE(jamielennox): This may not be the best thing to default to
@@ -239,9 +353,10 @@ class BaseIdentityPlugin(base.BaseAuthPlugin):
             # NOTE(jamielennox): Again if we can't contact the server we fall
             # back to just returning the URL from the catalog. This may not be
             # the best default but we need it for now.
-            LOG.warn(_LW('Failed to contact the endpoint at %s for discovery. '
-                         'Fallback to using that endpoint as the base url.'),
-                     url)
+            LOG.warning(_LW(
+                'Failed to contact the endpoint at %s for discovery. Fallback '
+                'to using that endpoint as the base url.'),
+                url)
         else:
             url = disc.url_for(version)
 
@@ -253,7 +368,7 @@ class BaseIdentityPlugin(base.BaseAuthPlugin):
     def get_project_id(self, session, **kwargs):
         return self.get_access(session).project_id
 
-    @utils.positional()
+    @positional()
     def get_discovery(self, session, url, authenticated=None):
         """Return the discovery object for a URL.
 

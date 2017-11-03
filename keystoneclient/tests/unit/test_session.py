@@ -1,3 +1,5 @@
+# -*- coding: utf-8 -*-
+#
 # Licensed under the Apache License, Version 2.0 (the "License"); you may
 # not use this file except in compliance with the License. You may obtain
 # a copy of the License at
@@ -34,6 +36,10 @@ from keystoneclient.tests.unit import utils
 class SessionTests(utils.TestCase):
 
     TEST_URL = 'http://127.0.0.1:5000/'
+
+    def setUp(self):
+        super(SessionTests, self).setUp()
+        self.deprecations.expect_deprecations()
 
     def test_get(self):
         session = client_session.Session()
@@ -113,7 +119,7 @@ class SessionTests(utils.TestCase):
         session = client_session.Session(cert='cert.pem', timeout=5,
                                          verify='certs')
 
-        FAKE_RESP = utils.TestResponse({'status_code': 200, 'text': 'resp'})
+        FAKE_RESP = utils.test_response(text='resp')
         RESP = mock.Mock(return_value=FAKE_RESP)
 
         with mock.patch.object(session.session, 'request', RESP) as mocked:
@@ -140,17 +146,19 @@ class SessionTests(utils.TestCase):
                           session.get, self.TEST_URL)
 
     def test_session_debug_output(self):
-        """Test request and response headers in debug logs
+        """Test request and response headers in debug logs.
 
         in order to redact secure headers while debug is true.
         """
         session = client_session.Session(verify=False)
-        headers = {'HEADERA': 'HEADERVALB'}
+        headers = {'HEADERA': 'HEADERVALB',
+                   'Content-Type': 'application/json'}
         security_headers = {'Authorization': uuid.uuid4().hex,
                             'X-Auth-Token': uuid.uuid4().hex,
-                            'X-Subject-Token': uuid.uuid4().hex, }
-        body = 'BODYRESPONSE'
-        data = 'BODYDATA'
+                            'X-Subject-Token': uuid.uuid4().hex,
+                            'X-Service-Token': uuid.uuid4().hex}
+        body = '{"a": "b"}'
+        data = '{"c": "d"}'
         all_headers = dict(
             itertools.chain(headers.items(), security_headers.items()))
         self.stub_url('POST', text=body, headers=all_headers)
@@ -173,6 +181,94 @@ class SessionTests(utils.TestCase):
             self.assertIn('%s: {SHA1}' % k, self.logger.output)
             self.assertEqual(v, resp.headers[k])
             self.assertNotIn(v, self.logger.output)
+
+    def test_logs_failed_output(self):
+        """Test that output is logged even for failed requests."""
+        session = client_session.Session()
+        body = {uuid.uuid4().hex: uuid.uuid4().hex}
+
+        self.stub_url('GET', json=body, status_code=400,
+                      headers={'Content-Type': 'application/json'})
+        resp = session.get(self.TEST_URL, raise_exc=False)
+
+        self.assertEqual(resp.status_code, 400)
+        self.assertIn(list(body.keys())[0], self.logger.output)
+        self.assertIn(list(body.values())[0], self.logger.output)
+
+    def test_logging_body_only_for_specified_content_types(self):
+        """Verify response body is only logged in specific content types.
+
+        Response bodies are logged only when the response's Content-Type header
+        is set to application/json. This prevents us to get an unexpected
+        MemoryError when reading arbitrary responses, such as streams.
+        """
+        OMITTED_BODY = ('Omitted, Content-Type is set to %s. Only '
+                        'application/json responses have their bodies logged.')
+        session = client_session.Session(verify=False)
+
+        # Content-Type is not set
+        body = jsonutils.dumps({'token': {'id': '...'}})
+        self.stub_url('POST', text=body)
+        session.post(self.TEST_URL)
+        self.assertNotIn(body, self.logger.output)
+        self.assertIn(OMITTED_BODY % None, self.logger.output)
+
+        # Content-Type is set to text/xml
+        body = '<token><id>...</id></token>'
+        self.stub_url('POST', text=body, headers={'Content-Type': 'text/xml'})
+        session.post(self.TEST_URL)
+        self.assertNotIn(body, self.logger.output)
+        self.assertIn(OMITTED_BODY % 'text/xml', self.logger.output)
+
+        # Content-Type is set to application/json
+        body = jsonutils.dumps({'token': {'id': '...'}})
+        self.stub_url('POST', text=body,
+                      headers={'Content-Type': 'application/json'})
+        session.post(self.TEST_URL)
+        self.assertIn(body, self.logger.output)
+        self.assertNotIn(OMITTED_BODY % 'application/json', self.logger.output)
+
+        # Content-Type is set to application/json; charset=UTF-8
+        body = jsonutils.dumps({'token': {'id': '...'}})
+        self.stub_url(
+            'POST', text=body,
+            headers={'Content-Type': 'application/json; charset=UTF-8'})
+        session.post(self.TEST_URL)
+        self.assertIn(body, self.logger.output)
+        self.assertNotIn(OMITTED_BODY % 'application/json; charset=UTF-8',
+                         self.logger.output)
+
+    def test_unicode_data_in_debug_output(self):
+        """Verify that ascii-encodable data is logged without modification."""
+        session = client_session.Session(verify=False)
+
+        body = 'RESP'
+        data = u'αβγδ'
+        self.stub_url('POST', text=body)
+        session.post(self.TEST_URL, data=data)
+
+        self.assertIn("'%s'" % data, self.logger.output)
+
+    def test_binary_data_not_in_debug_output(self):
+        """Verify that non-ascii-encodable data causes replacement."""
+        if six.PY2:
+            data = "my data" + chr(255)
+        else:
+            # Python 3 logging handles binary data well.
+            return
+
+        session = client_session.Session(verify=False)
+
+        body = 'RESP'
+        self.stub_url('POST', text=body)
+
+        # Forced mixed unicode and byte strings in request
+        # elements to make sure that all joins are appropriately
+        # handled (any join of unicode and byte strings should
+        # raise a UnicodeDecodeError)
+        session.post(unicode(self.TEST_URL), data=data)
+
+        self.assertNotIn('my data', self.logger.output)
 
     def test_logging_cacerts(self):
         path_to_certs = '/path/to/certs'
@@ -232,10 +328,78 @@ class SessionTests(utils.TestCase):
         # The exception should contain the URL and details about the SSL error
         msg = _('SSL exception connecting to %(url)s: %(error)s') % {
             'url': self.TEST_URL, 'error': error}
-        self.assertRaisesRegexp(exceptions.SSLError,
-                                msg,
-                                session.get,
-                                self.TEST_URL)
+        six.assertRaisesRegex(self,
+                              exceptions.SSLError,
+                              msg,
+                              session.get,
+                              self.TEST_URL)
+
+    def test_mask_password_in_http_log_response(self):
+        session = client_session.Session()
+
+        def fake_debug(msg):
+            self.assertNotIn('verybadpass', msg)
+
+        logger = mock.Mock(isEnabledFor=mock.Mock(return_value=True))
+        logger.debug = mock.Mock(side_effect=fake_debug)
+        body = {
+            "connection_info": {
+                "driver_volume_type": "iscsi",
+                "data": {
+                    "auth_password": "verybadpass",
+                    "target_discovered": False,
+                    "encrypted": False,
+                    "qos_specs": None,
+                    "target_iqn": ("iqn.2010-10.org.openstack:volume-"
+                                   "744d2085-8e78-40a5-8659-ef3cffb2480e"),
+                    "target_portal": "172.99.69.228:3260",
+                    "volume_id": "744d2085-8e78-40a5-8659-ef3cffb2480e",
+                    "target_lun": 1,
+                    "access_mode": "rw",
+                    "auth_username": "verybadusername",
+                    "auth_method": "CHAP"}}}
+        body_json = jsonutils.dumps(body)
+        response = mock.Mock(text=body_json, status_code=200,
+                             headers={'content-type': 'application/json'})
+        session._http_log_response(response, logger)
+        self.assertEqual(1, logger.debug.call_count)
+
+
+class TCPKeepAliveAdapter(utils.TestCase):
+
+    @mock.patch.object(client_session, 'socket')
+    @mock.patch('requests.adapters.HTTPAdapter.init_poolmanager')
+    def test_init_poolmanager_all_options(self, mock_parent_init_poolmanager,
+                                          mock_socket):
+        # properties expected to be in socket.
+        mock_socket.TCP_KEEPIDLE = mock.sentinel.TCP_KEEPIDLE
+        mock_socket.TCP_KEEPCNT = mock.sentinel.TCP_KEEPCNT
+        mock_socket.TCP_KEEPINTVL = mock.sentinel.TCP_KEEPINTVL
+        desired_opts = [mock_socket.TCP_KEEPIDLE, mock_socket.TCP_KEEPCNT,
+                        mock_socket.TCP_KEEPINTVL]
+
+        adapter = client_session.TCPKeepAliveAdapter()
+        adapter.init_poolmanager()
+
+        call_args, call_kwargs = mock_parent_init_poolmanager.call_args
+        called_socket_opts = call_kwargs['socket_options']
+        call_options = [opt for (protocol, opt, value) in called_socket_opts]
+        for opt in desired_opts:
+            self.assertIn(opt, call_options)
+
+    @mock.patch.object(client_session, 'socket')
+    @mock.patch('requests.adapters.HTTPAdapter.init_poolmanager')
+    def test_init_poolmanager(self, mock_parent_init_poolmanager, mock_socket):
+        spec = ['IPPROTO_TCP', 'TCP_NODELAY', 'SOL_SOCKET', 'SO_KEEPALIVE']
+        mock_socket.mock_add_spec(spec)
+        adapter = client_session.TCPKeepAliveAdapter()
+        adapter.init_poolmanager()
+
+        call_args, call_kwargs = mock_parent_init_poolmanager.call_args
+        called_socket_opts = call_kwargs['socket_options']
+        call_options = [opt for (protocol, opt, value) in called_socket_opts]
+        self.assertEqual([mock_socket.TCP_NODELAY, mock_socket.SO_KEEPALIVE],
+                         call_options)
 
     def test_mask_password_in_http_log_response(self):
         session = client_session.Session()
@@ -277,8 +441,14 @@ class RedirectTests(utils.TestCase):
     DEFAULT_REDIRECT_BODY = 'Redirect'
     DEFAULT_RESP_BODY = 'Found'
 
+    def setUp(self):
+        super(RedirectTests, self).setUp()
+        self.deprecations.expect_deprecations()
+
     def setup_redirects(self, method='GET', status_code=305,
-                        redirect_kwargs={}, final_kwargs={}):
+                        redirect_kwargs=None, final_kwargs=None):
+        redirect_kwargs = redirect_kwargs or {}
+        final_kwargs = final_kwargs or {}
         redirect_kwargs.setdefault('text', self.DEFAULT_REDIRECT_BODY)
 
         for s, d in zip(self.REDIRECT_CHAIN, self.REDIRECT_CHAIN[1:]):
@@ -353,7 +523,8 @@ class ConstructSessionFromArgsTests(utils.TestCase):
 
     def _s(self, k=None, **kwargs):
         k = k or kwargs
-        return client_session.Session.construct(k)
+        with self.deprecations.expect_deprecations_here():
+            return client_session.Session.construct(k)
 
     def test_verify(self):
         self.assertFalse(self._s(insecure=True).verify)
@@ -381,7 +552,7 @@ class AuthPlugin(base.BaseAuthPlugin):
     Takes Parameters such that it can throw exceptions at the right times.
     """
 
-    TEST_TOKEN = 'aToken'
+    TEST_TOKEN = utils.TestCase.TEST_TOKEN
     TEST_USER_ID = 'aUser'
     TEST_PROJECT_ID = 'aProject'
 
@@ -431,7 +602,7 @@ class CalledAuthPlugin(base.BaseAuthPlugin):
 
     def get_token(self, session):
         self.get_token_called = True
-        return 'aToken'
+        return utils.TestCase.TEST_TOKEN
 
     def get_endpoint(self, session, **kwargs):
         self.get_endpoint_called = True
@@ -448,6 +619,10 @@ class SessionAuthTests(utils.TestCase):
     TEST_URL = 'http://127.0.0.1:5000/'
     TEST_JSON = {'hello': 'world'}
 
+    def setUp(self):
+        super(SessionAuthTests, self).setUp()
+        self.deprecations.expect_deprecations()
+
     def stub_service_url(self, service_type, interface, path,
                          method='GET', **kwargs):
         base_url = AuthPlugin.SERVICE_URLS[service_type][interface]
@@ -462,7 +637,7 @@ class SessionAuthTests(utils.TestCase):
         auth = AuthPlugin()
         sess = client_session.Session(auth=auth)
         resp = sess.get(self.TEST_URL)
-        self.assertDictEqual(resp.json(), self.TEST_JSON)
+        self.assertEqual(resp.json(), self.TEST_JSON)
 
         self.assertRequestHeaderEqual('X-Auth-Token', AuthPlugin.TEST_TOKEN)
 
@@ -472,7 +647,7 @@ class SessionAuthTests(utils.TestCase):
         auth = AuthPlugin()
         sess = client_session.Session(auth=auth)
         resp = sess.get(self.TEST_URL, authenticated=False)
-        self.assertDictEqual(resp.json(), self.TEST_JSON)
+        self.assertEqual(resp.json(), self.TEST_JSON)
 
         self.assertRequestHeaderEqual('X-Auth-Token', None)
 
@@ -569,7 +744,7 @@ class SessionAuthTests(utils.TestCase):
 
         requests_auth = object()
 
-        FAKE_RESP = utils.TestResponse({'status_code': 200, 'text': 'resp'})
+        FAKE_RESP = utils.test_response(text='resp')
         RESP = mock.Mock(return_value=FAKE_RESP)
 
         with mock.patch.object(sess.session, 'request', RESP) as mocked:
@@ -667,22 +842,24 @@ class SessionAuthTests(utils.TestCase):
 
         auth = AuthPlugin()
         sess = client_session.Session(auth=auth)
-        response = uuid.uuid4().hex
+        response = {uuid.uuid4().hex: uuid.uuid4().hex}
 
         self.stub_url('GET',
-                      text=response,
-                      headers={'Content-Type': 'text/html'})
+                      json=response,
+                      headers={'Content-Type': 'application/json'})
 
         resp = sess.get(self.TEST_URL, logger=logger)
 
-        self.assertEqual(response, resp.text)
+        self.assertEqual(response, resp.json())
         output = io.getvalue()
 
         self.assertIn(self.TEST_URL, output)
-        self.assertIn(response, output)
+        self.assertIn(list(response.keys())[0], output)
+        self.assertIn(list(response.values())[0], output)
 
         self.assertNotIn(self.TEST_URL, self.logger.output)
-        self.assertNotIn(response, self.logger.output)
+        self.assertNotIn(list(response.keys())[0], self.logger.output)
+        self.assertNotIn(list(response.values())[0], self.logger.output)
 
 
 class AdapterTest(utils.TestCase):
@@ -695,6 +872,10 @@ class AdapterTest(utils.TestCase):
     VERSION = uuid.uuid4().hex
 
     TEST_URL = CalledAuthPlugin.ENDPOINT
+
+    def setUp(self):
+        super(AdapterTest, self).setUp()
+        self.deprecations.expect_deprecations()
 
     def _create_loaded_adapter(self):
         auth = CalledAuthPlugin()
@@ -860,21 +1041,23 @@ class AdapterTest(utils.TestCase):
         sess = client_session.Session(auth=auth)
         adpt = adapter.Adapter(sess, auth=auth, logger=logger)
 
-        response = uuid.uuid4().hex
+        response = {uuid.uuid4().hex: uuid.uuid4().hex}
 
-        self.stub_url('GET', text=response,
-                      headers={'Content-Type': 'text/html'})
+        self.stub_url('GET', json=response,
+                      headers={'Content-Type': 'application/json'})
 
         resp = adpt.get(self.TEST_URL, logger=logger)
 
-        self.assertEqual(response, resp.text)
+        self.assertEqual(response, resp.json())
         output = io.getvalue()
 
         self.assertIn(self.TEST_URL, output)
-        self.assertIn(response, output)
+        self.assertIn(list(response.keys())[0], output)
+        self.assertIn(list(response.values())[0], output)
 
         self.assertNotIn(self.TEST_URL, self.logger.output)
-        self.assertNotIn(response, self.logger.output)
+        self.assertNotIn(list(response.keys())[0], self.logger.output)
+        self.assertNotIn(list(response.values())[0], self.logger.output)
 
 
 class ConfLoadingTests(utils.TestCase):
@@ -893,10 +1076,11 @@ class ConfLoadingTests(utils.TestCase):
         self.conf_fixture.config(**kwargs)
 
     def get_session(self, **kwargs):
-        return client_session.Session.load_from_conf_options(
-            self.conf_fixture.conf,
-            self.GROUP,
-            **kwargs)
+        with self.deprecations.expect_deprecations_here():
+            return client_session.Session.load_from_conf_options(
+                self.conf_fixture.conf,
+                self.GROUP,
+                **kwargs)
 
     def test_insecure_timeout(self):
         self.config(insecure=True, timeout=5)
@@ -946,7 +1130,8 @@ class CliLoadingTests(utils.TestCase):
 
     def get_session(self, val, **kwargs):
         args = self.parser.parse_args(val.split())
-        return client_session.Session.load_from_cli_options(args, **kwargs)
+        with self.deprecations.expect_deprecations_here():
+            return client_session.Session.load_from_cli_options(args, **kwargs)
 
     def test_insecure_timeout(self):
         s = self.get_session('--insecure --timeout 5.5')

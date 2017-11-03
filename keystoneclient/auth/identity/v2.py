@@ -14,6 +14,7 @@ import abc
 import logging
 
 from oslo_config import cfg
+from positional import positional
 import six
 
 from keystoneclient import access
@@ -48,7 +49,7 @@ class Auth(base.BaseIdentityPlugin):
 
         return options
 
-    @utils.positional()
+    @positional()
     def __init__(self, auth_url,
                  trust_id=None,
                  tenant_id=None,
@@ -57,9 +58,19 @@ class Auth(base.BaseIdentityPlugin):
         super(Auth, self).__init__(auth_url=auth_url,
                                    reauthenticate=reauthenticate)
 
-        self.trust_id = trust_id
+        self._trust_id = trust_id
         self.tenant_id = tenant_id
         self.tenant_name = tenant_name
+
+    @property
+    def trust_id(self):
+        # Override to remove deprecation.
+        return self._trust_id
+
+    @trust_id.setter
+    def trust_id(self, value):
+        # Override to remove deprecation.
+        self._trust_id = value
 
     def get_auth_ref(self, session, **kwargs):
         headers = {'Accept': 'application/json'}
@@ -93,6 +104,7 @@ class Auth(base.BaseIdentityPlugin):
         :return: A dict of authentication data for the auth type.
         :rtype: dict
         """
+        pass  # pragma: no cover
 
 
 _NOT_PASSED = object()
@@ -116,7 +128,7 @@ class Password(Auth):
     :raises TypeError: if a user_id or username is not provided.
     """
 
-    @utils.positional(4)
+    @positional(4)
     def __init__(self, auth_url, username=_NOT_PASSED, password=None,
                  user_id=_NOT_PASSED, **kwargs):
         super(Password, self).__init__(auth_url, **kwargs)
@@ -131,8 +143,28 @@ class Password(Auth):
             user_id = None
 
         self.user_id = user_id
-        self.username = username
-        self.password = password
+        self._username = username
+        self._password = password
+
+    @property
+    def username(self):
+        # Override to remove deprecation.
+        return self._username
+
+    @username.setter
+    def username(self, value):
+        # Override to remove deprecation.
+        self._username = value
+
+    @property
+    def password(self):
+        # Override to remove deprecation.
+        return self._password
+
+    @password.setter
+    def password(self, value):
+        # Override to remove deprecation.
+        self._password = value
 
     def get_auth_data(self, headers=None):
         auth = {'password': self.password}
@@ -145,15 +177,23 @@ class Password(Auth):
         return {'passwordCredentials': auth}
 
     @classmethod
+    def load_from_argparse_arguments(cls, namespace, **kwargs):
+        if not (kwargs.get('password') or namespace.os_password):
+            kwargs['password'] = utils.prompt_user_password()
+
+        return super(Password, cls).load_from_argparse_arguments(namespace,
+                                                                 **kwargs)
+
+    @classmethod
     def get_options(cls):
         options = super(Password, cls).get_options()
 
         options.extend([
-            cfg.StrOpt('user-name',
+            cfg.StrOpt('username',
                        dest='username',
-                       deprecated_name='username',
+                       deprecated_name='user-name',
                        help='Username to login with'),
-            cfg.StrOpt('user-id', help='User ID to longin with'),
+            cfg.StrOpt('user-id', help='User ID to login with'),
             cfg.StrOpt('password', secret=True, help='Password to use'),
         ])
 
@@ -174,7 +214,17 @@ class Token(Auth):
 
     def __init__(self, auth_url, token, **kwargs):
         super(Token, self).__init__(auth_url, **kwargs)
-        self.token = token
+        self._token = token
+
+    @property
+    def token(self):
+        # Override to remove deprecation.
+        return self._token
+
+    @token.setter
+    def token(self, value):
+        # Override to remove deprecation.
+        self._token = value
 
     def get_auth_data(self, headers=None):
         if headers is not None:

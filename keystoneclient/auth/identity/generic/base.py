@@ -72,6 +72,16 @@ class BaseGenericPlugin(base.BaseIdentityPlugin):
 
         self._plugin = None
 
+    @property
+    def trust_id(self):
+        # Override to remove deprecation.
+        return self._trust_id
+
+    @trust_id.setter
+    def trust_id(self, value):
+        # Override to remove deprecation.
+        self._trust_id = value
+
     @abc.abstractmethod
     def create_plugin(self, session, version, url, raw_status=None):
         """Create a plugin from the given paramters.
@@ -89,7 +99,7 @@ class BaseGenericPlugin(base.BaseIdentityPlugin):
 
         :returns: A plugin that can match the parameters or None if nothing.
         """
-        return None
+        return None  # pragma: no cover
 
     @property
     def _has_domain_scope(self):
@@ -104,14 +114,14 @@ class BaseGenericPlugin(base.BaseIdentityPlugin):
 
     @property
     def _v2_params(self):
-        """Parameters that are common to v2 plugins."""
+        """Return parameters that are common to v2 plugins."""
         return {'trust_id': self._trust_id,
                 'tenant_id': self._project_id,
                 'tenant_name': self._project_name}
 
     @property
     def _v3_params(self):
-        """Parameters that are common to v3 plugins."""
+        """Return parameters that are common to v3 plugins."""
         return {'trust_id': self._trust_id,
                 'project_id': self._project_id,
                 'project_name': self._project_name,
@@ -130,9 +140,9 @@ class BaseGenericPlugin(base.BaseIdentityPlugin):
         except (exceptions.DiscoveryFailure,
                 exceptions.HTTPError,
                 exceptions.ConnectionError):
-            LOG.warn(_LW('Discovering versions from the identity service '
-                         'failed when creating the password plugin. '
-                         'Attempting to determine version from URL.'))
+            LOG.warning(_LW('Discovering versions from the identity service '
+                            'failed when creating the password plugin. '
+                            'Attempting to determine version from URL.'))
 
             url_parts = urlparse.urlparse(self.auth_url)
             path = url_parts.path.lower()

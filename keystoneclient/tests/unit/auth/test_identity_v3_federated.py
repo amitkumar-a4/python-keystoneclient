@@ -35,6 +35,8 @@ class V3FederatedPlugin(utils.TestCase):
     def setUp(self):
         super(V3FederatedPlugin, self).setUp()
 
+        self.deprecations.expect_deprecations()
+
         self.unscoped_token = fixture.V3Token()
         self.unscoped_token_id = uuid.uuid4().hex
         self.scoped_token = copy.deepcopy(self.unscoped_token)

@@ -23,7 +23,7 @@ from keystoneclient import exceptions
 
 
 class Tenant(base.Resource):
-    """Represents a Keystone tenant
+    """Represents a Keystone tenant.
 
     Attributes:
         * id: a uuid that identifies the tenant
@@ -32,7 +32,9 @@ class Tenant(base.Resource):
         * enabled: boolean to indicate if tenant is enabled
 
     """
+
     def __repr__(self):
+        """Return string representation of tenant resource information."""
         return "<Tenant %s>" % self._info
 
     def delete(self):
@@ -72,6 +74,7 @@ class Tenant(base.Resource):
 
 class TenantManager(base.ManagerWithFind):
     """Manager class for manipulating Keystone tenants."""
+
     resource_class = Tenant
 
     def __init__(self, client, role_manager, user_manager):
@@ -93,7 +96,7 @@ class TenantManager(base.ManagerWithFind):
             if k not in params['tenant']:
                 params['tenant'][k] = v
 
-        return self._create('/tenants', params, "tenant")
+        return self._post('/tenants', params, "tenant")
 
     def list(self, limit=None, marker=None):
         """Get a list of tenants.
@@ -105,7 +108,6 @@ class TenantManager(base.ManagerWithFind):
         :rtype: list of :class:`Tenant`
 
         """
-
         params = {}
         if limit:
             params['limit'] = limit
@@ -145,7 +147,7 @@ class TenantManager(base.ManagerWithFind):
                 body['tenant'][k] = v
 
         # Keystone's API uses a POST rather than a PUT here.
-        return self._create("/tenants/%s" % tenant_id, body, "tenant")
+        return self._post("/tenants/%s" % tenant_id, body, "tenant")
 
     def delete(self, tenant):
         """Delete a tenant."""

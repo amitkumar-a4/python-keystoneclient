@@ -20,7 +20,7 @@ from keystoneclient.tests.unit import client_fixtures
 from keystoneclient.tests.unit.v3 import utils
 
 
-class TokenTests(utils.TestCase, testresources.ResourcedTestCase):
+class TokenTests(utils.ClientTestCase, testresources.ResourcedTestCase):
 
     resources = [('examples', client_fixtures.EXAMPLES_RESOURCE)]
 
@@ -44,7 +44,30 @@ class TokenTests(utils.TestCase, testresources.ResourcedTestCase):
         self.stub_url('GET', ['auth', 'tokens', 'OS-PKI', 'revoked'],
                       json=sample_revoked_response)
         resp = self.client.tokens.get_revoked()
+        self.assertQueryStringIs()
         self.assertEqual(sample_revoked_response, resp)
+
+    def test_get_revoked_audit_id_only(self):
+        # When get_revoked(audit_id_only=True) then ?audit_id_only is set on
+        # the request.
+        sample_revoked_response = {
+            'revoked': [
+                {
+                    'audit_id': uuid.uuid4().hex,
+                    'expires': '2016-01-21T15:53:52Z',
+                },
+            ],
+        }
+        self.stub_url('GET', ['auth', 'tokens', 'OS-PKI', 'revoked'],
+                      json=sample_revoked_response)
+        resp = self.client.tokens.get_revoked(audit_id_only=True)
+        self.assertQueryStringIs('audit_id_only')
+        self.assertEqual(sample_revoked_response, resp)
+
+    def test_get_revoked_audit_id_only_positional_exc(self):
+        # When get_revoked(True) an exception is raised because this must be
+        # called with named parameter.
+        self.assertRaises(TypeError, self.client.tokens.get_revoked, True)
 
     def test_validate_token_with_token_id(self):
         # Can validate a token passing a string token ID.
@@ -53,6 +76,10 @@ class TokenTests(utils.TestCase, testresources.ResourcedTestCase):
             self.examples.v3_UUID_TOKEN_DEFAULT]
         self.stub_url('GET', ['auth', 'tokens'],
                       headers={'X-Subject-Token': token_id, }, json=token_ref)
+
+        token_data = self.client.tokens.get_token_data(token_id)
+        self.assertEqual(token_data, token_ref)
+
         access_info = self.client.tokens.validate(token_id)
 
         self.assertRequestHeaderEqual('X-Subject-Token', token_id)
@@ -77,6 +104,9 @@ class TokenTests(utils.TestCase, testresources.ResourcedTestCase):
         # When the token is invalid the server typically returns a 404.
         token_id = uuid.uuid4().hex
         self.stub_url('GET', ['auth', 'tokens'], status_code=404)
+
+        self.assertRaises(exceptions.NotFound,
+                          self.client.tokens.get_token_data, token_id)
         self.assertRaises(exceptions.NotFound,
                           self.client.tokens.validate, token_id)
 
@@ -87,6 +117,11 @@ class TokenTests(utils.TestCase, testresources.ResourcedTestCase):
             self.examples.v3_UUID_TOKEN_DEFAULT]
         self.stub_url('GET', ['auth', 'tokens'],
                       headers={'X-Subject-Token': token_id, }, json=token_ref)
+
+        token_data = self.client.tokens.get_token_data(token_id)
+        self.assertQueryStringIs()
+        self.assertIn('catalog', token_data['token'])
+
         access_info = self.client.tokens.validate(token_id)
 
         self.assertQueryStringIs()
@@ -99,6 +134,11 @@ class TokenTests(utils.TestCase, testresources.ResourcedTestCase):
             self.examples.v3_UUID_TOKEN_UNSCOPED]
         self.stub_url('GET', ['auth', 'tokens'],
                       headers={'X-Subject-Token': token_id, }, json=token_ref)
+
+        token_data = self.client.tokens.get_token_data(token_id)
+        self.assertQueryStringIs()
+        self.assertNotIn('catalog', token_data['token'])
+
         access_info = self.client.tokens.validate(token_id,
                                                   include_catalog=False)
 

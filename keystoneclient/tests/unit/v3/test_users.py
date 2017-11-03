@@ -20,7 +20,7 @@ from keystoneclient.tests.unit.v3 import utils
 from keystoneclient.v3 import users
 
 
-class UserTests(utils.TestCase, utils.CrudTests):
+class UserTests(utils.ClientTestCase, utils.CrudTests):
     def setUp(self):
         super(UserTests, self).setUp()
         self.key = 'user'
@@ -112,6 +112,7 @@ class UserTests(utils.TestCase, utils.CrudTests):
     def test_create_with_project(self):
         # Can create a user with the deprecated project option rather than
         # default_project_id.
+        self.deprecations.expect_deprecations()
         ref = self.new_ref()
 
         self.stub_entity('POST', [self.collection_key],
@@ -136,6 +137,8 @@ class UserTests(utils.TestCase, utils.CrudTests):
     def test_create_with_project_and_default_project(self):
         # Can create a user with the deprecated project and default_project_id.
         # The backend call should only pass the default_project_id.
+        self.deprecations.expect_deprecations()
+
         ref = self.new_ref()
 
         self.stub_entity('POST',
@@ -181,6 +184,8 @@ class UserTests(utils.TestCase, utils.CrudTests):
     def test_update_with_project(self):
         # Can update a user with the deprecated project option rather than
         # default_project_id.
+        self.deprecations.expect_deprecations()
+
         ref = self.new_ref()
         req_ref = ref.copy()
         req_ref.pop('id')
@@ -204,6 +209,8 @@ class UserTests(utils.TestCase, utils.CrudTests):
         self.assertEntityRequestBodyIs(req_ref)
 
     def test_update_with_project_and_default_project(self, ref=None):
+        self.deprecations.expect_deprecations()
+
         ref = self.new_ref()
         req_ref = ref.copy()
         req_ref.pop('id')
@@ -231,8 +238,8 @@ class UserTests(utils.TestCase, utils.CrudTests):
         new_password = uuid.uuid4().hex
 
         self.stub_url('POST',
-                      [self.collection_key, self.TEST_USER, 'password'])
-        self.client.user_id = self.TEST_USER
+                      [self.collection_key, self.TEST_USER_ID, 'password'])
+        self.client.user_id = self.TEST_USER_ID
         self.manager.update_password(old_password, new_password)
 
         exp_req_body = {
@@ -241,8 +248,9 @@ class UserTests(utils.TestCase, utils.CrudTests):
             }
         }
 
-        self.assertEqual(self.TEST_URL + '/users/test/password',
-                         self.requests_mock.last_request.url)
+        self.assertEqual(
+            '%s/users/%s/password' % (self.TEST_URL, self.TEST_USER_ID),
+            self.requests_mock.last_request.url)
         self.assertRequestBodyIs(json=exp_req_body)
         self.assertNotIn(old_password, self.logger.output)
         self.assertNotIn(new_password, self.logger.output)

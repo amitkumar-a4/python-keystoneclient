@@ -14,8 +14,9 @@
 #    License for the specific language governing permissions and limitations
 #    under the License.
 
+from positional import positional
+
 from keystoneclient import base
-from keystoneclient import utils
 
 
 class Group(base.Resource):
@@ -27,7 +28,8 @@ class Group(base.Resource):
         * description: group description
 
     """
-    @utils.positional(enforcement=utils.positional.WARN)
+
+    @positional(enforcement=positional.WARN)
     def update(self, name=None, description=None):
         kwargs = {
             'name': name if name is not None else self.name,
@@ -47,27 +49,45 @@ class Group(base.Resource):
 
 class GroupManager(base.CrudManager):
     """Manager class for manipulating Identity groups."""
+
     resource_class = Group
     collection_key = 'groups'
     key = 'group'
 
-    @utils.positional(1, enforcement=utils.positional.WARN)
+    @positional(1, enforcement=positional.WARN)
     def create(self, name, domain=None, description=None, **kwargs):
+        """Create a group.
+
+        :param str name: the name of the group.
+        :param domain: the domain of the group.
+        :type domain: str or :class:`keystoneclient.v3.domains.Domain`
+        :param str description: a description of the group.
+        :param kwargs: any other attribute provided will be passed to the
+                       server.
+
+        :returns: the created group returned from server.
+        :rtype: :class:`keystoneclient.v3.groups.Group`
+
+        """
         return super(GroupManager, self).create(
             name=name,
             domain_id=base.getid(domain),
             description=description,
             **kwargs)
 
-    @utils.positional(enforcement=utils.positional.WARN)
+    @positional(enforcement=positional.WARN)
     def list(self, user=None, domain=None, **kwargs):
         """List groups.
 
-        If domain or user is provided, then filter groups with
-        that attribute.
+        :param user: the user of the groups to be filtered on.
+        :type user: str or :class:`keystoneclient.v3.users.User`
+        :param domain: the domain of the groups to be filtered on.
+        :type domain: str or :class:`keystoneclient.v3.domains.Domain`
+        :param kwargs: any other attribute provided will filter groups on.
 
-        If ``**kwargs`` are provided, then filter groups with
-        attributes matching ``**kwargs``.
+        :returns: a list of groups.
+        :rtype: list of :class:`keystoneclient.v3.groups.Group`.
+
         """
         if user:
             base_url = '/users/%s' % base.getid(user)
@@ -79,11 +99,32 @@ class GroupManager(base.CrudManager):
             **kwargs)
 
     def get(self, group):
+        """Retrieve a group.
+
+        :param group: the group to be retrieved from the server.
+        :type group: str or :class:`keystoneclient.v3.groups.Group`
+
+        :returns: the specified group returned from server.
+        :rtype: :class:`keystoneclient.v3.groups.Group`
+
+        """
         return super(GroupManager, self).get(
             group_id=base.getid(group))
 
-    @utils.positional(enforcement=utils.positional.WARN)
+    @positional(enforcement=positional.WARN)
     def update(self, group, name=None, description=None, **kwargs):
+        """Update a group.
+
+        :param group: the group to be updated on the server.
+        :type group: str or :class:`keystoneclient.v3.groups.Group`
+        :param str name: the new name of the group.
+        :param str description: the new description of the group.
+        :param kwargs: any other attribute provided will be passed to server.
+
+        :returns: the updated group returned from server.
+        :rtype: :class:`keystoneclient.v3.groups.Group`
+
+        """
         return super(GroupManager, self).update(
             group_id=base.getid(group),
             name=name,
@@ -91,5 +132,14 @@ class GroupManager(base.CrudManager):
             **kwargs)
 
     def delete(self, group):
+        """Delete a group.
+
+        :param group: the group to be deleted on the server.
+        :type group: str or :class:`keystoneclient.v3.groups.Group`
+
+        :returns: Response object with 204 status.
+        :rtype: :class:`requests.models.Response`
+
+        """
         return super(GroupManager, self).delete(
             group_id=base.getid(group))

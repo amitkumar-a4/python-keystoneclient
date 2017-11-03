@@ -13,7 +13,7 @@
 import datetime
 import uuid
 
-from lxml import etree
+from lxml import etree  # nosec(cjschaef): used to create xml, not parse it
 from oslo_config import cfg
 from six.moves import urllib
 
@@ -72,9 +72,9 @@ class _BaseSAMLPlugin(v3.AuthConstructor):
             cfg.StrOpt('identity-provider', help="Identity Provider's name"),
             cfg.StrOpt('identity-provider-url',
                        help="Identity Provider's URL"),
-            cfg.StrOpt('user-name', dest='username', help='Username',
-                       deprecated_name='username'),
-            cfg.StrOpt('password', help='Password')
+            cfg.StrOpt('username', dest='username', help='Username',
+                       deprecated_name='user-name'),
+            cfg.StrOpt('password', secret=True, help='Password')
         ])
         return options
 
@@ -88,7 +88,7 @@ class Saml2UnscopedTokenAuthMethod(v3.AuthMethod):
 
 
 class Saml2UnscopedToken(_BaseSAMLPlugin):
-    """Implement authentication plugin for SAML2 protocol.
+    r"""Implement authentication plugin for SAML2 protocol.
 
     ECP stands for `Enhanced Client or Proxy` and is a SAML2 extension
     for federated authentication where a transportation layer consists of
@@ -172,7 +172,27 @@ class Saml2UnscopedToken(_BaseSAMLPlugin):
         super(Saml2UnscopedToken, self).__init__(auth_url=auth_url, **kwargs)
         self.identity_provider = identity_provider
         self.identity_provider_url = identity_provider_url
-        self.username, self.password = username, password
+        self._username, self._password = username, password
+
+    @property
+    def username(self):
+        # Override to remove deprecation.
+        return self._username
+
+    @username.setter
+    def username(self, value):
+        # Override to remove deprecation.
+        self._username = value
+
+    @property
+    def password(self):
+        # Override to remove deprecation.
+        return self._password
+
+    @password.setter
+    def password(self, value):
+        # Override to remove deprecation.
+        self._password = value
 
     def _handle_http_ecp_redirect(self, session, response, method, **kwargs):
         if response.status_code not in (self.HTTP_MOVED_TEMPORARILY,
@@ -273,7 +293,6 @@ class Saml2UnscopedToken(_BaseSAMLPlugin):
 
     def _send_idp_saml2_authn_request(self, session):
         """Present modified SAML2 authn assertion from the Service Provider."""
-
         self._prepare_idp_saml2_request(self.saml2_authn_request)
         idp_saml2_authn_request = self.saml2_authn_request
 
@@ -492,7 +511,27 @@ class ADFSUnscopedToken(_BaseSAMLPlugin):
         self.identity_provider = identity_provider
         self.identity_provider_url = identity_provider_url
         self.service_provider_endpoint = service_provider_endpoint
-        self.username, self.password = username, password
+        self._username, self._password = username, password
+
+    @property
+    def username(self):
+        # Override to remove deprecation.
+        return self._username
+
+    @username.setter
+    def username(self, value):
+        # Override to remove deprecation.
+        self._username = value
+
+    @property
+    def password(self):
+        # Override to remove deprecation.
+        return self._password
+
+    @password.setter
+    def password(self, value):
+        # Override to remove deprecation.
+        self._password = value
 
     @classmethod
     def get_options(cls):
@@ -519,7 +558,8 @@ class ADFSUnscopedToken(_BaseSAMLPlugin):
         """
         try:
             return bool(session.cookies)
-        except AttributeError:
+        except AttributeError:  # nosec(cjschaef): fetch cookies from
+            # underylying requests.Session object, or fail trying
             pass
 
         return bool(session.session.cookies)
@@ -540,7 +580,6 @@ class ADFSUnscopedToken(_BaseSAMLPlugin):
         :type fmt: string
 
         """
-
         date_created = datetime.datetime.utcnow()
         date_expires = date_created + datetime.timedelta(
             seconds=self.DEFAULT_ADFS_TOKEN_EXPIRATION)
@@ -552,7 +591,6 @@ class ADFSUnscopedToken(_BaseSAMLPlugin):
         Some values like username or password are inserted in the request.
 
         """
-
         WSS_SECURITY_NAMESPACE = {
             'o': ('http://docs.oasis-open.org/wss/2004/01/oasis-200401-'
                   'wss-wssecurity-secext-1.0.xsd')
@@ -811,7 +849,7 @@ class ADFSUnscopedToken(_BaseSAMLPlugin):
         This is a multistep process::
 
         * Prepare ADFS Request Securty Token -
-        build a etree.XML object filling certain attributes with proper user
+        build an etree.XML object filling certain attributes with proper user
         credentials, created/expires dates (ticket is be valid for 120 seconds
         as currently we don't handle reusing ADFS issued security tokens) .
         Step handled by ``ADFSUnscopedToken._prepare_adfs_request()`` method.
@@ -864,7 +902,6 @@ class Saml2ScopedTokenMethod(v3.TokenMethod):
 
     def get_auth_data(self, session, auth, headers, **kwargs):
         """Build and return request body for token scoping step."""
-
         t = super(Saml2ScopedTokenMethod, self).get_auth_data(
             session, auth, headers, **kwargs)
         _token_method, token = t

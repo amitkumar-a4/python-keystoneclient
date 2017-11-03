@@ -28,7 +28,7 @@ RESPONSE_BODY = '{"hi": "there"}'
 
 def get_client():
     cl = httpclient.HTTPClient(username="username", password="password",
-                               tenant_id="tenant", auth_url="auth_test")
+                               project_id="tenant", auth_url="auth_test")
     return cl
 
 
@@ -39,35 +39,28 @@ def get_authed_client():
     return cl
 
 
-class FakeLog(object):
-    def __init__(self):
-        self.warn_log = str()
-        self.debug_log = str()
-
-    def warn(self, msg=None, *args, **kwargs):
-        self.warn_log = "%s\n%s" % (self.warn_log, (msg % args))
-
-    def debug(self, msg=None, *args, **kwargs):
-        self.debug_log = "%s\n%s" % (self.debug_log, (msg % args))
-
-
 class ClientTest(utils.TestCase):
 
     TEST_URL = 'http://127.0.0.1:5000/hi'
 
     def test_unauthorized_client_requests(self):
-        cl = get_client()
+        # Creating a HTTPClient not using session is deprecated.
+        with self.deprecations.expect_deprecations_here():
+            cl = get_client()
         self.assertRaises(exceptions.AuthorizationFailure, cl.get, '/hi')
         self.assertRaises(exceptions.AuthorizationFailure, cl.post, '/hi')
         self.assertRaises(exceptions.AuthorizationFailure, cl.put, '/hi')
         self.assertRaises(exceptions.AuthorizationFailure, cl.delete, '/hi')
 
     def test_get(self):
-        cl = get_authed_client()
+        # Creating a HTTPClient not using session is deprecated.
+        with self.deprecations.expect_deprecations_here():
+            cl = get_authed_client()
 
         self.stub_url('GET', text=RESPONSE_BODY)
 
-        resp, body = cl.get("/hi")
+        with self.deprecations.expect_deprecations_here():
+            resp, body = cl.get("/hi")
         self.assertEqual(self.requests_mock.last_request.method, 'GET')
         self.assertEqual(self.requests_mock.last_request.url, self.TEST_URL)
 
@@ -78,14 +71,18 @@ class ClientTest(utils.TestCase):
         self.assertEqual(body, {"hi": "there"})
 
     def test_get_error_with_plaintext_resp(self):
-        cl = get_authed_client()
+        # Creating a HTTPClient not using session is deprecated.
+        with self.deprecations.expect_deprecations_here():
+            cl = get_authed_client()
         self.stub_url('GET', status_code=400,
                       text='Some evil plaintext string')
 
         self.assertRaises(exceptions.BadRequest, cl.get, '/hi')
 
     def test_get_error_with_json_resp(self):
-        cl = get_authed_client()
+        # Creating a HTTPClient not using session is deprecated.
+        with self.deprecations.expect_deprecations_here():
+            cl = get_authed_client()
         err_response = {
             "error": {
                 "code": 400,
@@ -96,17 +93,21 @@ class ClientTest(utils.TestCase):
         self.stub_url('GET', status_code=400, json=err_response)
         exc_raised = False
         try:
-            cl.get('/hi')
+            with self.deprecations.expect_deprecations_here():
+                cl.get('/hi')
         except exceptions.BadRequest as exc:
             exc_raised = True
             self.assertEqual(exc.message, "Error message string")
         self.assertTrue(exc_raised, 'Exception not raised.')
 
     def test_post(self):
-        cl = get_authed_client()
+        # Creating a HTTPClient not using session is deprecated.
+        with self.deprecations.expect_deprecations_here():
+            cl = get_authed_client()
 
         self.stub_url('POST')
-        cl.post("/hi", body=[1, 2, 3])
+        with self.deprecations.expect_deprecations_here():
+            cl.post("/hi", body=[1, 2, 3])
 
         self.assertEqual(self.requests_mock.last_request.method, 'POST')
         self.assertEqual(self.requests_mock.last_request.body, '[1, 2, 3]')
@@ -117,13 +118,18 @@ class ClientTest(utils.TestCase):
 
     def test_forwarded_for(self):
         ORIGINAL_IP = "10.100.100.1"
-        cl = httpclient.HTTPClient(username="username", password="password",
-                                   tenant_id="tenant", auth_url="auth_test",
-                                   original_ip=ORIGINAL_IP)
+        # Creating a HTTPClient not using session is deprecated.
+        with self.deprecations.expect_deprecations_here():
+            cl = httpclient.HTTPClient(username="username",
+                                       password="password",
+                                       project_id="tenant",
+                                       auth_url="auth_test",
+                                       original_ip=ORIGINAL_IP)
 
         self.stub_url('GET')
 
-        cl.request(self.TEST_URL, 'GET')
+        with self.deprecations.expect_deprecations_here():
+            cl.request(self.TEST_URL, 'GET')
         forwarded = "for=%s;by=%s" % (ORIGINAL_IP, httpclient.USER_AGENT)
         self.assertRequestHeaderEqual('Forwarded', forwarded)
 
@@ -160,21 +166,24 @@ class BasicRequestTests(utils.TestCase):
         self.addCleanup(self.logger.setLevel, level)
 
     def request(self, method='GET', response='Test Response', status_code=200,
-                url=None, **kwargs):
+                url=None, headers={}, **kwargs):
         if not url:
             url = self.url
 
         self.requests_mock.register_uri(method, url, text=response,
-                                        status_code=status_code)
+                                        status_code=status_code,
+                                        headers=headers)
 
-        return httpclient.request(url, method, **kwargs)
+        with self.deprecations.expect_deprecations_here():
+            return httpclient.request(url, method, headers=headers, **kwargs)
 
     def test_basic_params(self):
         method = 'GET'
         response = 'Test Response'
         status = 200
 
-        self.request(method=method, status_code=status, response=response)
+        self.request(method=method, status_code=status, response=response,
+                     headers={'Content-Type': 'application/json'})
 
         self.assertEqual(self.requests_mock.last_request.method, method)
 
@@ -202,7 +211,8 @@ class BasicRequestTests(utils.TestCase):
 
     def test_body(self):
         data = "BODY DATA"
-        self.request(response=data)
+        self.request(response=data,
+                     headers={'Content-Type': 'application/json'})
         logger_message = self.logger_message.getvalue()
         self.assertThat(logger_message, matchers.Contains('BODY:'))
         self.assertThat(logger_message, matchers.Contains(data))

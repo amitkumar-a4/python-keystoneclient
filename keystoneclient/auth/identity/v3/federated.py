@@ -18,7 +18,7 @@ import six
 from keystoneclient.auth.identity.v3 import base
 from keystoneclient.auth.identity.v3 import token
 
-__all__ = ['FederatedBaseAuth']
+__all__ = ('FederatedBaseAuth',)
 
 
 @six.add_metaclass(abc.ABCMeta)
@@ -27,15 +27,20 @@ class FederatedBaseAuth(base.BaseAuth):
     rescoping_plugin = token.Token
 
     def __init__(self, auth_url, identity_provider, protocol, **kwargs):
-        """Class constructor accepting following parameters:
+        """Class constructor for federated authentication plugins.
+
+        Accepting following parameters:
 
         :param auth_url: URL of the Identity Service
         :type auth_url: string
-        :param identity_provider: name of the Identity Provider the client
+        :param identity_provider: Name of the Identity Provider the client
                                   will authenticate against. This parameter
                                   will be used to build a dynamic URL used to
                                   obtain unscoped OpenStack token.
         :type identity_provider: string
+        :param protocol: Protocol name configured on the keystone service
+                         provider side
+        :type protocol: string
 
         """
         super(FederatedBaseAuth, self).__init__(auth_url=auth_url, **kwargs)
@@ -49,8 +54,12 @@ class FederatedBaseAuth(base.BaseAuth):
         options.extend([
             cfg.StrOpt('identity-provider',
                        help="Identity Provider's name"),
-            cfg.StrOpt('protocol',
-                       help='Protocol for federated plugin'),
+            cfg.StrOpt('protocol', help="Name of the federated protocol used "
+                                        "for federated authentication. Must "
+                                        "match its counterpart name "
+                                        "configured at the keystone service "
+                                        "provider. Typically values would be "
+                                        "'saml2' or 'oidc'.")
         ])
 
         return options
@@ -109,3 +118,4 @@ class FederatedBaseAuth(base.BaseAuth):
     @abc.abstractmethod
     def get_unscoped_auth_ref(self, session, **kwargs):
         """Fetch unscoped federated token."""
+        pass  # pragma: no cover

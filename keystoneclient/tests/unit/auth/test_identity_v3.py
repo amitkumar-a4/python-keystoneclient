@@ -10,8 +10,11 @@
 # License for the specific language governing permissions and limitations
 # under the License.
 
+import argparse
 import copy
 import uuid
+
+import mock
 
 from keystoneclient import access
 from keystoneclient.auth.identity import v3
@@ -114,9 +117,10 @@ class V3IdentityPlugin(utils.TestCase):
     def setUp(self):
         super(V3IdentityPlugin, self).setUp()
 
-        V3_URL = "%sv3" % self.TEST_URL
         self.TEST_DISCOVERY_RESPONSE = {
-            'versions': {'values': [fixture.V3Discovery(V3_URL)]}}
+            'versions': {'values': [fixture.V3Discovery(self.TEST_URL)]}}
+
+        self.deprecations.expect_deprecations()
 
         self.TEST_RESPONSE_DICT = {
             "token": {
@@ -214,7 +218,7 @@ class V3IdentityPlugin(utils.TestCase):
                         username=self.TEST_USER,
                         password=self.TEST_PASS)
         s = session.Session(auth=a)
-        cs = client.Client(session=s, auth_url=self.TEST_URL)
+        cs = client.Client(session=s)
 
         # As a sanity check on the auth_ref, make sure client has the
         # proper user id, that it fetches the right project response
@@ -243,7 +247,7 @@ class V3IdentityPlugin(utils.TestCase):
         self.stub_auth(json=self.TEST_RESPONSE_DICT)
         a = v3.Password(self.TEST_URL, username=self.TEST_USER,
                         password=self.TEST_PASS,
-                        project_id=self.TEST_DOMAIN_ID)
+                        project_id=self.TEST_TENANT_ID)
         s = session.Session(a)
 
         self.assertEqual({'X-Auth-Token': self.TEST_TOKEN},
@@ -253,10 +257,10 @@ class V3IdentityPlugin(utils.TestCase):
                {'methods': ['password'],
                 'password': {'user': {'name': self.TEST_USER,
                                       'password': self.TEST_PASS}}},
-               'scope': {'project': {'id': self.TEST_DOMAIN_ID}}}}
+               'scope': {'project': {'id': self.TEST_TENANT_ID}}}}
         self.assertRequestBodyIs(json=req)
         self.assertEqual(s.auth.auth_ref.auth_token, self.TEST_TOKEN)
-        self.assertEqual(s.auth.auth_ref.project_id, self.TEST_DOMAIN_ID)
+        self.assertEqual(s.auth.auth_ref.project_id, self.TEST_TENANT_ID)
 
     def test_authenticate_with_token(self):
         self.stub_auth(json=self.TEST_RESPONSE_DICT)
@@ -456,10 +460,12 @@ class V3IdentityPlugin(utils.TestCase):
                         password=self.TEST_PASS)
         s = session.Session(auth=a)
 
-        self.assertEqual('token1', s.get_token())
+        with self.deprecations.expect_deprecations_here():
+            self.assertEqual('token1', s.get_token())
         self.assertEqual({'X-Auth-Token': 'token1'}, s.get_auth_headers())
         a.invalidate()
-        self.assertEqual('token2', s.get_token())
+        with self.deprecations.expect_deprecations_here():
+            self.assertEqual('token2', s.get_token())
         self.assertEqual({'X-Auth-Token': 'token2'}, s.get_auth_headers())
 
     def test_doesnt_log_password(self):
@@ -469,7 +475,8 @@ class V3IdentityPlugin(utils.TestCase):
         a = v3.Password(self.TEST_URL, username=self.TEST_USER,
                         password=password)
         s = session.Session(a)
-        self.assertEqual(self.TEST_TOKEN, s.get_token())
+        with self.deprecations.expect_deprecations_here():
+            self.assertEqual(self.TEST_TOKEN, s.get_token())
         self.assertEqual({'X-Auth-Token': self.TEST_TOKEN},
                          s.get_auth_headers())
 
@@ -485,7 +492,7 @@ class V3IdentityPlugin(utils.TestCase):
                         include_catalog=False)
         s = session.Session(auth=a)
 
-        s.get_token()
+        s.get_auth_headers()
 
         auth_url = self.TEST_URL + '/auth/tokens'
         self.assertEqual(auth_url, a.token_url)
@@ -496,3 +503,68 @@ class V3IdentityPlugin(utils.TestCase):
         self.assertIs(v3.AuthMethod, v3_base.AuthMethod)
         self.assertIs(v3.AuthConstructor, v3_base.AuthConstructor)
         self.assertIs(v3.Auth, v3_base.Auth)
+
+    def test_unscoped_request(self):
+        token = fixture.V3Token()
+        self.stub_auth(json=token)
+        password = uuid.uuid4().hex
+
+        a = v3.Password(self.TEST_URL,
+                        user_id=token.user_id,
+                        password=password,
+                        unscoped=True)
+        s = session.Session()
+
+        auth_ref = a.get_access(s)
+
+        with self.deprecations.expect_deprecations_here():
+            self.assertFalse(auth_ref.scoped)
+        body = self.requests_mock.last_request.json()
+
+        ident = body['auth']['identity']
+
+        self.assertEqual(['password'], ident['methods'])
+        self.assertEqual(token.user_id, ident['password']['user']['id'])
+        self.assertEqual(password, ident['password']['user']['password'])
+
+        self.assertEqual({}, body['auth']['scope']['unscoped'])
+
+    def test_unscoped_with_scope_data(self):
+        a = v3.Password(self.TEST_URL,
+                        user_id=uuid.uuid4().hex,
+                        password=uuid.uuid4().hex,
+                        unscoped=True,
+                        project_id=uuid.uuid4().hex)
+
+        s = session.Session()
+
+        self.assertRaises(exceptions.AuthorizationFailure, a.get_auth_ref, s)
+
+    @mock.patch('sys.stdin', autospec=True)
+    def test_prompt_password(self, mock_stdin):
+        parser = argparse.ArgumentParser()
+        v3.Password.register_argparse_arguments(parser)
+
+        username = uuid.uuid4().hex
+        user_domain_id = uuid.uuid4().hex
+        auth_url = uuid.uuid4().hex
+        project_id = uuid.uuid4().hex
+        password = uuid.uuid4().hex
+
+        opts = parser.parse_args(['--os-username', username,
+                                  '--os-auth-url', auth_url,
+                                  '--os-user-domain-id', user_domain_id,
+                                  '--os-project-id', project_id])
+
+        with mock.patch('getpass.getpass') as mock_getpass:
+            mock_getpass.return_value = password
+            mock_stdin.isatty = lambda: True
+
+            plugin = v3.Password.load_from_argparse_arguments(opts)
+
+            self.assertEqual(auth_url, plugin.auth_url)
+            self.assertEqual(username, plugin.auth_methods[0].username)
+            self.assertEqual(project_id, plugin.project_id)
+            self.assertEqual(user_domain_id,
+                             plugin.auth_methods[0].user_domain_id)
+            self.assertEqual(password, plugin.auth_methods[0].password)

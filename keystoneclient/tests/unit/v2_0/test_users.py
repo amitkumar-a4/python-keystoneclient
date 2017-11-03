@@ -17,7 +17,7 @@ from keystoneclient.v2_0 import roles
 from keystoneclient.v2_0 import users
 
 
-class UserTests(utils.TestCase):
+class UserTests(utils.ClientTestCase):
     def setUp(self):
         super(UserTests, self).setUp()
         self.ADMIN_USER_ID = uuid.uuid4().hex
@@ -191,7 +191,6 @@ class UserTests(utils.TestCase):
     def test_update(self):
         req_1 = {
             "user": {
-                "id": self.DEMO_USER_ID,
                 "email": "gabriel@example.com",
                 "name": "gabriel",
             }
@@ -199,20 +198,17 @@ class UserTests(utils.TestCase):
         password = uuid.uuid4().hex
         req_2 = {
             "user": {
-                "id": self.DEMO_USER_ID,
                 "password": password,
             }
         }
         tenant_id = uuid.uuid4().hex
         req_3 = {
             "user": {
-                "id": self.DEMO_USER_ID,
                 "tenantId": tenant_id,
             }
         }
         req_4 = {
             "user": {
-                "id": self.DEMO_USER_ID,
                 "enabled": False,
             }
         }
@@ -252,10 +248,10 @@ class UserTests(utils.TestCase):
         resp_body = {
             'access': {}
         }
-        user_id = uuid.uuid4().hex
-        self.stub_url('PATCH', ['OS-KSCRUD', 'users', user_id], json=resp_body)
+        self.stub_url('PATCH',
+                      ['OS-KSCRUD', 'users', self.TEST_USER_ID],
+                      json=resp_body)
 
-        self.client.user_id = user_id
         self.client.users.update_own_password(old_password, new_password)
         self.assertRequestBodyIs(json=req_body)
         self.assertNotIn(old_password, self.logger.output)

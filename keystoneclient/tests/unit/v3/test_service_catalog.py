@@ -13,6 +13,7 @@
 from keystoneclient import access
 from keystoneclient import exceptions
 from keystoneclient import fixture
+from keystoneclient.tests.unit import utils as test_utils
 from keystoneclient.tests.unit.v3 import client_fixtures
 from keystoneclient.tests.unit.v3 import utils
 
@@ -21,9 +22,9 @@ class ServiceCatalogTest(utils.TestCase):
     def setUp(self):
         super(ServiceCatalogTest, self).setUp()
         self.AUTH_RESPONSE_BODY = client_fixtures.auth_response_body()
-        self.RESPONSE = utils.TestResponse({
-            "headers": client_fixtures.AUTH_RESPONSE_HEADERS
-        })
+        self.RESPONSE = test_utils.test_response(
+            headers=client_fixtures.AUTH_RESPONSE_HEADERS
+        )
 
         self.north_endpoints = {'public':
                                 'http://glance.north.host/glanceapi/public',
@@ -66,16 +67,20 @@ class ServiceCatalogTest(utils.TestCase):
 
     def test_service_catalog_regions(self):
         self.AUTH_RESPONSE_BODY['token']['region_name'] = "North"
-        auth_ref = access.AccessInfo.factory(self.RESPONSE,
-                                             self.AUTH_RESPONSE_BODY)
+        # Setting region_name on the catalog is deprecated.
+        with self.deprecations.expect_deprecations_here():
+            auth_ref = access.AccessInfo.factory(self.RESPONSE,
+                                                 self.AUTH_RESPONSE_BODY)
         sc = auth_ref.service_catalog
 
         url = sc.url_for(service_type='image', endpoint_type='public')
         self.assertEqual(url, "http://glance.north.host/glanceapi/public")
 
         self.AUTH_RESPONSE_BODY['token']['region_name'] = "South"
-        auth_ref = access.AccessInfo.factory(self.RESPONSE,
-                                             self.AUTH_RESPONSE_BODY)
+        # Setting region_name on the catalog is deprecated.
+        with self.deprecations.expect_deprecations_here():
+            auth_ref = access.AccessInfo.factory(self.RESPONSE,
+                                                 self.AUTH_RESPONSE_BODY)
         sc = auth_ref.service_catalog
         url = sc.url_for(service_type='image', endpoint_type='internal')
         self.assertEqual(url, "http://glance.south.host/glanceapi/internal")
@@ -149,7 +154,9 @@ class ServiceCatalogTest(utils.TestCase):
 
     def test_service_catalog_param_overrides_body_region(self):
         self.AUTH_RESPONSE_BODY['token']['region_name'] = "North"
-        auth_ref = access.AccessInfo.factory(None, self.AUTH_RESPONSE_BODY)
+        # Passing region_name to service catalog is deprecated.
+        with self.deprecations.expect_deprecations_here():
+            auth_ref = access.AccessInfo.factory(None, self.AUTH_RESPONSE_BODY)
         sc = auth_ref.service_catalog
 
         url = sc.url_for(service_type='image')

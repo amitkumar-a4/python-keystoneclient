@@ -12,6 +12,9 @@
 
 from oslo_utils import timeutils
 
+from keystoneclient import utils
+
+
 # The set of attributes common between the RevokeEvent
 # and the dictionaries created from the token Data.
 _NAMES = ['trust_id',
@@ -75,11 +78,11 @@ class RevokeEvent(object):
         if self.consumer_id is not None:
             event['OS-OAUTH1:access_token_id'] = self.access_token_id
         if self.expires_at is not None:
-            event['expires_at'] = timeutils.isotime(self.expires_at,
-                                                    subsecond=True)
+            event['expires_at'] = utils.isotime(self.expires_at,
+                                                subsecond=True)
         if self.issued_before is not None:
-            event['issued_before'] = timeutils.isotime(self.issued_before,
-                                                       subsecond=True)
+            event['issued_before'] = utils.isotime(self.issued_before,
+                                                   subsecond=True)
         return event
 
     def key_for_name(self, name):
@@ -91,7 +94,7 @@ def attr_keys(event):
 
 
 class RevokeTree(object):
-    """Fast Revocation Checking Tree Structure
+    """Fast Revocation Checking Tree Structure.
 
     The Tree is an index to quickly match tokens against events.
     Each node is a hashtable of key=value combinations from revocation events.
@@ -104,7 +107,7 @@ class RevokeTree(object):
         self.add_events(revoke_events)
 
     def add_event(self, event):
-        """Updates the tree based on a revocation event.
+        """Update the tree based on a revocation event.
 
         Creates any necessary internal nodes in the tree corresponding to the
         fields of the revocation event.  The leaf node will always be set to
@@ -124,7 +127,7 @@ class RevokeTree(object):
         return event
 
     def remove_event(self, event):
-        """Update the tree based on the removal of a Revocation Event
+        """Update the tree based on the removal of a Revocation Event.
 
         Removes empty nodes from the tree from the leaf back to the root.
 
@@ -155,7 +158,7 @@ class RevokeTree(object):
         return map(self.add_event, revoke_events or [])
 
     def is_revoked(self, token_data):
-        """Check if a token matches the revocation event
+        """Check if a token is revoked.
 
         Compare the values for each level of the tree with the values from
         the token, accounting for attributes that have alternative
@@ -216,8 +219,9 @@ class RevokeTree(object):
             try:
                 if leaf['issued_before'] > token_data['issued_at']:
                     return True
-            except KeyError:
-                pass
+            except KeyError:  # nosec(cjschaef): 'issued_before' or
+                # 'issued_at' key doesn't exist, try next leaf
+                continue
         # If we made it out of the loop then no element in revocation tree
         # corresponds to our token and it is good.
         return False
@@ -229,9 +233,9 @@ def build_token_values_v2(access, default_domain_id):
         'expires_at': timeutils.normalize_time(
             timeutils.parse_isotime(token_data['expires'])),
         'issued_at': timeutils.normalize_time(
-            timeutils.parse_isotime(token_data['issued_at']))}
-
-    token_values['user_id'] = access.get('user', {}).get('id')
+            timeutils.parse_isotime(token_data['issued_at'])),
+        'user_id': access.get('user', {}).get('id')
+    }
 
     project = token_data.get('tenant')
     if project is not None:

@@ -15,19 +15,15 @@
 from __future__ import unicode_literals
 
 import os
+import subprocess
 import sys
+import warnings
 
 import pbr.version
 
 
 sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__),
                 '..', '..')))
-
-# NOTE(blk-u): Path for our Sphinx extension, remove when
-# https://launchpad.net/bugs/1260495 is fixed.
-sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__),
-                '..')))
-
 
 # If extensions (or modules to document with autodoc) are in another directory,
 # add these directories to sys.path here. If the directory is relative to the
@@ -44,10 +40,6 @@ extensions = ['sphinx.ext.autodoc',
               'sphinx.ext.coverage',
               'sphinx.ext.intersphinx',
               'oslosphinx',
-              # NOTE(blk-u): Uncomment the [pbr] section in setup.cfg and
-              # remove this Sphinx extension when
-              # https://launchpad.net/bugs/1260495 is fixed.
-              'ext.apidoc',
              ]
 
 todo_include_todos = True
@@ -113,15 +105,12 @@ add_module_names = True
 pygments_style = 'sphinx'
 
 # A list of ignored prefixes for module index sorting.
-#modindex_common_prefix = []
+modindex_common_prefix = ['keystoneclient.']
 
 # Grouping the document tree for man pages.
 # List of tuples 'sourcefile', 'target', 'title', 'Authors name', 'manual'
 
-man_pages = [
-    ('man/keystone', 'keystone', 'Client for OpenStack Identity API',
-     ['OpenStack Contributors'], 1),
-]
+#man_pages = []
 
 # -- Options for HTML output --------------------------------------------------
 
@@ -161,8 +150,14 @@ man_pages = [
 
 # If not '', a 'Last updated on:' timestamp is inserted at every page bottom,
 # using the given strftime format.
-git_cmd = "git log --pretty=format:'%ad, commit %h' --date=local -n1"
-html_last_updated_fmt = os.popen(git_cmd).read()
+git_cmd = ["git", "log", "--pretty=format:'%ad, commit %h'", "--date=local",
+           "-n1"]
+try:
+    html_last_updated_fmt = subprocess.Popen(git_cmd,
+                                     stdout=subprocess.PIPE).communicate()[0]
+except Exception:
+    warnings.warn('Cannot get last updated time from git repository. '
+                  'Not setting "html_last_updated_fmt".')
 
 # If true, SmartyPants will be used to convert quotes and dashes to
 # typographically correct entities.
@@ -234,7 +229,9 @@ latex_documents = [
 # If false, no module index is generated.
 #latex_use_modindex = True
 
+keystoneauth_url = 'http://docs.openstack.org/developer/keystoneauth/'
 intersphinx_mapping = {
     'python': ('http://docs.python.org/', None),
     'osloconfig': ('http://docs.openstack.org/developer/oslo.config/', None),
+    'keystoneauth1': (keystoneauth_url, None),
 }

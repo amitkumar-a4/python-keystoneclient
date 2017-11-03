@@ -10,9 +10,10 @@
 # License for the specific language governing permissions and limitations
 # under the License.
 
-from oslo_serialization import jsonutils
+import warnings
 
-from keystoneclient import utils
+from oslo_serialization import jsonutils
+from positional import positional
 
 
 class Adapter(object):
@@ -45,11 +46,16 @@ class Adapter(object):
     :type logger: logging.Logger
     """
 
-    @utils.positional()
+    @positional()
     def __init__(self, session, service_type=None, service_name=None,
                  interface=None, region_name=None, endpoint_override=None,
                  version=None, auth=None, user_agent=None,
                  connect_retries=None, logger=None):
+        warnings.warn(
+            'keystoneclient.adapter.Adapter is deprecated as of the 2.1.0 '
+            'release in favor of keystoneauth1.adapter.Adapter. It will be '
+            'removed in future releases.', DeprecationWarning)
+
         # NOTE(jamielennox): when adding new parameters to adapter please also
         # add them to the adapter call in httpclient.HTTPClient.__init__
         self.session = session
@@ -200,7 +206,8 @@ class LegacyJsonAdapter(Adapter):
 
         try:
             kwargs['json'] = kwargs.pop('body')
-        except KeyError:
+        except KeyError:  # nosec(cjschaef): kwargs doesn't contain a 'body'
+            # key, while 'json' is an optional argument for Session.request
             pass
 
         resp = super(LegacyJsonAdapter, self).request(*args, **kwargs)
@@ -209,7 +216,8 @@ class LegacyJsonAdapter(Adapter):
         if resp.text:
             try:
                 body = jsonutils.loads(resp.text)
-            except ValueError:
+            except ValueError:  # nosec(cjschaef): return None for body as
+                # expected
                 pass
 
         return resp, body

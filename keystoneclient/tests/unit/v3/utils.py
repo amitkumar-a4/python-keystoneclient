@@ -15,15 +15,12 @@ import uuid
 import six
 from six.moves.urllib import parse as urlparse
 
+from keystoneclient.tests.unit import client_fixtures
 from keystoneclient.tests.unit import utils
-from keystoneclient.v3 import client
-
-
-TestResponse = utils.TestResponse
 
 
 def parameterize(ref):
-    """Rewrites attributes to match the kwarg naming convention in client.
+    """Rewrite attributes to match the kwarg naming convention in client.
 
     >>> parameterize({'project_id': 0})
     {'project': 0}
@@ -127,15 +124,8 @@ class TestCase(UnauthenticatedTestCase):
         "type": "object-store"
     }]
 
-    def setUp(self):
-        super(TestCase, self).setUp()
-        self.client = client.Client(username=self.TEST_USER,
-                                    token=self.TEST_TOKEN,
-                                    tenant_name=self.TEST_TENANT_NAME,
-                                    auth_url=self.TEST_URL,
-                                    endpoint=self.TEST_URL)
-
     def stub_auth(self, subject_token=None, **kwargs):
+
         if not subject_token:
             subject_token = self.TEST_TOKEN
 
@@ -150,6 +140,44 @@ class TestCase(UnauthenticatedTestCase):
                 headers['X-Subject-Token'] = subject_token
 
         self.stub_url('POST', ['auth', 'tokens'], **kwargs)
+
+
+class ClientTestCase(utils.ClientTestCaseMixin, TestCase):
+
+    ORIGINAL_CLIENT_TYPE = 'original'
+    KSC_SESSION_CLIENT_TYPE = 'ksc-session'
+    KSA_SESSION_CLIENT_TYPE = 'ksa-session'
+
+    scenarios = [
+        (
+            ORIGINAL_CLIENT_TYPE, {
+                'client_fixture_class': client_fixtures.OriginalV3,
+                'client_type': ORIGINAL_CLIENT_TYPE
+            }
+        ),
+        (
+            KSC_SESSION_CLIENT_TYPE, {
+                'client_fixture_class': client_fixtures.KscSessionV3,
+                'client_type': KSC_SESSION_CLIENT_TYPE
+            }
+        ),
+        (
+            KSA_SESSION_CLIENT_TYPE, {
+                'client_fixture_class': client_fixtures.KsaSessionV3,
+                'client_type': KSA_SESSION_CLIENT_TYPE
+            }
+        )
+
+    ]
+
+    @property
+    def is_original_client(self):
+        return self.client_type == self.ORIGINAL_CLIENT_TYPE
+
+    @property
+    def is_session_client(self):
+        return self.client_type in (self.KSC_SESSION_CLIENT_TYPE,
+                                    self.KSA_SESSION_CLIENT_TYPE)
 
 
 class CrudTests(object):
@@ -244,6 +272,20 @@ class CrudTests(object):
                 expected_path = 'v3/%s' % self.collection_key
 
         return expected_path
+
+    def test_list_by_id(self, ref=None, **filter_kwargs):
+        """Test ``entities.list(id=x)`` being rewritten as ``GET /v3/entities/x``.
+
+        This tests an edge case of each manager's list() implementation, to
+        ensure that it "does the right thing" when users call ``.list()``
+        when they should have used ``.get()``.
+
+        """
+        if 'id' not in filter_kwargs:
+            ref = ref or self.new_ref()
+            filter_kwargs['id'] = ref['id']
+
+        self.assertRaises(TypeError, self.manager.list, **filter_kwargs)
 
     def test_list(self, ref_list=None, expected_path=None,
                   expected_query=None, **filter_kwargs):

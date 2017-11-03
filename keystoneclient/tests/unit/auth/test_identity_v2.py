@@ -10,8 +10,11 @@
 # License for the specific language governing permissions and limitations
 # under the License.
 
+import argparse
 import copy
 import uuid
+
+import mock
 
 from keystoneclient.auth.identity import v2
 from keystoneclient import exceptions
@@ -77,6 +80,7 @@ class V2IdentityPlugin(utils.TestCase):
 
     def setUp(self):
         super(V2IdentityPlugin, self).setUp()
+        self.deprecations.expect_deprecations()
         self.TEST_RESPONSE_DICT = {
             "access": {
                 "token": {
@@ -272,11 +276,13 @@ class V2IdentityPlugin(utils.TestCase):
                         password=self.TEST_PASS)
         s = session.Session(auth=a)
 
-        self.assertEqual('token1', s.get_token())
+        with self.deprecations.expect_deprecations_here():
+            self.assertEqual('token1', s.get_token())
         self.assertEqual({'X-Auth-Token': 'token1'}, s.get_auth_headers())
 
         a.invalidate()
-        self.assertEqual('token2', s.get_token())
+        with self.deprecations.expect_deprecations_here():
+            self.assertEqual('token2', s.get_token())
         self.assertEqual({'X-Auth-Token': 'token2'}, s.get_auth_headers())
 
     def test_doesnt_log_password(self):
@@ -286,7 +292,8 @@ class V2IdentityPlugin(utils.TestCase):
         a = v2.Password(self.TEST_URL, username=self.TEST_USER,
                         password=password)
         s = session.Session(auth=a)
-        self.assertEqual(self.TEST_TOKEN, s.get_token())
+        with self.deprecations.expect_deprecations_here():
+            self.assertEqual(self.TEST_TOKEN, s.get_token())
         self.assertEqual({'X-Auth-Token': self.TEST_TOKEN},
                          s.get_auth_headers())
         self.assertNotIn(password, self.logger.output)
@@ -294,3 +301,28 @@ class V2IdentityPlugin(utils.TestCase):
     def test_password_with_no_user_id_or_name(self):
         self.assertRaises(TypeError,
                           v2.Password, self.TEST_URL, password=self.TEST_PASS)
+
+    @mock.patch('sys.stdin', autospec=True)
+    def test_prompt_password(self, mock_stdin):
+        parser = argparse.ArgumentParser()
+        v2.Password.register_argparse_arguments(parser)
+
+        username = uuid.uuid4().hex
+        auth_url = uuid.uuid4().hex
+        tenant_id = uuid.uuid4().hex
+        password = uuid.uuid4().hex
+
+        opts = parser.parse_args(['--os-username', username,
+                                  '--os-auth-url', auth_url,
+                                  '--os-tenant-id', tenant_id])
+
+        with mock.patch('getpass.getpass') as mock_getpass:
+            mock_getpass.return_value = password
+            mock_stdin.isatty = lambda: True
+
+            plugin = v2.Password.load_from_argparse_arguments(opts)
+
+            self.assertEqual(auth_url, plugin.auth_url)
+            self.assertEqual(username, plugin.username)
+            self.assertEqual(tenant_id, plugin.tenant_id)
+            self.assertEqual(password, plugin.password)

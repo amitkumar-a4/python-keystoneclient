@@ -10,10 +10,8 @@
 # License for the specific language governing permissions and limitations
 # under the License.
 
+from keystoneclient.tests.unit import client_fixtures
 from keystoneclient.tests.unit import utils
-from keystoneclient.v2_0 import client
-
-TestResponse = utils.TestResponse
 
 
 class UnauthenticatedTestCase(utils.TestCase):
@@ -76,13 +74,17 @@ class TestCase(UnauthenticatedTestCase):
         "name": "swift"
     }]
 
-    def setUp(self):
-        super(TestCase, self).setUp()
-        self.client = client.Client(username=self.TEST_USER,
-                                    token=self.TEST_TOKEN,
-                                    tenant_name=self.TEST_TENANT_NAME,
-                                    auth_url=self.TEST_URL,
-                                    endpoint=self.TEST_URL)
-
     def stub_auth(self, **kwargs):
         self.stub_url('POST', ['tokens'], **kwargs)
+
+
+class ClientTestCase(utils.ClientTestCaseMixin, TestCase):
+
+    scenarios = [
+        ('original',
+         {'client_fixture_class': client_fixtures.OriginalV2}),
+        ('ksc-session',
+         {'client_fixture_class': client_fixtures.KscSessionV2}),
+        ('ksa-session',
+         {'client_fixture_class': client_fixtures.KsaSessionV2}),
+    ]

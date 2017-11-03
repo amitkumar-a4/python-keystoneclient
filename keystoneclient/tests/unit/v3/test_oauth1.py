@@ -14,7 +14,6 @@
 import uuid
 
 import mock
-from oslo_utils import timeutils
 import six
 from six.moves.urllib import parse as urlparse
 from testtools import matchers
@@ -22,6 +21,7 @@ from testtools import matchers
 from keystoneclient import session
 from keystoneclient.tests.unit.v3 import client_fixtures
 from keystoneclient.tests.unit.v3 import utils
+from keystoneclient import utils as client_utils
 from keystoneclient.v3.contrib.oauth1 import access_tokens
 from keystoneclient.v3.contrib.oauth1 import auth
 from keystoneclient.v3.contrib.oauth1 import consumers
@@ -33,15 +33,11 @@ except ImportError:
     oauth1 = None
 
 
-class BaseTest(utils.TestCase):
+class ConsumerTests(utils.ClientTestCase, utils.CrudTests):
     def setUp(self):
-        super(BaseTest, self).setUp()
         if oauth1 is None:
             self.skipTest('oauthlib package not available')
 
-
-class ConsumerTests(BaseTest, utils.CrudTests):
-    def setUp(self):
         super(ConsumerTests, self).setUp()
         self.key = 'consumer'
         self.collection_key = 'consumers'
@@ -79,7 +75,7 @@ class ConsumerTests(BaseTest, utils.CrudTests):
         self.assertEqual(consumer_id, consumer.id)
 
 
-class TokenTests(BaseTest):
+class TokenTests(object):
     def _new_oauth_token(self):
         key = uuid.uuid4().hex
         secret = uuid.uuid4().hex
@@ -89,7 +85,7 @@ class TokenTests(BaseTest):
 
     def _new_oauth_token_with_expires_at(self):
         key, secret, token = self._new_oauth_token()
-        expires_at = timeutils.strtime()
+        expires_at = client_utils.strtime()
         params = {'oauth_token': key,
                   'oauth_token_secret': secret,
                   'oauth_expires_at': expires_at}
@@ -97,10 +93,11 @@ class TokenTests(BaseTest):
         return (key, secret, expires_at, token)
 
     def _validate_oauth_headers(self, auth_header, oauth_client):
-        """Assert that the data in the headers matches the data
+        """Validate data in the headers.
+
+        Assert that the data in the headers matches the data
         that is produced from oauthlib.
         """
-
         self.assertThat(auth_header, matchers.StartsWith('OAuth '))
         parameters = dict(
             oauth1.rfc5849.utils.parse_authorization_header(auth_header))
@@ -122,8 +119,11 @@ class TokenTests(BaseTest):
         return parameters
 
 
-class RequestTokenTests(TokenTests):
+class RequestTokenTests(utils.ClientTestCase, TokenTests):
     def setUp(self):
+        if oauth1 is None:
+            self.skipTest('oauthlib package not available')
+
         super(RequestTokenTests, self).setUp()
         self.model = request_tokens.RequestToken
         self.manager = self.client.oauth1.request_tokens
@@ -181,8 +181,11 @@ class RequestTokenTests(TokenTests):
                                      oauth_client)
 
 
-class AccessTokenTests(TokenTests):
+class AccessTokenTests(utils.ClientTestCase, TokenTests):
     def setUp(self):
+        if oauth1 is None:
+            self.skipTest('oauthlib package not available')
+
         super(AccessTokenTests, self).setUp()
         self.manager = self.client.oauth1.access_tokens
         self.model = access_tokens.AccessToken
@@ -223,7 +226,7 @@ class AccessTokenTests(TokenTests):
                                      oauth_client)
 
 
-class AuthenticateWithOAuthTests(TokenTests):
+class AuthenticateWithOAuthTests(utils.TestCase, TokenTests):
     def setUp(self):
         super(AuthenticateWithOAuthTests, self).setUp()
         if oauth1 is None:
@@ -243,12 +246,13 @@ class AuthenticateWithOAuthTests(TokenTests):
                                     "access_token_id": access_key}
         self.stub_auth(json=oauth_token)
 
-        a = auth.OAuth(self.TEST_URL, consumer_key=consumer_key,
-                       consumer_secret=consumer_secret,
-                       access_key=access_key,
-                       access_secret=access_secret)
-        s = session.Session(auth=a)
-        t = s.get_token()
+        with self.deprecations.expect_deprecations_here():
+            a = auth.OAuth(self.TEST_URL, consumer_key=consumer_key,
+                           consumer_secret=consumer_secret,
+                           access_key=access_key,
+                           access_secret=access_secret)
+            s = session.Session(auth=a)
+            t = s.get_token()
         self.assertEqual(self.TEST_TOKEN, t)
 
         OAUTH_REQUEST_BODY = {

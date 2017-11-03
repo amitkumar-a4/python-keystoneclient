@@ -11,20 +11,21 @@
 # under the License.
 
 import abc
+import json
 import logging
 
 from oslo_config import cfg
+from positional import positional
 import six
 
 from keystoneclient import access
 from keystoneclient.auth.identity import base
 from keystoneclient import exceptions
 from keystoneclient.i18n import _
-from keystoneclient import utils
 
 _logger = logging.getLogger(__name__)
 
-__all__ = ['Auth', 'AuthMethod', 'AuthConstructor', 'BaseAuth']
+__all__ = ('Auth', 'AuthMethod', 'AuthConstructor', 'BaseAuth')
 
 
 @six.add_metaclass(abc.ABCMeta)
@@ -46,7 +47,7 @@ class BaseAuth(base.BaseIdentityPlugin):
                                  token. (optional) default True.
     """
 
-    @utils.positional()
+    @positional()
     def __init__(self, auth_url,
                  trust_id=None,
                  domain_id=None,
@@ -59,7 +60,7 @@ class BaseAuth(base.BaseIdentityPlugin):
                  include_catalog=True):
         super(BaseAuth, self).__init__(auth_url=auth_url,
                                        reauthenticate=reauthenticate)
-        self.trust_id = trust_id
+        self._trust_id = trust_id
         self.domain_id = domain_id
         self.domain_name = domain_name
         self.project_id = project_id
@@ -69,13 +70,23 @@ class BaseAuth(base.BaseIdentityPlugin):
         self.include_catalog = include_catalog
 
     @property
+    def trust_id(self):
+        # Override to remove deprecation.
+        return self._trust_id
+
+    @trust_id.setter
+    def trust_id(self, value):
+        # Override to remove deprecation.
+        self._trust_id = value
+
+    @property
     def token_url(self):
         """The full URL where we will send authentication data."""
         return '%s/auth/tokens' % self.auth_url.rstrip('/')
 
     @abc.abstractmethod
     def get_auth_ref(self, session, **kwargs):
-        return None
+        return None  # pragma: no cover
 
     @classmethod
     def get_options(cls):
@@ -112,9 +123,13 @@ class Auth(BaseAuth):
                                 is going to expire. (optional) default True
     :param bool include_catalog: Include the service catalog in the returned
                                  token. (optional) default True.
+    :param bool unscoped: Force the return of an unscoped token. This will make
+                          the keystone server return an unscoped token even if
+                          a default_project_id is set for this user.
     """
 
     def __init__(self, auth_url, auth_methods, **kwargs):
+        self.unscoped = kwargs.pop('unscoped', False)
         super(Auth, self).__init__(auth_url=auth_url, **kwargs)
         self.auth_methods = auth_methods
 
@@ -138,12 +153,13 @@ class Auth(BaseAuth):
 
         mutual_exclusion = [bool(self.domain_id or self.domain_name),
                             bool(self.project_id or self.project_name),
-                            bool(self.trust_id)]
+                            bool(self.trust_id),
+                            bool(self.unscoped)]
 
         if sum(mutual_exclusion) > 1:
             raise exceptions.AuthorizationFailure(
                 _('Authentication cannot be scoped to multiple targets. Pick '
-                  'one of: project, domain or trust'))
+                  'one of: project, domain, trust or unscoped'))
 
         if self.domain_id:
             body['auth']['scope'] = {'domain': {'id': self.domain_id}}
@@ -161,6 +177,8 @@ class Auth(BaseAuth):
                 scope['project']['domain'] = {'name': self.project_domain_name}
         elif self.trust_id:
             body['auth']['scope'] = {'OS-TRUST:trust': {'id': self.trust_id}}
+        elif self.unscoped:
+            body['auth']['scope'] = {'unscoped': {}}
 
         # NOTE(jamielennox): we add nocatalog here rather than in token_url
         # directly as some federation plugins require the base token_url
@@ -173,6 +191,7 @@ class Auth(BaseAuth):
                             authenticated=False, log=False, **rkwargs)
 
         try:
+            _logger.debug(json.dumps(resp.json()))
             resp_data = resp.json()['token']
         except (KeyError, ValueError):
             raise exceptions.InvalidResponse(response=resp)
@@ -201,7 +220,7 @@ class AuthMethod(object):
             setattr(self, param, kwargs.pop(param, None))
 
         if kwargs:
-            msg = _("Unexpected Attributes: %s") % ", ".join(kwargs.keys())
+            msg = _("Unexpected Attributes: %s") % ", ".join(kwargs)
             raise AttributeError(msg)
 
     @classmethod
@@ -223,12 +242,15 @@ class AuthMethod(object):
                  data for the auth type.
         :rtype: tuple(string, dict)
         """
+        pass  # pragma: no cover
 
 
 @six.add_metaclass(abc.ABCMeta)
 class AuthConstructor(Auth):
-    """AuthConstructor is a means of creating an Auth Plugin that contains
-    only one authentication method. This is generally the required usage.
+    """Abstract base class for creating an Auth Plugin.
+
+    The Auth Plugin created contains only one authentication method. This
+    is generally the required usage.
 
     An AuthConstructor creates an AuthMethod based on the method's
     arguments and the auth_method_class defined by the plugin. It then
