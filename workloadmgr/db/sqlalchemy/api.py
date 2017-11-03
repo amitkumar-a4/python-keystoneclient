@@ -11,6 +11,8 @@ import uuid
 import warnings
 import threading
 
+from oslo_config import cfg
+
 import sqlalchemy
 import sqlalchemy.orm as sa_orm
 import sqlalchemy.sql as sa_sql
@@ -34,6 +36,7 @@ from workloadmgr.openstack.common import timeutils
 from workloadmgr.openstack.common import uuidutils
 from workloadmgr.apscheduler import job
 from workloadmgr.vault import vault
+from workloadmgr.virt import qemuimages
 from workloadmgr.openstack.common.gettextutils import _
 
 FLAGS = flags.FLAGS
@@ -41,6 +44,8 @@ FLAGS = flags.FLAGS
 LOG = logging.getLogger(__name__)
 
 lock = threading.Lock()
+
+CONF = cfg.CONF
 
 
 def is_admin_context(context):
@@ -121,6 +126,7 @@ def require_context(f):
         return f(*args, **kwargs)
     return wrapper
 
+
 def model_query(context, *args, **kwargs):
     """Query helper that accounts for context's `read_deleted` field.
 
@@ -131,8 +137,8 @@ def model_query(context, *args, **kwargs):
             query to match the context's project_id.
     """
     session = kwargs.get('session') or get_session()
-    read_deleted = kwargs.get('read_deleted') 
-    if read_deleted == None and context != None:
+    read_deleted = kwargs.get('read_deleted')
+    if read_deleted is None and context is not None:
         read_deleted = context.read_deleted
     project_only = kwargs.get('project_only')
 
@@ -144,13 +150,15 @@ def model_query(context, *args, **kwargs):
     elif read_deleted == 'only':
         query = query.filter_by(deleted=True)
     else:
-        raise Exception(_("Unrecognized read_deleted value '%s'") % read_deleted)
+        raise Exception(
+            _("Unrecognized read_deleted value '%s'") %
+            read_deleted)
     if context:
-        if project_only and is_user_context(context):
+        if project_only and project_only == 'yes' and is_user_context(context):
             query = query.filter_by(project_id=context.project_id)
-        elif project_only:
-             query = query.filter_by(project_id=context.project_id)
-    if 'get_hidden' in kwargs:     
+        elif project_only and project_only == 'yes':
+            query = query.filter_by(project_id=context.project_id)
+    if 'get_hidden' in kwargs:
         if kwargs.get('get_hidden', False) == False:
             query = query.filter_by(hidden=False)
 
@@ -209,10 +217,12 @@ def service_delete(context, service_id):
         service_ref = _service_get(context, service_id, session=session)
         service_ref.delete(session=session)
 
+
 @require_admin_context
 def service_get(context, service_id):
     session = get_session()
     return _service_get(context, service_id, session)
+
 
 @require_admin_context
 def _service_get(context, service_id, session):
@@ -323,23 +333,28 @@ def service_update(context, service_id, values):
 
 @require_context
 def file_search_get_all(context, **kwargs):
-    status = kwargs.get('status',None)
-    time_in_minutes = kwargs.get('time_in_minutes',None)
+    status = kwargs.get('status', None)
+    time_in_minutes = kwargs.get('time_in_minutes', None)
     host = kwargs.get('host', None)
     vm_id = kwargs.get('vm_id', None)
-    query =  model_query(context, models.FileSearch, **kwargs)
+    query = model_query(context, models.FileSearch, **kwargs)
     query = query.filter_by(project_id=context.project_id)
     if time_in_minutes is not None:
-       now = timeutils.utcnow()
-       minutes_ago = now - timedelta(minutes=int(time_in_minutes))
-       query = query.filter(models.FileSearch.created_at < minutes_ago)
+        now = timeutils.utcnow()
+        minutes_ago = now - timedelta(minutes=int(time_in_minutes))
+        query = query.filter(models.FileSearch.created_at < minutes_ago)
     if vm_id is not None:
-       query = query.filter_by(vm_id=vm_id)
+        query = query.filter_by(vm_id=vm_id)
     if host is not None:
-       query = query.filter(or_(models.FileSearch.host == host, models.FileSearch.host == None))
+        query = query.filter(or_(models.FileSearch.host ==
+                                 host, models.FileSearch.host is None))
     if status is not None:
-       query = query.filter(and_(models.FileSearch.status != status, models.FileSearch.status != 'error'))
-    return query.all()   
+        query = query.filter(
+            and_(
+                models.FileSearch.status != status,
+                models.FileSearch.status != 'error'))
+    return query.all()
+
 
 @require_context
 def file_search_delete(context, search_id):
@@ -348,10 +363,12 @@ def file_search_delete(context, search_id):
         ref = _file_search_get(context, search_id, session=session)
         session.delete(ref)
 
+
 @require_context
 def file_search_get(context, search_id):
     session = get_session()
     return _file_search_get(context, search_id, session)
+
 
 @require_context
 def _file_search_get(context, search_id, session):
@@ -367,6 +384,7 @@ def _file_search_get(context, search_id, session):
 
     return result
 
+
 @require_context
 def file_search_create(context, values):
     session = get_session()
@@ -374,6 +392,7 @@ def file_search_create(context, values):
     ref.update(values)
     ref.save()
     return ref
+
 
 @require_context
 def file_search_update(context, search_id, values):
@@ -383,8 +402,11 @@ def file_search_update(context, search_id, values):
         ref.update(values)
         ref.save(session=session)
 
+
 #### Work load Types #################
 """ workload_type functions """
+
+
 @require_context
 def _set_metadata_for_workload_type(context, workload_type_ref, metadata,
                                     purge_metadata, session):
@@ -406,7 +428,8 @@ def _set_metadata_for_workload_type(context, workload_type_ref, metadata,
                            'value': value}
         if key in orig_metadata:
             metadata_ref = orig_metadata[key]
-            _workload_type_metadata_update(context, metadata_ref, metadata_values, session)
+            _workload_type_metadata_update(
+                context, metadata_ref, metadata_values, session)
         else:
             _workload_type_metadata_create(context, metadata_values, session)
 
@@ -416,19 +439,23 @@ def _set_metadata_for_workload_type(context, workload_type_ref, metadata,
                 metadata_ref = orig_metadata[key]
                 _workload_type_metadata_delete(context, metadata_ref, session)
 
+
 @require_context
 def _workload_type_metadata_create(context, values, session):
     """Create an WorkloadTypeMetadata object"""
     metadata_ref = models.WorkloadTypeMetadata()
     if not values.get('id'):
-        values['id'] = str(uuid.uuid4())    
-    return _workload_type_metadata_update(context, metadata_ref, values, session)
+        values['id'] = str(uuid.uuid4())
+    return _workload_type_metadata_update(
+        context, metadata_ref, values, session)
+
 
 @require_context
 def workload_type_metadata_create(context, values):
     """Create an WorkloadTypeMetadata object"""
     session = get_session()
     return _workload_type_metadata_create(context, values, session)
+
 
 @require_context
 def _workload_type_metadata_update(context, metadata_ref, values, session):
@@ -440,6 +467,7 @@ def _workload_type_metadata_update(context, metadata_ref, values, session):
     metadata_ref.save(session=session)
     return metadata_ref
 
+
 @require_context
 def _workload_type_metadata_delete(context, metadata_ref, session):
     """
@@ -447,23 +475,32 @@ def _workload_type_metadata_delete(context, metadata_ref, session):
     """
     metadata_ref.delete(session=session)
     return metadata_ref
+
+
 @require_context
-def _workload_type_update(context, values, workload_type_id, purge_metadata, session):
-    
+def _workload_type_update(
+        context, values, workload_type_id, purge_metadata, session):
+
     metadata = values.pop('metadata', {})
-    
+
     if workload_type_id:
-        workload_type_ref = workload_type_get(context, workload_type_id, session)
+        workload_type_ref = workload_type_get(
+            context, workload_type_id, session)
     else:
         workload_type_ref = models.WorkloadTypes()
         if not values.get('id'):
-            values['id'] = str(uuid.uuid4())        
-    
+            values['id'] = str(uuid.uuid4())
+
     workload_type_ref.update(values)
     workload_type_ref.save(session)
-    
-    _set_metadata_for_workload_type(context, workload_type_ref, metadata, purge_metadata, session)  
-      
+
+    _set_metadata_for_workload_type(
+        context,
+        workload_type_ref,
+        metadata,
+        purge_metadata,
+        session)
+
     return workload_type_ref
 
 
@@ -472,60 +509,75 @@ def workload_type_create(context, values):
     session = get_session()
     return _workload_type_update(context, values, None, False, session)
 
+
 @require_context
 def workload_type_update(context, id, values, purge_metadata=False):
     session = get_session()
     return _workload_type_update(context, values, id, purge_metadata, session)
 
+
 @require_context
 def workload_types_get(context):
     session = get_session()
     try:
-        query = model_query(context, models.WorkloadTypes, session=session,
-                            read_deleted="no")\
-                       .options(sa_orm.joinedload(models.WorkloadTypes.metadata))\
-                       .filter((models.WorkloadTypes.project_id == context.project_id) | (models.WorkloadTypes.is_public == True))
+        query = model_query(
+            context,
+            models.WorkloadTypes,
+            session=session,
+            read_deleted="no") .options(
+            sa_orm.joinedload(
+                models.WorkloadTypes.metadata)) .filter(
+                (models.WorkloadTypes.project_id == context.project_id) | (
+                    models.WorkloadTypes.is_public))
 
-        #TODO(gbasava): filter out deleted workload_types if context disallows it
+        # TODO(gbasava): filter out deleted workload_types if context disallows
+        # it
         workload_types = query.all()
 
     except sa_orm.exc.NoResultFound:
         raise exception.WorkloadTypesNotFound()
-    
+
     return workload_types
+
 
 @require_context
 def workload_type_get(context, id):
     session = get_session()
     try:
-        query = session.query(models.WorkloadTypes)\
-                       .options(sa_orm.joinedload(models.WorkloadTypes.metadata))\
-                       .filter_by(id=id)
+        query = session.query(
+            models.WorkloadTypes) .options(
+            sa_orm.joinedload(
+                models.WorkloadTypes.metadata)) .filter_by(
+                id=id)
 
-        #TODO(gbasava): filter out deleted workload_types if context disallows it
+        # TODO(gbasava): filter out deleted workload_types if context disallows
+        # it
         workload_types = query.first()
 
     except sa_orm.exc.NoResultFound:
-        raise exception.WorkloadTypeNotFound(workload_type_id = id)
+        raise exception.WorkloadTypeNotFound(workload_type_id=id)
 
     if workload_types is None:
-        raise exception.WorkloadTypeNotFound(workload_type_id = id)
+        raise exception.WorkloadTypeNotFound(workload_type_id=id)
 
     return workload_types
+
 
 @require_context
 def workload_type_delete(context, id):
     session = get_session()
     with session.begin():
         session.query(models.WorkloadTypes).\
-                filter_by(id=id).\
-                update({'status': 'deleted',
-                        'deleted': True,
-                        'deleted_at': timeutils.utcnow(),
-                        'updated_at': literal_column('updated_at')})
+            filter_by(id=id).\
+            update({'status': 'deleted',
+                    'deleted': True,
+                    'deleted_at': timeutils.utcnow(),
+                    'updated_at': literal_column('updated_at')})
+
 
 #### Workloads ################################################################
 """ workload functions """
+
 
 def _set_metadata_for_workload(context, workload_ref, metadata,
                                purge_metadata, session):
@@ -547,7 +599,8 @@ def _set_metadata_for_workload(context, workload_ref, metadata,
                            'value': value}
         if key in orig_metadata:
             metadata_ref = orig_metadata[key]
-            _workload_metadata_update(context, metadata_ref, metadata_values, session)
+            _workload_metadata_update(
+                context, metadata_ref, metadata_values, session)
         else:
             _workload_metadata_create(context, metadata_values, session)
 
@@ -555,21 +608,25 @@ def _set_metadata_for_workload(context, workload_ref, metadata,
         for key in orig_metadata.keys():
             if key not in metadata:
                 metadata_ref = orig_metadata[key]
-                _workload_metadata_delete(context, metadata_ref, session=session)
+                _workload_metadata_delete(
+                    context, metadata_ref, session=session)
+
 
 @require_context
 def _workload_metadata_create(context, values, session):
     """Create an WorkloadMetadata object"""
     metadata_ref = models.WorkloadMetadata()
     if not values.get('id'):
-        values['id'] = str(uuid.uuid4())    
+        values['id'] = str(uuid.uuid4())
     return _workload_metadata_update(context, metadata_ref, values, session)
+
 
 @require_context
 def workload_metadata_create(context, values, session):
     """Create an WorkloadMetadata object"""
     session = get_session()
     return _workload_metadata_create(context, values, session)
+
 
 @require_context
 def _workload_metadata_update(context, metadata_ref, values, session):
@@ -581,6 +638,7 @@ def _workload_metadata_update(context, metadata_ref, values, session):
     metadata_ref.save(session=session)
     return metadata_ref
 
+
 @require_context
 def _workload_metadata_delete(context, metadata_ref, session):
     """
@@ -588,23 +646,29 @@ def _workload_metadata_delete(context, metadata_ref, session):
     """
     metadata_ref.delete(session=session)
 
+
 def _workload_update(context, values, workload_id, purge_metadata, session):
-    
+
     metadata = values.pop('metadata', {})
-    
+
     if workload_id:
         workload_ref = _workload_get(context, workload_id, session)
     else:
         workload_ref = models.Workloads()
         if not values.get('id'):
-            values['id'] = str(uuid.uuid4())        
-    
+            values['id'] = str(uuid.uuid4())
+
     workload_ref.update(values)
     workload_ref.save(session)
-    
+
     if metadata:
-        _set_metadata_for_workload(context, workload_ref, metadata, purge_metadata, session=session)  
-      
+        _set_metadata_for_workload(
+            context,
+            workload_ref,
+            metadata,
+            purge_metadata,
+            session=session)
+
     return workload_ref
 
 
@@ -613,99 +677,118 @@ def workload_create(context, values):
     session = get_session()
     return _workload_update(context, values, None, False, session)
 
+
 @require_context
 def workload_update(context, id, values, purge_metadata=False):
     session = get_session()
     return _workload_update(context, values, id, purge_metadata, session)
 
+
 @require_context
 def workload_get_all(context, **kwargs):
-        qs =  model_query( context, models.Workloads, **kwargs).\
-                                options(sa_orm.joinedload(models.Workloads.metadata))
+    qs = model_query(context, models.Workloads, **kwargs).\
+        options(sa_orm.joinedload(models.Workloads.metadata))
 
-        if is_admin_context(context):
-           if 'nfs_share' in kwargs and kwargs['nfs_share'] is not None and kwargs['nfs_share'] != '':
-              qs = qs.filter(and_(models.Workloads.metadata.any(models.WorkloadMetadata.key.in_(['backup_media_target'])),\
-                             models.Workloads.metadata.any(models.WorkloadMetadata.value.in_([kwargs['nfs_share']]))))
-           else:
-                if 'dashboard_item' in kwargs:
-                   if kwargs.get('dashboard_item') ==  'activities':
-                      if 'time_in_minutes' in kwargs:
-                          time_in_minutes = int(kwargs.get('time_in_minutes'))
-                      else:
-                           time_in_minutes = 0
-                      time_delta = ((time_in_minutes / 60) / 24) * -1
-                      qs = model_query( context,
-                                 models.Workloads.id,
-                                 models.Workloads.deleted,
-                                 models.Workloads.deleted_at,
-                                 models.Workloads.display_name,
-                                 models.Workloads.status,
-                                 models.Workloads.created_at,
-                                 models.Workloads.user_id,
-                                 models.Workloads.project_id,
-                                 **kwargs). \
-                                 filter(or_(models.Workloads.created_at > func.adddate(func.now(), time_delta),
-                                 models.Workloads.deleted_at > func.adddate(func.now(), time_delta)))
-           if 'all_workloads' in kwargs and kwargs['all_workloads'] is not True:   
-               qs = qs.filter_by(project_id=context.project_id)
+    if is_admin_context(context):
+        if 'nfs_share' in kwargs and kwargs['nfs_share'] is not None and kwargs['nfs_share'] != '':
+            qs = qs.filter(
+                and_(
+                    models.Workloads.metadata.any(
+                        models.WorkloadMetadata.key.in_(
+                            ['backup_media_target'])), models.Workloads.metadata.any(
+                        models.WorkloadMetadata.value.in_(
+                            [
+                                kwargs['nfs_share']]))))
         else:
-             qs = qs.filter_by(project_id=context.project_id)
-        if 'project_list' and 'user_list' in kwargs:
-           project_list = kwargs['project_list']
-           user_list = kwargs['user_list']
-           if isinstance(project_list, list) and isinstance(user_list, list):
-              if 'exclude' in kwargs and kwargs['exclude'] is True:
-                 qs = qs.filter( models.Workloads.project_id.notin_(project_list) | models.Workloads.user_id.notin_(user_list)  )
-              else:
-                 qs = qs.filter(models.Workloads.project_id.in_(project_list), models.Workloads.user_id.in_(user_list))
-           else:
-               error = _('Project list and user list should be list')
-               raise exception.ErrorOccurred(reason=error)
-
-        if 'project_list' in kwargs and 'user_list' not in kwargs:
-            project_list = kwargs['project_list']
-            qs = model_query( context, models.Workloads.id, **kwargs)
-            if isinstance(project_list, list):
-                if 'exclude_project' in kwargs and kwargs['exclude_project'] is True:
-                    qs = qs.filter((models.Workloads.project_id.notin_(project_list)) )
-                else:
-                    qs = qs.filter((models.Workloads.project_id.in_(project_list)) )
+            if 'dashboard_item' in kwargs:
+                if kwargs.get('dashboard_item') == 'activities':
+                    if 'time_in_minutes' in kwargs:
+                        time_in_minutes = int(kwargs.get('time_in_minutes'))
+                    else:
+                        time_in_minutes = 0
+                    time_delta = ((time_in_minutes / 60) / 24) * -1
+                    qs = model_query(
+                        context,
+                        models.Workloads.id,
+                        models.Workloads.deleted,
+                        models.Workloads.deleted_at,
+                        models.Workloads.display_name,
+                        models.Workloads.status,
+                        models.Workloads.created_at,
+                        models.Workloads.user_id,
+                        models.Workloads.project_id,
+                        **kwargs). filter(
+                        or_(
+                            models.Workloads.created_at > func.adddate(
+                                func.now(),
+                                time_delta),
+                            models.Workloads.deleted_at > func.adddate(
+                                func.now(),
+                                time_delta)))
+        if 'all_workloads' in kwargs and kwargs['all_workloads'] is not True:
+            qs = qs.filter_by(project_id=context.project_id)
+    else:
+        qs = qs.filter_by(project_id=context.project_id)
+    if 'project_list' and 'user_list' in kwargs:
+        project_list = kwargs['project_list']
+        user_list = kwargs['user_list']
+        if isinstance(project_list, list) and isinstance(user_list, list):
+            if 'exclude' in kwargs and kwargs['exclude'] is True:
+                qs = qs.filter(models.Workloads.project_id.notin_(
+                    project_list) | models.Workloads.user_id.notin_(user_list))
             else:
-                error = _('Project list should be list')
-                raise exception.ErrorOccurred(reason=error)
-
-        if 'workload_list' in kwargs:
-           workload_list = kwargs['workload_list']
-           if isinstance(workload_list, list):
-              qs = model_query( context, models.Workloads.id, **kwargs)
-              if 'exclude_workload' in kwargs and kwargs['exclude_workload'] is True:
-                 qs = qs.filter(and_(models.Workloads.id.notin_(workload_list)) )
-              else:
-                 qs = qs.filter(and_(models.Workloads.id.in_(workload_list)) )
-           else:
-               error = _('Workload list should be list')
-               raise exception.ErrorOccurred(reason=error)
-
-
-        qs = qs.order_by(models.Workloads.created_at.desc())
-
-        if 'page_number' in kwargs and kwargs['page_number'] is not None and kwargs['page_number'] != '':
-           page_size = setting_get(context,'page_size')
-           return qs.limit(int(page_size)).offset(int(page_size)*(int(kwargs['page_number'])-1)).all()
+                qs = qs.filter(
+                    models.Workloads.project_id.in_(project_list),
+                    models.Workloads.user_id.in_(user_list))
         else:
-             return qs.all()
+            error = _('Project list and user list should be list')
+            raise exception.ErrorOccurred(reason=error)
+
+    if 'project_list' in kwargs and 'user_list' not in kwargs:
+        project_list = kwargs['project_list']
+        qs = model_query(context, models.Workloads.id, **kwargs)
+        if isinstance(project_list, list):
+            if 'exclude_project' in kwargs and kwargs['exclude_project'] is True:
+                qs = qs.filter(
+                    (models.Workloads.project_id.notin_(project_list)))
+            else:
+                qs = qs.filter((models.Workloads.project_id.in_(project_list)))
+        else:
+            error = _('Project list should be list')
+            raise exception.ErrorOccurred(reason=error)
+
+    if 'workload_list' in kwargs:
+        workload_list = kwargs['workload_list']
+        if isinstance(workload_list, list):
+            qs = model_query(context, models.Workloads.id, **kwargs)
+            if 'exclude_workload' in kwargs and kwargs['exclude_workload'] is True:
+                qs = qs.filter(and_(models.Workloads.id.notin_(workload_list)))
+            else:
+                qs = qs.filter(and_(models.Workloads.id.in_(workload_list)))
+        else:
+            error = _('Workload list should be list')
+            raise exception.ErrorOccurred(reason=error)
+
+    qs = qs.order_by(models.Workloads.created_at.desc())
+
+    if 'page_number' in kwargs and kwargs['page_number'] is not None and kwargs['page_number'] != '':
+        page_size = setting_get(context, 'page_size')
+        return qs.limit(int(page_size)).offset(
+            int(page_size) * (int(kwargs['page_number']) - 1)).all()
+    else:
+        return qs.all()
+
 
 @require_context
 def _workload_get(context, id, session, **kwargs):
     try:
         workload = model_query(
-                     context, models.Workloads, session=session, **kwargs).\
-                     options(sa_orm.joinedload(models.Workloads.metadata)).\
-                     filter_by(id=id).first()
+            context, models.Workloads, session=session, **kwargs).\
+            options(sa_orm.joinedload(models.Workloads.metadata)).\
+            filter_by(id=id).first()
 
-        #TODO(gbasava): filter out deleted workloads if context disallows it
-      
+        # TODO(gbasava): filter out deleted workloads if context disallows it
+
         if workload is None:
             raise exception.WorkloadNotFound(workload_id=id)
 
@@ -714,10 +797,12 @@ def _workload_get(context, id, session, **kwargs):
 
     return workload
 
+
 @require_context
 def workload_get(context, id, **kwargs):
-    session = get_session() 
-    return _workload_get(context, id, session, **kwargs)   
+    session = get_session()
+    return _workload_get(context, id, session, **kwargs)
+
 
 @require_context
 def workload_delete(context, id):
@@ -730,10 +815,13 @@ def workload_delete(context, id):
                     'deleted_at': timeutils.utcnow(),
                     'updated_at': literal_column('updated_at')})
 
-#### WorkloadVMs ################################################################
+
+#### WorkloadVMs #########################################################
 """ workload_vms functions """
+
+
 def _set_metadata_for_workload_vms(context, workload_vm_ref, metadata,
-                                    purge_metadata, session):
+                                   purge_metadata, session):
     """
     Create or update a set of workload_vms_metadata for a given workload_vm
 
@@ -752,7 +840,8 @@ def _set_metadata_for_workload_vms(context, workload_vm_ref, metadata,
                            'value': value}
         if key in orig_metadata:
             metadata_ref = orig_metadata[key]
-            _workload_vms_metadata_update(context, metadata_ref, metadata_values, session)
+            _workload_vms_metadata_update(
+                context, metadata_ref, metadata_values, session)
         else:
             _workload_vms_metadata_create(context, metadata_values, session)
 
@@ -760,21 +849,26 @@ def _set_metadata_for_workload_vms(context, workload_vm_ref, metadata,
         for key in orig_metadata.keys():
             if key not in metadata:
                 metadata_ref = orig_metadata[key]
-                _workload_vms_metadata_delete(context, metadata_ref, session=session)
+                _workload_vms_metadata_delete(
+                    context, metadata_ref, session=session)
+
 
 @require_context
 def _workload_vms_metadata_create(context, values, session):
     """Create an WorkloadMetadata object"""
     metadata_ref = models.WorkloadVMMetadata()
     if not values.get('id'):
-        values['id'] = str(uuid.uuid4())    
-    return _workload_vms_metadata_update(context, metadata_ref, values, session)
+        values['id'] = str(uuid.uuid4())
+    return _workload_vms_metadata_update(
+        context, metadata_ref, values, session)
+
 
 @require_context
 def workload_vms_metadata_create(context, values, session):
     """Create an WorkloadMetadata object"""
     session = get_session()
     return _workload_vms_metadata_create(context, values, session)
+
 
 @require_context
 def _workload_vms_metadata_update(context, metadata_ref, values, session):
@@ -786,6 +880,7 @@ def _workload_vms_metadata_update(context, metadata_ref, values, session):
     metadata_ref.save(session=session)
     return metadata_ref
 
+
 @require_context
 def _workload_vms_metadata_delete(context, metadata_ref, session):
     """
@@ -794,23 +889,29 @@ def _workload_vms_metadata_delete(context, metadata_ref, session):
     metadata_ref.delete(session=session)
     return metadata_ref
 
+
 def _workload_vms_update(context, values, id, purge_metadata, session):
-    
+
     metadata = values.pop('metadata', {})
-    
+
     if id:
         workload_vm_ref = _workload_vm_get(context, id, session)
     else:
         workload_vm_ref = models.WorkloadVMs()
         if not values.get('id'):
-            values['id'] = str(uuid.uuid4())        
-    
+            values['id'] = str(uuid.uuid4())
+
     workload_vm_ref.update(values)
     workload_vm_ref.save(session)
-    
+
     if metadata:
-        _set_metadata_for_workload_vms(context, workload_vm_ref, metadata, purge_metadata, session=session)  
-      
+        _set_metadata_for_workload_vms(
+            context,
+            workload_vm_ref,
+            metadata,
+            purge_metadata,
+            session=session)
+
     return workload_vm_ref
 
 
@@ -819,74 +920,92 @@ def workload_vms_create(context, values):
     session = get_session()
     return _workload_vms_update(context, values, None, False, session)
 
+
 @require_context
 def workload_vms_update(context, id, values, purge_metadata=False):
     session = get_session()
     return _workload_vms_update(context, values, id, purge_metadata, session)
 
+
 @require_context
 def workload_vms_get(context, workload_id, **kwargs):
     session = kwargs.get('session') or get_session()
     try:
-        query = model_query(context, models.WorkloadVMs,
-                            session=session, read_deleted="no")\
-                       .options(sa_orm.joinedload(models.WorkloadVMs.metadata))\
-                       .filter_by(workload_id=workload_id)\
-                       .filter(models.WorkloadVMs.status != None)\
+        if workload_id:
+            query = model_query(context, models.WorkloadVMs,
+                                session=session, read_deleted="no")\
+                .options(sa_orm.joinedload(models.WorkloadVMs.metadata))\
+                .filter_by(workload_id=workload_id)\
+                .filter(models.WorkloadVMs.status is not None)
+        else:
+            query = model_query(context, models.WorkloadVMs,
+                                session=session, read_deleted="no")\
+                .options(sa_orm.joinedload(models.WorkloadVMs.metadata))\
+                .filter(models.WorkloadVMs.status is not None)
 
-        #TODO(gbasava): filter out deleted workload_vms if context disallows it
+        # TODO(gbasava): filter out deleted workload_vms if context disallows
+        # it
         workload_vms = query.all()
 
     except sa_orm.exc.NoResultFound:
-        raise exception.WorkloadVMsNotFound(workload_id = workload_id)
-    
+        raise exception.WorkloadVMsNotFound(workload_id=workload_id)
+
     return workload_vms
+
 
 @require_context
 def workload_vm_get_by_id(context, vm_id, **kwargs):
     session = kwargs.get('session') or get_session()
     read_deleted = 'no'
     if 'read_deleted' in kwargs:
-       read_deleted = kwargs['read_deleted'] 
+        read_deleted = kwargs['read_deleted']
     try:
         query = model_query(context, models.WorkloadVMs,
                             session=session, read_deleted=read_deleted)\
-                     .options(sa_orm.joinedload(models.WorkloadVMs.metadata))\
-                     .join(models.Workloads)\
-                     .filter(models.WorkloadVMs.status != None)\
-                     .filter(models.WorkloadVMs.vm_id==vm_id)\
-                     .filter(models.Workloads.project_id == context.project_id)
+            .options(sa_orm.joinedload(models.WorkloadVMs.metadata))\
+            .join(models.Workloads)\
+            .filter(models.WorkloadVMs.status is not None)\
+            .filter(models.WorkloadVMs.vm_id == vm_id)\
+            .filter(models.Workloads.project_id == context.project_id)
 
         if 'workloads_filter' in kwargs:
-           query = query.filter(and_(models.Workloads.status != kwargs['workloads_filter'], models.Workloads.status != None))
-             
+            query = query.filter(
+                and_(
+                    models.Workloads.status != kwargs['workloads_filter'],
+                    models.Workloads.status is not None))
+
         vm_found = query.all()
 
     except sa_orm.exc.NoResultFound:
-           raise exception.WorkloadVMsNotFound(vm_id = vm_id)
+        raise exception.WorkloadVMsNotFound(vm_id=vm_id)
 
     return vm_found
+
 
 @require_context
 def _workload_vm_get(context, id, session):
     try:
-        query = session.query(models.WorkloadVMs)\
-                       .options(sa_orm.joinedload(models.WorkloadVMs.metadata))\
-                       .filter_by(id=id)\
-
-        #TODO(gbasava): filter out deleted workload_vms if context disallows it
+        query = session.query(
+            models.WorkloadVMs) .options(
+            sa_orm.joinedload(
+                models.WorkloadVMs.metadata)) .filter_by(
+                id=id)
+        # TODO(gbasava): filter out deleted workload_vms if context disallows
+        # it
         workload_vm = query.first()
 
     except sa_orm.exc.NoResultFound:
-        raise exception.WorkloadVMNotFound(workload_vm_id = id)
+        raise exception.WorkloadVMNotFound(workload_vm_id=id)
 
     return workload_vm
 
+
 @require_context
 def workload_vm_get(context, id):
-    session = get_session() 
-    return _workload_vm_get(context, id, session)   
-    
+    session = get_session()
+    return _workload_vm_get(context, id, session)
+
+
 @require_context
 def workload_vms_delete(context, vm_id, workload_id):
     session = get_session()
@@ -898,52 +1017,58 @@ def workload_vms_delete(context, vm_id, workload_id):
                     'deleted': True,
                     'deleted_at': timeutils.utcnow(),
                     'updated_at': literal_column('updated_at')})
-######################################################################################################
+##########################################################################
+
+
 @require_admin_context
 def snapshot_mark_incomplete_as_error(context, host):
     """
     mark the snapshots that are left hanging from previous run on host as 'error'
     """
     session = get_session()
-    now = timeutils.utcnow()  
-    snapshots =  model_query(context, models.Snapshots, session=session).\
-                            filter_by(host=host).all()
+    now = timeutils.utcnow()
+    snapshots = model_query(context, models.Snapshots, session=session).\
+        filter_by(host=host).all()
     for snapshot in snapshots:
         if snapshot.status != 'available' and snapshot.status != 'error' and \
            snapshot.status != 'restoring' and snapshot.status != 'mounted' and \
            snapshot.status != 'cancelled':
-            values =  {'progress_percent': 100, 'progress_msg': '',
-                       'error_msg': 'Snapshot did not finish successfully',
-                       'status': 'error' }
+            values = {'progress_percent': 100, 'progress_msg': '',
+                      'error_msg': 'Snapshot did not finish successfully',
+                      'status': 'error'}
             snapshot.update(values)
             snapshot.save(session=session)
 
         if snapshot.status == 'restoring':
-            values =  { 'status': 'available' }
+            values = {'status': 'available'}
             snapshot.save(session=session)
 
-        workload_update(context, snapshot.workload_id, {'status':'available'})
-           
-    snapshots =  model_query(context, models.Snapshots, session=session).\
-                            all()
+        workload_update(context, snapshot.workload_id, {'status': 'available'})
+
+    snapshots = model_query(context, models.Snapshots, session=session).\
+        all()
     for snapshot in snapshots:
         if snapshot.status != 'available' and snapshot.status != 'error' and\
            snapshot.status != 'restoring' and snapshot.status != 'mounted' and \
            snapshot.status != 'cancelled':
-            if (snapshot.host is not None) and snapshot.host == '' and now - snapshot.created_at > timedelta(minutes=60):
-                values =  {'progress_percent': 100, 'progress_msg': '',
-                           'error_msg': 'Snapshot did not finish successfully',
-                           'status': 'error' }
+            if (snapshot.host is not None) and snapshot.host == '' and now - \
+                    snapshot.created_at > timedelta(minutes=60):
+                values = {'progress_percent': 100, 'progress_msg': '',
+                          'error_msg': 'Snapshot did not finish successfully',
+                          'status': 'error'}
                 snapshot.update(values)
                 snapshot.save(session=session)
         if snapshot.status == 'restoring':
-            values =  { 'status': 'available' }
+            values = {'status': 'available'}
             snapshot.save(session=session)
+
 
 #### Snapshot ################################################################
 """ snapshot functions """
+
+
 def _set_metadata_for_snapshot(context, snapshot_ref, metadata,
-                                    purge_metadata, session):
+                               purge_metadata, session):
     """
     Create or update a set of snapshot_metadata for a given snapshot
 
@@ -962,7 +1087,8 @@ def _set_metadata_for_snapshot(context, snapshot_ref, metadata,
                            'value': value}
         if key in orig_metadata:
             metadata_ref = orig_metadata[key]
-            _snapshot_metadata_update(context, metadata_ref, metadata_values, session)
+            _snapshot_metadata_update(
+                context, metadata_ref, metadata_values, session)
         else:
             _snapshot_metadata_create(context, metadata_values, session)
 
@@ -970,21 +1096,25 @@ def _set_metadata_for_snapshot(context, snapshot_ref, metadata,
         for key in orig_metadata.keys():
             if key not in metadata:
                 metadata_ref = orig_metadata[key]
-                _snapshot_metadata_delete(context, metadata_ref, session=session)
+                _snapshot_metadata_delete(
+                    context, metadata_ref, session=session)
+
 
 @require_context
 def _snapshot_metadata_create(context, values, session):
     """Create a SnapshotMetadata object"""
     metadata_ref = models.SnapshotMetadata()
     if not values.get('id'):
-        values['id'] = str(uuid.uuid4())    
+        values['id'] = str(uuid.uuid4())
     return _snapshot_metadata_update(context, metadata_ref, values, session)
+
 
 @require_context
 def snapshot_metadata_create(context, values, session):
     """Create an SnapshotMetadata object"""
     session = get_session()
     return _snapshot_metadata_create(context, values, session)
+
 
 @require_context
 def _snapshot_metadata_update(context, metadata_ref, values, session):
@@ -996,6 +1126,7 @@ def _snapshot_metadata_update(context, metadata_ref, values, session):
     metadata_ref.save(session=session)
     return metadata_ref
 
+
 @require_context
 def _snapshot_metadata_delete(context, metadata_ref, session):
     """
@@ -1003,23 +1134,31 @@ def _snapshot_metadata_delete(context, metadata_ref, session):
     """
     metadata_ref.delete(session=session)
 
+
 def _snapshot_update(context, values, snapshot_id, purge_metadata, session):
     try:
-        lock.acquire()    
+        lock.acquire()
         metadata = values.pop('metadata', {})
-        
+
         if snapshot_id:
-            snapshot_ref = model_query(context, models.Snapshots, session=session, read_deleted="yes").\
-                                        filter_by(id=snapshot_id).first()
+            snapshot_ref = model_query(
+                context,
+                models.Snapshots,
+                session=session,
+                read_deleted="yes"). filter_by(
+                id=snapshot_id).first()
             if not snapshot_ref:
                 lock.release()
-                raise exception.SnapshotNotFound(snapshot_id = snapshot_id)
-                                                        
+                raise exception.SnapshotNotFound(snapshot_id=snapshot_id)
+
             if not values.get('uploaded_size'):
                 if values.get('uploaded_size_incremental'):
-                    values['uploaded_size'] =  snapshot_ref.uploaded_size + values.get('uploaded_size_incremental') 
-                    if not values.get('progress_percent') and snapshot_ref.size > 0:
-                        values['progress_percent'] = min( 99, (100 * values.get('uploaded_size'))/snapshot_ref.size )
+                    values['uploaded_size'] = snapshot_ref.uploaded_size + \
+                        values.get('uploaded_size_incremental')
+                    if not values.get(
+                            'progress_percent') and snapshot_ref.size > 0:
+                        values['progress_percent'] = min(
+                            99, (100 * values.get('uploaded_size')) / snapshot_ref.size)
         else:
             snapshot_ref = models.Snapshots()
             if not values.get('id'):
@@ -1027,45 +1166,54 @@ def _snapshot_update(context, values, snapshot_id, purge_metadata, session):
             if not values.get('size'):
                 values['size'] = 0
             if not values.get('restore_size'):
-                values['restore_size'] = 0                
+                values['restore_size'] = 0
             if not values.get('uploaded_size'):
                 values['uploaded_size'] = 0
             if not values.get('progress_percent'):
-                values['progress_percent'] = 0 
+                values['progress_percent'] = 0
         snapshot_ref.update(values)
         snapshot_ref.save(session)
-        
+
         if metadata:
-            _set_metadata_for_snapshot(context, snapshot_ref, metadata, purge_metadata, session=session)  
-          
+            _set_metadata_for_snapshot(
+                context,
+                snapshot_ref,
+                metadata,
+                purge_metadata,
+                session=session)
+
         return snapshot_ref
     finally:
         lock.release()
-    return snapshot_ref               
-        
+    return snapshot_ref
+
+
 @require_context
 def _snapshot_get(context, snapshot_id, **kwargs):
-    if kwargs.get('session') == None:
+    if kwargs.get('session') is None:
         kwargs['session'] = get_session()
-    result = model_query(   context, models.Snapshots, **kwargs).\
-                            options(sa_orm.joinedload(models.Snapshots.metadata)).\
-                            filter_by(id=snapshot_id).\
-                            first()
+    result = model_query(context, models.Snapshots, **kwargs).\
+        options(sa_orm.joinedload(models.Snapshots.metadata)).\
+        filter_by(id=snapshot_id).\
+        first()
 
     if not result:
         raise exception.SnapshotNotFound(snapshot_id=snapshot_id)
 
     return result
 
-@require_context
-def snapshot_get(context, snapshot_id, **kwargs):
-    if kwargs.get('session') == None:
-        kwargs['session'] = get_session()    
-    return _snapshot_get(context, snapshot_id, **kwargs) 
 
 @require_context
-def snapshot_get_metadata_cancel_flag(context, snapshot_id, return_val=0, process=None, **kwargs):
-    flag='0'
+def snapshot_get(context, snapshot_id, **kwargs):
+    if kwargs.get('session') is None:
+        kwargs['session'] = get_session()
+    return _snapshot_get(context, snapshot_id, **kwargs)
+
+
+@require_context
+def snapshot_get_metadata_cancel_flag(
+        context, snapshot_id, return_val=0, process=None, **kwargs):
+    flag = '0'
     snapshot_obj = snapshot_get(context, snapshot_id)
     for meta in snapshot_obj.metadata:
         if meta.key == 'cancel_requested':
@@ -1080,115 +1228,142 @@ def snapshot_get_metadata_cancel_flag(context, snapshot_id, return_val=0, proces
         error = _('Cancel requested for snapshot')
         raise exception.ErrorOccurred(reason=error)
 
+
 @require_context
 def snapshot_get_running_snapshots_by_host(context, **kwargs):
-    if kwargs.get('session') == None:
+    if kwargs.get('session') is None:
         kwargs['session'] = get_session()
 
-    result = model_query(   context, models.Snapshots.host, func.count(models.Snapshots.host), **kwargs).\
-                            filter(and_(~models.Snapshots.status.in_(['available','error','deleted','cancelled'])),models.Snapshots.host != '').\
-                            group_by(models.Snapshots.host).\
-                            all() 
+    result = model_query(context,
+                         models.Snapshots.host,
+                         func.count(models.Snapshots.host),
+                         **kwargs). filter(and_(~models.Snapshots.status.in_(['available',
+                                                                              'error',
+                                                                              'deleted',
+                                                                              'cancelled'])),
+                                           models.Snapshots.host != ''). group_by(models.Snapshots.host). all()
     return result
+
 
 @require_context
 def snapshot_get_all(context, **kwargs):
     qs = model_query(context, models.Snapshots, **kwargs).\
-                    options(sa_orm.joinedload(models.Snapshots.metadata))
+        options(sa_orm.joinedload(models.Snapshots.metadata))
     #qs = qs.join(models.SnapshotVMs, models.Snapshots.id == models.SnapshotVMs.snapshot_id)
-    if 'workload_id' in kwargs and kwargs['workload_id'] is not None and kwargs['workload_id'] != '':  
-       qs = qs.filter_by(workload_id=kwargs['workload_id'])
+    if 'workload_id' in kwargs and kwargs['workload_id'] is not None and kwargs['workload_id'] != '':
+        qs = qs.filter_by(workload_id=kwargs['workload_id'])
     if 'host' in kwargs and kwargs['host'] is not None and kwargs['host'] != '':
-       qs = qs.filter(models.Snapshots.host == kwargs['host'])
+        qs = qs.filter(models.Snapshots.host == kwargs['host'])
     if 'date_from' in kwargs and kwargs['date_from'] is not None and kwargs['date_from'] != '':
-       if 'date_to' in kwargs and kwargs['date_to'] is not None and kwargs['date_to'] != '':
-           date_to = kwargs['date_to']
-       else:
+        if 'date_to' in kwargs and kwargs['date_to'] is not None and kwargs['date_to'] != '':
+            date_to = kwargs['date_to']
+        else:
             date_to = datetime.now()
-       qs = qs.filter(and_(models.Snapshots.created_at >= func.date_format(kwargs['date_from'],'%y-%m-%dT%H:%i:%s'),\
-                      models.Snapshots.created_at <= func.date_format(date_to,'%y-%m-%dT%H:%i:%s')))
+        qs = qs.filter(
+            and_(
+                models.Snapshots.created_at >= func.date_format(
+                    kwargs['date_from'],
+                    '%y-%m-%dT%H:%i:%s'),
+                models.Snapshots.created_at <= func.date_format(
+                    date_to,
+                    '%y-%m-%dT%H:%i:%s')))
 
     if not is_admin_context(context):
-       qs = qs.filter_by(project_id=context.project_id)
+        qs = qs.filter_by(project_id=context.project_id)
     else:
-         if 'get_all' in kwargs and kwargs['get_all'] is not True:
+        if 'get_all' in kwargs and kwargs['get_all'] is not True:
             qs = qs.filter_by(project_id=context.project_id)
     if 'status' in kwargs and kwargs['status'] is not None:
-       if kwargs['status'] == 'available':
-          qs = qs.filter(or_(models.Snapshots.status == 'available', models.Snapshots.status == 'mounted'))
-       else:
+        if kwargs['status'] == 'available':
+            qs = qs.filter(or_(models.Snapshots.status ==
+                               'available', models.Snapshots.status == 'mounted'))
+        else:
             qs = qs.filter_by(status=kwargs['status'])
 
     qs = qs.order_by(models.Snapshots.created_at.desc())
     if 'end' in kwargs and kwargs['end'] != 0:
-       qs = qs.limit(kwargs['end'])
+        qs = qs.limit(kwargs['end'])
     if 'start' in kwargs and kwargs['start'] != 0:
-       qs = qs.offset(kwargs['start'])
+        qs = qs.offset(kwargs['start'])
 
     if 'get_instances' in kwargs and kwargs['get_instances'] is True:
-       snapshots = qs.all()
-       i = 0
-       for snapshot in snapshots:
-           instances = []
-           snapshot_vms = snapshot_vms_get(context, snapshot.id)
-           for snapshot_vm in snapshot_vms:
-               instances.append(snapshot_vm)
-           snapshots[i].instances = instances
-           i = i + 1
-       return snapshots
-    return qs.all() 
+        snapshots = qs.all()
+        i = 0
+        for snapshot in snapshots:
+            instances = []
+            snapshot_vms = snapshot_vms_get(context, snapshot.id)
+            for snapshot_vm in snapshot_vms:
+                instances.append(snapshot_vm)
+            snapshots[i].instances = instances
+            i = i + 1
+        return snapshots
+    return qs.all()
 
-@require_context                            
+
+@require_context
 def snapshot_get_all_by_workload(context, workload_id, **kwargs):
-    if kwargs.get('session') == None:
+    if kwargs.get('session') is None:
         kwargs['session'] = get_session()
 
     return model_query(context, models.Snapshots, **kwargs).\
-                        options(sa_orm.joinedload(models.Snapshots.metadata)).\
-                        filter_by(workload_id=workload_id).\
-                        order_by(models.Snapshots.created_at.desc()).all()
+        options(sa_orm.joinedload(models.Snapshots.metadata)).\
+        filter_by(workload_id=workload_id).\
+        order_by(models.Snapshots.created_at.desc()).all()
+
+
 @require_context
 def snapshot_get_all_by_project(context, project_id, **kwargs):
-    if kwargs.get('session') == None:
-       kwargs['session'] = get_session()
-    authorize_project_context(context, project_id)
-    return model_query(context, models.Snapshots, **kwargs).\
-                            options(sa_orm.joinedload(models.Snapshots.metadata)).\
-                            filter_by(project_id=project_id).all()
-        
-@require_context
-def snapshot_get_all_by_project_workload(context, project_id, workload_id, **kwargs):
-    if kwargs.get('session') == None:
+    if kwargs.get('session') is None:
         kwargs['session'] = get_session()
     authorize_project_context(context, project_id)
     return model_query(context, models.Snapshots, **kwargs).\
-                            options(sa_orm.joinedload(models.Snapshots.metadata)).\
-                            filter_by(project_id=project_id).\
-                            filter_by(workload_id=workload_id).\
-                            order_by(models.Snapshots.created_at.desc()).all()
+        options(sa_orm.joinedload(models.Snapshots.metadata)).\
+        filter_by(project_id=project_id).all()
+
+
+@require_context
+def snapshot_get_all_by_project_workload(
+        context, project_id, workload_id, **kwargs):
+    if kwargs.get('session') is None:
+        kwargs['session'] = get_session()
+    authorize_project_context(context, project_id)
+    return model_query(context, models.Snapshots, **kwargs).\
+        options(sa_orm.joinedload(models.Snapshots.metadata)).\
+        filter_by(project_id=project_id).\
+        filter_by(workload_id=workload_id).\
+        order_by(models.Snapshots.created_at.desc()).all()
+
 
 @require_context
 def snapshot_show(context, snapshot_id, **kwargs):
     session = get_session()
-    result = model_query(context, models.Snapshots, session=session, **kwargs).\
-                            options(sa_orm.joinedload(models.Snapshots.metadata)).\
-                            filter_by(id=snapshot_id).\
-                            first()
+    result = model_query(
+        context,
+        models.Snapshots,
+        session=session,
+        **kwargs). options(
+        sa_orm.joinedload(
+            models.Snapshots.metadata)). filter_by(
+                id=snapshot_id). first()
 
     if not result:
         raise exception.SnapshotNotFound(snapshot_id=snapshot_id)
 
     return result
 
+
 @require_context
 def snapshot_create(context, values):
     session = get_session()
     return _snapshot_update(context, values, None, False, session)
 
+
 @require_context
 def snapshot_update(context, snapshot_id, values, purge_metadata=False):
     session = get_session()
-    return _snapshot_update(context, values, snapshot_id, purge_metadata, session)
+    return _snapshot_update(context, values, snapshot_id,
+                            purge_metadata, session)
+
 
 @require_context
 def snapshot_type_time_size_update(context, snapshot_id):
@@ -1210,16 +1385,18 @@ def snapshot_type_time_size_update(context, snapshot_id):
         if snapshot_vm_resource.resource_type != 'disk':
             continue
         if snapshot_vm_resource.snapshot_type == 'full' and \
-            snapshot_vm_resource.resource_name != 'vda':
+                snapshot_vm_resource.resource_name != 'vda':
             snapshot_type_full = True
         if snapshot_vm_resource.snapshot_type == 'incremental':
             snapshot_type_incremental = True
         time_taken = time_taken + snapshot_vm_resource.time_taken
 
-        #update size
+        # update size
         if snapshot_vm_resource.status != 'deleted':
-            disk_type = get_metadata_value(snapshot_vm_resource.metadata,'disk_type')
-            vm_disk_resource_snaps = vm_disk_resource_snaps_get(context, snapshot_vm_resource.id)
+            disk_type = get_metadata_value(
+                snapshot_vm_resource.metadata, 'disk_type')
+            vm_disk_resource_snaps = vm_disk_resource_snaps_get(
+                context, snapshot_vm_resource.id)
             snapshot_vm_resource_size = 0
             for vm_disk_resource_snap in vm_disk_resource_snaps:
                 vm_disk_resource_snap_restore_size = 0
@@ -1227,51 +1404,58 @@ def snapshot_type_time_size_update(context, snapshot_id):
                 if vm_disk_resource_snap.vault_url is None:
                     continue
 
-                resource_snap_path = os.path.join(backup_target.mount_path,
-                                                  vm_disk_resource_snap.vault_url.strip(os.sep))
-                vm_disk_resource_snap_size = backup_target.get_object_size(resource_snap_path)
+                resource_snap_path = os.path.join(
+                    backup_target.mount_path,
+                    vm_disk_resource_snap.vault_url.strip(
+                        os.sep))
+                vm_disk_resource_snap_size = backup_target.get_object_size(
+                    resource_snap_path)
                 if vm_disk_resource_snap_size == 0:
                     vm_disk_resource_snap_size = vm_disk_resource_snap.size
-                    
-                disk_format = get_metadata_value(vm_disk_resource_snap.metadata,'disk_format')
-                if disk_format == 'vmdk':
-                    vault_path = os.path.join(backup_target.mount_path, 
-                                              vm_disk_resource_snap.vault_url.strip(os.sep))
-                    vm_disk_resource_snap_restore_size = vault.get_restore_size(vault_path,
-                                                                                disk_format, disk_type)
-                else:
-                    vm_disk_resource_snap_restore_size = vm_disk_resource_snap_size
-                    vm_disk_resource_snap_backing_id = vm_disk_resource_snap.vm_disk_resource_snap_backing_id
-                    while vm_disk_resource_snap_backing_id:
-                        vm_disk_resource_snap_backing = vm_disk_resource_snap_get(context, vm_disk_resource_snap_backing_id)
-                        vm_disk_resource_snap_restore_size = vm_disk_resource_snap_restore_size + vm_disk_resource_snap_backing.size
-                        vm_disk_resource_snap_backing_id = vm_disk_resource_snap_backing.vm_disk_resource_snap_backing_id
 
-                #For vmdk   
+                disk_format = get_metadata_value(
+                    vm_disk_resource_snap.metadata, 'disk_format')
+                if disk_format == 'vmdk':
+                    vault_path = os.path.join(
+                        backup_target.mount_path,
+                        vm_disk_resource_snap.vault_url.strip(
+                            os.sep))
+                    vm_disk_resource_snap_restore_size = vault.get_restore_size(
+                        vault_path, disk_format, disk_type)
+                else:
+                    vm_disk_resource_snap_restore_size = qemuimages.get_effective_size(
+                        resource_snap_path)
+
+                # For vmdk
                 if vm_disk_resource_snap_restore_size == 0:
                     vm_disk_resource_snap_restore_size = vm_disk_resource_snap_size
                     vm_disk_resource_snap_backing_id = vm_disk_resource_snap.vm_disk_resource_snap_backing_id
                     while vm_disk_resource_snap_backing_id:
-                        vm_disk_resource_snap_backing = vm_disk_resource_snap_get(context, vm_disk_resource_snap_backing_id)
+                        vm_disk_resource_snap_backing = vm_disk_resource_snap_get(
+                            context, vm_disk_resource_snap_backing_id)
                         if vm_disk_resource_snap_backing.vm_disk_resource_snap_backing_id:
-                            vm_disk_resource_snap_restore_size = vm_disk_resource_snap_restore_size + vm_disk_resource_snap_backing.size
+                            vm_disk_resource_snap_restore_size = vm_disk_resource_snap_restore_size + \
+                                vm_disk_resource_snap_backing.size
                         else:
-                            vm_disk_resource_snap_restore_size = vm_disk_resource_snap_restore_size + vm_disk_resource_snap_backing.restore_size
+                            vm_disk_resource_snap_restore_size = vm_disk_resource_snap_restore_size + \
+                                vm_disk_resource_snap_backing.restore_size
                         vm_disk_resource_snap_backing_id = vm_disk_resource_snap_backing.vm_disk_resource_snap_backing_id
-                                
-                vm_disk_resource_snap_update(context, vm_disk_resource_snap.id, {'size' : vm_disk_resource_snap_size,
-                                                                                 'restore_size' : vm_disk_resource_snap_restore_size}) 
+
+                vm_disk_resource_snap_update(
+                    context, vm_disk_resource_snap.id, {
+                        'size': vm_disk_resource_snap_size, 'restore_size': vm_disk_resource_snap_restore_size})
                 snapshot_vm_resource_size = snapshot_vm_resource_size + vm_disk_resource_snap_size
-                    
-            vm_disk_resource_snap_top = vm_disk_resource_snap_get_top(context, snapshot_vm_resource.id)
+
+            vm_disk_resource_snap_top = vm_disk_resource_snap_get_top(
+                context, snapshot_vm_resource.id)
             snapshot_vm_resource_restore_size = vm_disk_resource_snap_top.restore_size
-            snapshot_vm_resource_update(context, snapshot_vm_resource.id, {'size' : snapshot_vm_resource_size,
-                                                                           'restore_size' : snapshot_vm_resource_restore_size})
+            snapshot_vm_resource_update(
+                context, snapshot_vm_resource.id, {
+                    'size': snapshot_vm_resource_size, 'restore_size': snapshot_vm_resource_restore_size})
             snapshot_size = snapshot_size + snapshot_vm_resource_size
             snapshot_restore_size = snapshot_restore_size + snapshot_vm_resource_restore_size
 
-
-    snapshot_vms= snapshot_vms_get(context, snapshot_id)
+    snapshot_vms = snapshot_vms_get(context, snapshot_id)
     snapshot_data_transfer_time = 0
     snapshot_object_store_transfer_time = 0
     for snapshot_vm in snapshot_vms:
@@ -1279,47 +1463,66 @@ def snapshot_type_time_size_update(context, snapshot_id):
         snapshot_vm_restore_size = 0
         snapshot_vm_data_transfer_time = 0
         snapshot_vm_object_store_transfer_time = 0
-        snapshot_vm_resources = snapshot_vm_resources_get(context, snapshot_vm.vm_id, snapshot_id)
+        snapshot_vm_resources = snapshot_vm_resources_get(
+            context, snapshot_vm.vm_id, snapshot_id)
         for snapshot_vm_resource in snapshot_vm_resources:
             if snapshot_vm_resource.resource_type != 'disk':
                 continue
-            snapshot_vm_size = snapshot_vm_size +  snapshot_vm_resource.size
-            snapshot_vm_restore_size = snapshot_vm_restore_size + snapshot_vm_resource.restore_size
+            snapshot_vm_size = snapshot_vm_size + snapshot_vm_resource.size
+            snapshot_vm_restore_size = snapshot_vm_restore_size + \
+                snapshot_vm_resource.restore_size
             snapshot_vm_data_transfer_time += snapshot_vm_resource.time_taken
-            snapshot_vm_object_store_transfer_time +=  int(get_metadata_value(snapshot_vm_resource.metadata,  'object_store_transfer_time', '0'))
-        snapshot_vm_update(context, snapshot_vm.vm_id, snapshot_id, {'size' : snapshot_vm_size, 
-                                                                     'restore_size' : snapshot_vm_restore_size,
-                                                                     'metadata' : {'data_transfer_time' : snapshot_vm_data_transfer_time,
-                                                                                   'object_store_transfer_time' : snapshot_vm_object_store_transfer_time,
-                                                                                   },
-                                                                     })
-        snapshot_data_transfer_time += snapshot_vm_data_transfer_time        
+            snapshot_vm_object_store_transfer_time += int(get_metadata_value(
+                snapshot_vm_resource.metadata, 'object_store_transfer_time', '0'))
+        snapshot_vm_update(
+            context,
+            snapshot_vm.vm_id,
+            snapshot_id,
+            {
+                'size': snapshot_vm_size,
+                'restore_size': snapshot_vm_restore_size,
+                'metadata': {
+                    'data_transfer_time': snapshot_vm_data_transfer_time,
+                    'object_store_transfer_time': snapshot_vm_object_store_transfer_time,
+                },
+            })
+        snapshot_data_transfer_time += snapshot_vm_data_transfer_time
         snapshot_object_store_transfer_time += snapshot_vm_object_store_transfer_time
 
     if snapshot.finished_at:
-        time_taken = max(time_taken, int((snapshot.finished_at - snapshot.created_at).total_seconds()))
+        time_taken = max(
+            time_taken, int(
+                (snapshot.finished_at - snapshot.created_at).total_seconds()))
     else:
-        time_taken = max(time_taken, int((timeutils.utcnow() - snapshot.created_at).total_seconds()))
+        time_taken = max(
+            time_taken, int(
+                (timeutils.utcnow() - snapshot.created_at).total_seconds()))
 
     if snapshot_type_full and snapshot_type_incremental:
         snapshot_type = 'mixed'
     elif snapshot_type_incremental:
-        snapshot_type = 'incremental'                
+        snapshot_type = 'incremental'
     elif snapshot_type_full:
         snapshot_type = 'full'
     else:
         snapshot_type = 'full'
-                          
-    return snapshot_update(context, snapshot_id, {'snapshot_type' : snapshot_type, 
-                                                  'time_taken' : time_taken,
-                                                  'size' : snapshot_size,
-                                                  'restore_size' : snapshot_restore_size,
-                                                  'uploaded_size' : snapshot_size,
-                                                  'metadata' : {'data_transfer_time' : snapshot_data_transfer_time,
-                                                                'object_store_transfer_time' : snapshot_object_store_transfer_time,
-                                                                },                                                  
-                                                  })
-    
+
+    return snapshot_update(
+        context,
+        snapshot_id,
+        {
+            'snapshot_type': snapshot_type,
+            'time_taken': time_taken,
+            'size': snapshot_size,
+            'restore_size': snapshot_restore_size,
+            'uploaded_size': snapshot_size,
+            'metadata': {
+                'data_transfer_time': snapshot_data_transfer_time,
+                'object_store_transfer_time': snapshot_object_store_transfer_time,
+            },
+        })
+
+
 @require_context
 def snapshot_delete(context, snapshot_id):
     session = get_session()
@@ -1331,23 +1534,29 @@ def snapshot_delete(context, snapshot_id):
                     'deleted_at': timeutils.utcnow(),
                     'updated_at': literal_column('updated_at')})
 
-@require_context            
+
+@require_context
 def get_snapshot_children(context, snapshot_id, children):
     grand_children = set()
     snapshot_vm_resources = snapshot_resources_get(context, snapshot_id)
     for snapshot_vm_resource in snapshot_vm_resources:
         if snapshot_vm_resource.resource_type != 'disk':
             continue
-        vm_disk_resource_snaps = vm_disk_resource_snaps_get(context, snapshot_vm_resource.id)
+        vm_disk_resource_snaps = vm_disk_resource_snaps_get(
+            context, snapshot_vm_resource.id)
         for vm_disk_resource_snap in vm_disk_resource_snaps:
             if vm_disk_resource_snap.vm_disk_resource_snap_child_id:
                 try:
-                    vm_disk_resource_snap_child = vm_disk_resource_snap_get(context, vm_disk_resource_snap.vm_disk_resource_snap_child_id)
-                    snapshot_vm_resource_child = snapshot_vm_resource_get(context,vm_disk_resource_snap_child.snapshot_vm_resource_id)
+                    vm_disk_resource_snap_child = vm_disk_resource_snap_get(
+                        context, vm_disk_resource_snap.vm_disk_resource_snap_child_id)
+                    snapshot_vm_resource_child = snapshot_vm_resource_get(
+                        context, vm_disk_resource_snap_child.snapshot_vm_resource_id)
                     if snapshot_vm_resource_child.snapshot_id not in grand_children:
-                        grand_children.add(snapshot_vm_resource_child.snapshot_id)
+                        grand_children.add(
+                            snapshot_vm_resource_child.snapshot_id)
                         if snapshot_vm_resource_child.snapshot_id != snapshot_id:
-                            grand_children = get_snapshot_children(context, snapshot_vm_resource_child.snapshot_id, grand_children)
+                            grand_children = get_snapshot_children(
+                                context, snapshot_vm_resource_child.snapshot_id, grand_children)
                 except Exception as ex:
                     LOG.exception(ex)
     if children:
@@ -1355,34 +1564,43 @@ def get_snapshot_children(context, snapshot_id, children):
     else:
         return grand_children
 
-@require_context            
+
+@require_context
 def get_snapshot_parents(context, snapshot_id, parents):
     grand_parents = set()
     snapshot_vm_resources = snapshot_resources_get(context, snapshot_id)
     for snapshot_vm_resource in snapshot_vm_resources:
         if snapshot_vm_resource.resource_type != 'disk':
             continue
-        vm_disk_resource_snaps = vm_disk_resource_snaps_get(context, snapshot_vm_resource.id)
+        vm_disk_resource_snaps = vm_disk_resource_snaps_get(
+            context, snapshot_vm_resource.id)
         for vm_disk_resource_snap in vm_disk_resource_snaps:
             if vm_disk_resource_snap.vm_disk_resource_snap_backing_id:
                 try:
-                    vm_disk_resource_snap_parent = vm_disk_resource_snap_get(context, vm_disk_resource_snap.vm_disk_resource_snap_backing_id)
-                    snapshot_vm_resource_parent = snapshot_vm_resource_get(context, vm_disk_resource_snap_parent.snapshot_vm_resource_id)
+                    vm_disk_resource_snap_parent = vm_disk_resource_snap_get(
+                        context, vm_disk_resource_snap.vm_disk_resource_snap_backing_id)
+                    snapshot_vm_resource_parent = snapshot_vm_resource_get(
+                        context, vm_disk_resource_snap_parent.snapshot_vm_resource_id)
                     if snapshot_vm_resource_parent.snapshot_id not in grand_parents:
-                        grand_parents.add(snapshot_vm_resource_parent.snapshot_id)
+                        grand_parents.add(
+                            snapshot_vm_resource_parent.snapshot_id)
                         if snapshot_vm_resource_parent.snapshot_id != snapshot_id:
-                            grand_parents = get_snapshot_parents(context, snapshot_vm_resource_parent.snapshot_id, grand_parents)
+                            grand_parents = get_snapshot_parents(
+                                context, snapshot_vm_resource_parent.snapshot_id, grand_parents)
                 except Exception as ex:
                     LOG.exception(ex)
     if parents:
         return grand_parents.union(parents)
     else:
-        return grand_parents    
+        return grand_parents
 
-#### SnapshotVMs ################################################################
+
+#### SnapshotVMs #########################################################
 """ snapshot_vms functions """
+
+
 def _set_metadata_for_snapshot_vms(context, snapshot_vm_ref, metadata,
-                                    purge_metadata, session):
+                                   purge_metadata, session):
     """
     Create or update a set of snapshot_vms_metadata for a given snapshot_vm
 
@@ -1401,7 +1619,8 @@ def _set_metadata_for_snapshot_vms(context, snapshot_vm_ref, metadata,
                            'value': value}
         if key in orig_metadata:
             metadata_ref = orig_metadata[key]
-            _snapshot_vms_metadata_update(context, metadata_ref, metadata_values, session)
+            _snapshot_vms_metadata_update(
+                context, metadata_ref, metadata_values, session)
         else:
             _snapshot_vms_metadata_create(context, metadata_values, session)
 
@@ -1409,21 +1628,26 @@ def _set_metadata_for_snapshot_vms(context, snapshot_vm_ref, metadata,
         for key in orig_metadata.keys():
             if key not in metadata:
                 metadata_ref = orig_metadata[key]
-                _snapshot_vms_metadata_delete(context, metadata_ref, session=session)
+                _snapshot_vms_metadata_delete(
+                    context, metadata_ref, session=session)
+
 
 @require_context
 def _snapshot_vms_metadata_create(context, values, session):
     """Create an SnapshotMetadata object"""
     metadata_ref = models.SnapshotVMMetadata()
     if not values.get('id'):
-        values['id'] = str(uuid.uuid4())    
-    return _snapshot_vms_metadata_update(context, metadata_ref, values, session)
+        values['id'] = str(uuid.uuid4())
+    return _snapshot_vms_metadata_update(
+        context, metadata_ref, values, session)
+
 
 @require_context
 def snapshot_vms_metadata_create(context, values, session):
     """Create an SnapshotMetadata object"""
     session = get_session()
     return _snapshot_vms_metadata_create(context, values, session)
+
 
 @require_context
 def _snapshot_vms_metadata_update(context, metadata_ref, values, session):
@@ -1435,6 +1659,7 @@ def _snapshot_vms_metadata_update(context, metadata_ref, values, session):
     metadata_ref.save(session=session)
     return metadata_ref
 
+
 @require_context
 def _snapshot_vms_metadata_delete(context, metadata_ref, session):
     """
@@ -1442,12 +1667,15 @@ def _snapshot_vms_metadata_delete(context, metadata_ref, session):
     """
     metadata_ref.delete(session=session)
 
-def _snapshot_vm_update(context, values, vm_id, snapshot_id, purge_metadata, session):
-    
+
+def _snapshot_vm_update(context, values, vm_id,
+                        snapshot_id, purge_metadata, session):
+
     metadata = values.pop('metadata', {})
-    
+
     if vm_id:
-        snapshot_vm_ref = _snapshot_vm_get(context, vm_id, snapshot_id, session)
+        snapshot_vm_ref = _snapshot_vm_get(
+            context, vm_id, snapshot_id, session)
         if snapshot_vm_ref is None:
             return
     else:
@@ -1457,14 +1685,19 @@ def _snapshot_vm_update(context, values, vm_id, snapshot_id, purge_metadata, ses
         if not values.get('size'):
             values['size'] = 0
         if not values.get('restore_size'):
-            values['restore_size'] = 0   
+            values['restore_size'] = 0
 
     snapshot_vm_ref.update(values)
     snapshot_vm_ref.save(session)
-    
+
     if metadata:
-        _set_metadata_for_snapshot_vms(context, snapshot_vm_ref, metadata, purge_metadata, session=session)  
-      
+        _set_metadata_for_snapshot_vms(
+            context,
+            snapshot_vm_ref,
+            metadata,
+            purge_metadata,
+            session=session)
+
     return snapshot_vm_ref
 
 
@@ -1473,37 +1706,45 @@ def snapshot_vm_create(context, values):
     session = get_session()
     return _snapshot_vm_update(context, values, None, None, False, session)
 
+
 @require_context
-def snapshot_vm_update(context, vm_id, snapshot_id, values, purge_metadata=False):
+def snapshot_vm_update(context, vm_id, snapshot_id,
+                       values, purge_metadata=False):
     session = get_session()
-    return _snapshot_vm_update(context, values, vm_id, snapshot_id, purge_metadata, session)
+    return _snapshot_vm_update(
+        context, values, vm_id, snapshot_id, purge_metadata, session)
+
 
 @require_context
 def snapshot_vms_get(context, snapshot_id, **kwargs):
     session = kwargs.get('session') or get_session()
     try:
-        query = session.query(models.SnapshotVMs)\
-                       .options(sa_orm.joinedload(models.SnapshotVMs.metadata))\
-                       .filter_by(snapshot_id=snapshot_id)\
-
+        query = session.query(
+            models.SnapshotVMs) .options(
+            sa_orm.joinedload(
+                models.SnapshotVMs.metadata)) .filter_by(
+                snapshot_id=snapshot_id)
         snapshot_vms = query.all()
 
     except sa_orm.exc.NoResultFound:
         raise exception.SnapshotVMsNotFound(snapshot_id=snapshot_id)
-    
-    return snapshot_vms    
-   
+
+    return snapshot_vms
+
+
 @require_context
 def _snapshot_vm_get(context, vm_id, snapshot_id, session):
     try:
-        query = session.query(models.SnapshotVMs)\
-                       .options(sa_orm.joinedload(models.SnapshotVMs.metadata))\
-                       .filter_by(vm_id=vm_id)
+        query = session.query(
+            models.SnapshotVMs) .options(
+            sa_orm.joinedload(
+                models.SnapshotVMs.metadata)) .filter_by(
+                vm_id=vm_id)
 
         if snapshot_id is not None:
-           query = query.filter_by(snapshot_id=snapshot_id)
+            query = query.filter_by(snapshot_id=snapshot_id)
 
-        #TODO(gbasava): filter out deleted snapshot_vm if context disallows it
+        # TODO(gbasava): filter out deleted snapshot_vm if context disallows it
         snapshot_vm = query.first()
 
     except sa_orm.exc.NoResultFound:
@@ -1511,11 +1752,13 @@ def _snapshot_vm_get(context, vm_id, snapshot_id, session):
 
     return snapshot_vm
 
+
 @require_context
 def snapshot_vm_get(context, vm_id, snapshot_id):
-    session = get_session() 
-    return _snapshot_vm_get(context, vm_id, snapshot_id, session)   
-    
+    session = get_session()
+    return _snapshot_vm_get(context, vm_id, snapshot_id, session)
+
+
 @require_context
 def snapshot_vm_delete(context, vm_id, snapshot_id):
     session = get_session()
@@ -1527,8 +1770,9 @@ def snapshot_vm_delete(context, vm_id, snapshot_id):
                     'deleted': True,
                     'deleted_at': timeutils.utcnow(),
                     'updated_at': literal_column('updated_at')})
-#################################################################################################################
-            
+##########################################################################
+
+
 @require_context
 def vm_recent_snapshot_create(context, values):
     vm_recent_snapshot = models.VMRecentSnapshot()
@@ -1536,31 +1780,34 @@ def vm_recent_snapshot_create(context, values):
     vm_recent_snapshot.save()
     return vm_recent_snapshot
 
+
 @require_context
 def vm_recent_snapshot_get(context, vm_id, **kwargs):
     session = kwargs.get('session') or get_session()
     result = model_query(context, models.VMRecentSnapshot, session=session).\
-                            filter_by(vm_id=vm_id).\
-                            first()
+        filter_by(vm_id=vm_id).\
+        first()
 
     return result
+
 
 @require_context
 def vm_recent_snapshot_update(context, vm_id, values):
     session = get_session()
     with session.begin():
         vm_recent_snapshot = model_query(context, models.VMRecentSnapshot,
-                             session=session, read_deleted="yes").\
-            filter_by(vm_id = vm_id).first()
+                                         session=session, read_deleted="yes").\
+            filter_by(vm_id=vm_id).first()
 
         if not vm_recent_snapshot:
             values['vm_id'] = vm_id
             vm_recent_snapshot = models.VMRecentSnapshot()
-            
+
         vm_recent_snapshot.update(values)
         vm_recent_snapshot.save(session=session)
-        
+
     return vm_recent_snapshot
+
 
 @require_context
 def vm_recent_snapshot_delete(context, vm_id):
@@ -1573,10 +1820,17 @@ def vm_recent_snapshot_delete(context, vm_id):
                     'deleted_at': timeutils.utcnow(),
                     'updated_at': literal_column('updated_at')})
 
+
 """ snapshot vm resource functions """
+
+
 @require_context
-def _set_metadata_for_snapshot_vm_resource(context, snapshot_vm_resource_ref, metadata,
-                                           purge_metadata, session):
+def _set_metadata_for_snapshot_vm_resource(
+        context,
+        snapshot_vm_resource_ref,
+        metadata,
+        purge_metadata,
+        session):
     """
     Create or update a set of snapshot_vm_resource_metadata for a given snapshot resource
 
@@ -1590,36 +1844,45 @@ def _set_metadata_for_snapshot_vm_resource(context, snapshot_vm_resource_ref, me
         orig_metadata[metadata_ref.key] = metadata_ref
 
     for key, value in metadata.iteritems():
-        metadata_values = {'snapshot_vm_resource_id': snapshot_vm_resource_ref.id,
-                           'key': key,
-                           'value': value}
+        metadata_values = {
+            'snapshot_vm_resource_id': snapshot_vm_resource_ref.id,
+            'key': key,
+            'value': value}
         if key in orig_metadata:
             metadata_ref = orig_metadata[key]
-            _snapshot_vm_resource_metadata_update(context, metadata_ref, metadata_values, session)
+            _snapshot_vm_resource_metadata_update(
+                context, metadata_ref, metadata_values, session)
         else:
-            _snapshot_vm_resource_metadata_create(context, metadata_values, session)
+            _snapshot_vm_resource_metadata_create(
+                context, metadata_values, session)
 
     if purge_metadata:
         for key in orig_metadata.keys():
             if key not in metadata:
                 metadata_ref = orig_metadata[key]
-                _snapshot_vm_resource_metadata_delete(context, metadata_ref, session)
+                _snapshot_vm_resource_metadata_delete(
+                    context, metadata_ref, session)
+
 
 @require_context
 def _snapshot_vm_resource_metadata_create(context, values, session):
     """Create an SnapshotVMResourceMetadata object"""
     metadata_ref = models.SnapshotVMResourceMetadata()
     if not values.get('id'):
-        values['id'] = str(uuid.uuid4())    
-    return _snapshot_vm_resource_metadata_update(context, metadata_ref, values, session)
+        values['id'] = str(uuid.uuid4())
+    return _snapshot_vm_resource_metadata_update(
+        context, metadata_ref, values, session)
+
 
 @require_context
 def snapshot_vm_resource_metadata_create(context, values):
     session = get_session()
     return _snapshot_vm_resource_metadata_create(context, values, session)
 
+
 @require_context
-def _snapshot_vm_resource_metadata_update(context, metadata_ref, values, session):
+def _snapshot_vm_resource_metadata_update(
+        context, metadata_ref, values, session):
     """
     Used internally by snapshot_vm_resource_metadata_create and snapshot_vm_resource_metadata_update
     """
@@ -1628,6 +1891,7 @@ def _snapshot_vm_resource_metadata_update(context, metadata_ref, values, session
     metadata_ref.save(session=session)
     return metadata_ref
 
+
 @require_context
 def _snapshot_vm_resource_metadata_delete(context, metadata_ref, session):
     """
@@ -1635,25 +1899,33 @@ def _snapshot_vm_resource_metadata_delete(context, metadata_ref, session):
     """
     metadata_ref.delete(session=session)
 
+
 @require_context
-def _snapshot_vm_resource_update(context, values, snapshot_vm_resource_id, purge_metadata, session):
-    
+def _snapshot_vm_resource_update(
+        context, values, snapshot_vm_resource_id, purge_metadata, session):
+
     metadata = values.pop('metadata', {})
-    
+
     if snapshot_vm_resource_id:
-        snapshot_vm_resource_ref = _snapshot_vm_resource_get(context, snapshot_vm_resource_id, session=session)
+        snapshot_vm_resource_ref = _snapshot_vm_resource_get(
+            context, snapshot_vm_resource_id, session=session)
     else:
         snapshot_vm_resource_ref = models.SnapshotVMResources()
         if not values.get('size'):
-            values['size'] = 0        
+            values['size'] = 0
         if not values.get('restore_size'):
-            values['restore_size'] = 0   
-                
+            values['restore_size'] = 0
+
     snapshot_vm_resource_ref.update(values)
     snapshot_vm_resource_ref.save(session)
-    
-    _set_metadata_for_snapshot_vm_resource(context, snapshot_vm_resource_ref, metadata, purge_metadata, session)  
-      
+
+    _set_metadata_for_snapshot_vm_resource(
+        context,
+        snapshot_vm_resource_ref,
+        metadata,
+        purge_metadata,
+        session)
+
     return snapshot_vm_resource_ref
 
 
@@ -1662,103 +1934,124 @@ def snapshot_vm_resource_create(context, values):
     session = get_session()
     return _snapshot_vm_resource_update(context, values, None, False, session)
 
+
 @require_context
-def snapshot_vm_resource_update(context, snapshot_vm_resource_id, values, purge_metadata=False):
+def snapshot_vm_resource_update(
+        context, snapshot_vm_resource_id, values, purge_metadata=False):
     session = get_session()
-    return _snapshot_vm_resource_update(context, values, snapshot_vm_resource_id, purge_metadata, session)
+    return _snapshot_vm_resource_update(
+        context, values, snapshot_vm_resource_id, purge_metadata, session)
+
 
 @require_context
 def snapshot_vm_resources_get(context, vm_id, snapshot_id):
     session = get_session()
     try:
-        query = session.query(models.SnapshotVMResources)\
-                       .options(sa_orm.joinedload(models.SnapshotVMResources.metadata))\
-                       .filter_by(vm_id=vm_id)\
-                       .filter_by(snapshot_id=snapshot_id)
+        query = session.query(
+            models.SnapshotVMResources) .options(
+            sa_orm.joinedload(
+                models.SnapshotVMResources.metadata)) .filter_by(
+                vm_id=vm_id) .filter_by(
+                    snapshot_id=snapshot_id)
 
-        #TODO(gbasava): filter out deleted snapshots if context disallows it
+        # TODO(gbasava): filter out deleted snapshots if context disallows it
         snapshot_vm_resources = query.all()
 
     except sa_orm.exc.NoResultFound:
-        raise exception.SnapshotVMResourcesNotFound(snapshot_vm_id = vm_id, snapshot_id = snapshot_id)
-    
+        raise exception.SnapshotVMResourcesNotFound(
+            snapshot_vm_id=vm_id, snapshot_id=snapshot_id)
+
     return snapshot_vm_resources
+
 
 @require_context
 def snapshot_resources_get(context, snapshot_id, **kwargs):
     session = kwargs.get('session') or get_session()
     try:
-        query = session.query(models.SnapshotVMResources)\
-                       .options(sa_orm.joinedload(models.SnapshotVMResources.metadata))\
-                       .filter_by(snapshot_id=snapshot_id)
+        query = session.query(
+            models.SnapshotVMResources) .options(
+            sa_orm.joinedload(
+                models.SnapshotVMResources.metadata)) .filter_by(
+                snapshot_id=snapshot_id)
 
-        #TODO(gbasava): filter out deleted snapshots if context disallows it
+        # TODO(gbasava): filter out deleted snapshots if context disallows it
         snapshot_resources = query.all()
 
     except sa_orm.exc.NoResultFound:
-        raise exception.SnapshotResourcesNotFound(snapshot_id = snapshot_id)
-    
+        raise exception.SnapshotResourcesNotFound(snapshot_id=snapshot_id)
+
     return snapshot_resources
 
+
 @require_context
-def snapshot_vm_resource_get_by_resource_name(context, vm_id, snapshot_id, resource_name):
+def snapshot_vm_resource_get_by_resource_name(
+        context, vm_id, snapshot_id, resource_name):
     session = get_session()
     try:
-        query = session.query(models.SnapshotVMResources)\
-                       .options(sa_orm.joinedload(models.SnapshotVMResources.metadata))\
-                       .filter_by(vm_id=vm_id)\
-                       .filter_by(snapshot_id=snapshot_id)\
-                       .filter_by(resource_name=resource_name)
+        query = session.query(
+            models.SnapshotVMResources) .options(
+            sa_orm.joinedload(
+                models.SnapshotVMResources.metadata)) .filter_by(
+                vm_id=vm_id) .filter_by(
+                    snapshot_id=snapshot_id) .filter_by(
+                        resource_name=resource_name)
 
-        #TODO(gbasava): filter out deleted snapshots if context disallows it
+        # TODO(gbasava): filter out deleted snapshots if context disallows it
         snapshot_vm_resource = query.first()
 
     except sa_orm.exc.NoResultFound:
-        raise exception.SnapshotVMResourceWithNameNotFound(resource_name = resource_name, 
-                                                           snapshot_vm_id = vm_id, 
-                                                           snapshot_id = snapshot_id)
+        raise exception.SnapshotVMResourceWithNameNotFound(
+            resource_name=resource_name, snapshot_vm_id=vm_id, snapshot_id=snapshot_id)
 
     return snapshot_vm_resource
 
+
 @require_context
-def snapshot_vm_resource_get_by_resource_pit_id(context, vm_id, snapshot_id, resource_pit_id):
+def snapshot_vm_resource_get_by_resource_pit_id(
+        context, vm_id, snapshot_id, resource_pit_id):
     session = get_session()
     try:
-        query = session.query(models.SnapshotVMResources)\
-                       .options(sa_orm.joinedload(models.SnapshotVMResources.metadata))\
-                       .filter_by(vm_id=vm_id)\
-                       .filter_by(snapshot_id=snapshot_id)\
-                       .filter_by(resource_pit_id=resource_pit_id)
+        query = session.query(
+            models.SnapshotVMResources) .options(
+            sa_orm.joinedload(
+                models.SnapshotVMResources.metadata)) .filter_by(
+                vm_id=vm_id) .filter_by(
+                    snapshot_id=snapshot_id) .filter_by(
+                        resource_pit_id=resource_pit_id)
 
-        #TODO(gbasava): filter out deleted snapshots if context disallows it
+        # TODO(gbasava): filter out deleted snapshots if context disallows it
         snapshot_vm_resource = query.first()
 
     except sa_orm.exc.NoResultFound:
-        raise exception.SnapshotVMResourceWithNameNotFound(resource_pit_id = resource_pit_id, 
-                                                           snapshot_vm_id = vm_id, 
-                                                           snapshot_id = snapshot_id)
+        raise exception.SnapshotVMResourceWithNameNotFound(
+            resource_pit_id=resource_pit_id, snapshot_vm_id=vm_id, snapshot_id=snapshot_id)
 
     return snapshot_vm_resource
+
 
 @require_context
 def _snapshot_vm_resource_get(context, id, session):
     try:
-        query = session.query(models.SnapshotVMResources)\
-                       .options(sa_orm.joinedload(models.SnapshotVMResources.metadata))\
-                       .filter_by(id=id)
+        query = session.query(
+            models.SnapshotVMResources) .options(
+            sa_orm.joinedload(
+                models.SnapshotVMResources.metadata)) .filter_by(
+                id=id)
 
-        #TODO(gbasava): filter out deleted snapshots if context disallows it
+        # TODO(gbasava): filter out deleted snapshots if context disallows it
         snapshot_vm_resource = query.first()
 
     except sa_orm.exc.NoResultFound:
-        raise exception.SnapshotVMResourceNotFound(snapshot_vm_resource_id = id)
+        raise exception.SnapshotVMResourceNotFound(snapshot_vm_resource_id=id)
 
     return snapshot_vm_resource
+
 
 @require_context
 def snapshot_vm_resource_get(context, id):
     session = get_session()
     return _snapshot_vm_resource_get(context, id, session)
+
 
 @require_context
 def snapshot_vm_resource_delete(context, id):
@@ -1771,9 +2064,16 @@ def snapshot_vm_resource_delete(context, id):
                     'deleted_at': timeutils.utcnow(),
                     'updated_at': literal_column('updated_at')})
 
+
 """ disk resource snapshot functions """
-def _set_metadata_for_vm_disk_resource_snap(context, vm_disk_resource_snap_ref, metadata,
-                                            purge_metadata, session):
+
+
+def _set_metadata_for_vm_disk_resource_snap(
+        context,
+        vm_disk_resource_snap_ref,
+        metadata,
+        purge_metadata,
+        session):
     """
     Create or update a set of vm_disk_resource_snap_metadata for a given snapshot
 
@@ -1787,28 +2087,35 @@ def _set_metadata_for_vm_disk_resource_snap(context, vm_disk_resource_snap_ref, 
         orig_metadata[metadata_ref.key] = metadata_ref
 
     for key, value in metadata.iteritems():
-        metadata_values = {'vm_disk_resource_snap_id': vm_disk_resource_snap_ref.id,
-                           'key': key,
-                           'value': value}
+        metadata_values = {
+            'vm_disk_resource_snap_id': vm_disk_resource_snap_ref.id,
+            'key': key,
+            'value': value}
         if key in orig_metadata:
             metadata_ref = orig_metadata[key]
-            _vm_disk_resource_snap_metadata_update(context, metadata_ref, metadata_values, session)
+            _vm_disk_resource_snap_metadata_update(
+                context, metadata_ref, metadata_values, session)
         else:
-            _vm_disk_resource_snap_metadata_create(context, metadata_values, session)
+            _vm_disk_resource_snap_metadata_create(
+                context, metadata_values, session)
 
     if purge_metadata:
         for key in orig_metadata.keys():
             if key not in metadata:
                 metadata_ref = orig_metadata[key]
-                _vm_disk_resource_snap_metadata_delete(context, metadata_ref, session)
+                _vm_disk_resource_snap_metadata_delete(
+                    context, metadata_ref, session)
+
 
 @require_context
 def _vm_disk_resource_snap_metadata_create(context, values, session):
     """Create an VMDiskResourceSnapMetadata object"""
     metadata_ref = models.VMDiskResourceSnapMetadata()
     if not values.get('id'):
-        values['id'] = str(uuid.uuid4())    
-    return _vm_disk_resource_snap_metadata_update(context, metadata_ref, values, session)
+        values['id'] = str(uuid.uuid4())
+    return _vm_disk_resource_snap_metadata_update(
+        context, metadata_ref, values, session)
+
 
 @require_context
 def vm_disk_resource_snap_metadata_create(context, values):
@@ -1817,7 +2124,8 @@ def vm_disk_resource_snap_metadata_create(context, values):
     return _vm_disk_resource_snap_metadata_create(context, values, session)
 
 
-def _vm_disk_resource_snap_metadata_update(context, metadata_ref, values, session):
+def _vm_disk_resource_snap_metadata_update(
+        context, metadata_ref, values, session):
     """
     Used internally by vm_disk_resource_snap_metadata_create and vm_disk_resource_snap_metadata_update
     """
@@ -1833,24 +2141,32 @@ def _vm_disk_resource_snap_metadata_delete(context, metadata_ref, session):
     """
     metadata_ref.delete(session=session)
 
-def _vm_disk_resource_snap_update(context, values, vm_disk_resource_snap_id, purge_metadata, session):
-    
+
+def _vm_disk_resource_snap_update(
+        context, values, vm_disk_resource_snap_id, purge_metadata, session):
+
     metadata = values.pop('metadata', {})
 
     if vm_disk_resource_snap_id:
-        vm_disk_resource_snap_ref = _vm_disk_resource_snap_get(context, vm_disk_resource_snap_id, session)
+        vm_disk_resource_snap_ref = _vm_disk_resource_snap_get(
+            context, vm_disk_resource_snap_id, session)
     else:
         vm_disk_resource_snap_ref = models.VMDiskResourceSnaps()
         if not values.get('size'):
             values['size'] = 0
         if not values.get('restore_size'):
-            values['restore_size'] = 0   
-            
+            values['restore_size'] = 0
+
     vm_disk_resource_snap_ref.update(values)
     vm_disk_resource_snap_ref.save(session)
-    
-    _set_metadata_for_vm_disk_resource_snap(context, vm_disk_resource_snap_ref, metadata, purge_metadata, session)  
-      
+
+    _set_metadata_for_vm_disk_resource_snap(
+        context,
+        vm_disk_resource_snap_ref,
+        metadata,
+        purge_metadata,
+        session)
+
     return vm_disk_resource_snap_ref
 
 
@@ -1859,79 +2175,104 @@ def vm_disk_resource_snap_create(context, values):
     session = get_session()
     return _vm_disk_resource_snap_update(context, values, None, False, session)
 
+
 @require_context
-def vm_disk_resource_snap_update(context, vm_disk_resource_snap_id, values, purge_metadata=False):
+def vm_disk_resource_snap_update(
+        context, vm_disk_resource_snap_id, values, purge_metadata=False):
     session = get_session()
-    return _vm_disk_resource_snap_update(context, values, vm_disk_resource_snap_id, purge_metadata, session)
+    return _vm_disk_resource_snap_update(
+        context, values, vm_disk_resource_snap_id, purge_metadata, session)
+
 
 @require_context
 def vm_disk_resource_snaps_get(context, snapshot_vm_resource_id, **kwargs):
     session = kwargs.get('session') or get_session()
     try:
-        query = session.query(models.VMDiskResourceSnaps)\
-                       .options(sa_orm.joinedload(models.VMDiskResourceSnaps.metadata))\
-                       .filter_by(snapshot_vm_resource_id=snapshot_vm_resource_id)
+        query = session.query(
+            models.VMDiskResourceSnaps) .options(
+            sa_orm.joinedload(
+                models.VMDiskResourceSnaps.metadata)) .filter_by(
+                snapshot_vm_resource_id=snapshot_vm_resource_id)
 
-        #TODO(gbasava): filter out deleted snapshots if context disallows it
+        # TODO(gbasava): filter out deleted snapshots if context disallows it
         vm_disk_resource_snaps = query.all()
 
     except sa_orm.exc.NoResultFound:
-        raise exception.VMDiskResourceSnapsNotFound(snapshot_vm_resource_id = snapshot_vm_resource_id)
-    
+        raise exception.VMDiskResourceSnapsNotFound(
+            snapshot_vm_resource_id=snapshot_vm_resource_id)
+
     return vm_disk_resource_snaps
+
 
 @require_context
 def vm_disk_resource_snap_get_top(context, snapshot_vm_resource_id):
     session = get_session()
     try:
-        query = session.query(models.VMDiskResourceSnaps)\
-                       .options(sa_orm.joinedload(models.VMDiskResourceSnaps.metadata))\
-                       .filter_by(snapshot_vm_resource_id = snapshot_vm_resource_id)\
-                       .filter_by(top= True)
+        query = session.query(
+            models.VMDiskResourceSnaps) .options(
+            sa_orm.joinedload(
+                models.VMDiskResourceSnaps.metadata)) .filter_by(
+                snapshot_vm_resource_id=snapshot_vm_resource_id) .filter_by(
+                    top=True)
 
-        #TODO(gbasava): filter out resource snapshots if context disallows it
+        # TODO(gbasava): filter out resource snapshots if context disallows it
         vm_disk_resource_snap = query.one()
 
     except sa_orm.exc.NoResultFound:
-        raise exception.VMDiskResourceSnapTopNotFound(snapshot_vm_resource_id = snapshot_vm_resource_id)
-    
+        raise exception.VMDiskResourceSnapTopNotFound(
+            snapshot_vm_resource_id=snapshot_vm_resource_id)
+
     return vm_disk_resource_snap
+
 
 @require_context
 def vm_disk_resource_snap_get_bottom(context, snapshot_vm_resource_id):
-    vm_disk_resource_snap = db.vm_disk_resource_snap_get_top(context, snapshot_vm_resource_id)
+    vm_disk_resource_snap = db.vm_disk_resource_snap_get_top(
+        context, snapshot_vm_resource_id)
     while vm_disk_resource_snap and vm_disk_resource_snap.vm_disk_resource_snap_backing_id:
-        vm_disk_resource_snap_backing = db.vm_disk_resource_snap_get(context,vm_disk_resource_snap.vm_disk_resource_snap_backing_id)
+        vm_disk_resource_snap_backing = db.vm_disk_resource_snap_get(
+            context, vm_disk_resource_snap.vm_disk_resource_snap_backing_id)
         if vm_disk_resource_snap_backing.snapshot_vm_resource_id == vm_disk_resource_snap.snapshot_vm_resource_id:
             vm_disk_resource_snap = vm_disk_resource_snap_backing
         else:
             break
     return vm_disk_resource_snap
 
+
 @require_context
 def _vm_disk_resource_snap_get(context, vm_disk_resource_snap_id, session):
     try:
-        query = session.query(models.VMDiskResourceSnaps)\
-                       .options(sa_orm.joinedload(models.VMDiskResourceSnaps.metadata))\
-                       .filter_by(id=vm_disk_resource_snap_id)
+        query = session.query(
+            models.VMDiskResourceSnaps) .options(
+            sa_orm.joinedload(
+                models.VMDiskResourceSnaps.metadata)) .filter_by(
+                id=vm_disk_resource_snap_id)
 
-        #TODO(gbasava): filter out deleted resource snapshots if context disallows it
+        # TODO(gbasava): filter out deleted resource snapshots if context
+        # disallows it
         vm_disk_resource_snap = query.one()
 
     except sa_orm.exc.NoResultFound:
-        raise exception.VMDiskResourceSnapNotFound(vm_disk_resource_snap_id = vm_disk_resource_snap_id)
-    
+        raise exception.VMDiskResourceSnapNotFound(
+            vm_disk_resource_snap_id=vm_disk_resource_snap_id)
+
     return vm_disk_resource_snap
+
 
 @require_context
 def vm_disk_resource_snap_get(context, vm_disk_resource_snap_id):
     session = get_session()
-    return _vm_disk_resource_snap_get(context, vm_disk_resource_snap_id, session)
+    return _vm_disk_resource_snap_get(
+        context, vm_disk_resource_snap_id, session)
+
 
 @require_context
-def vm_disk_resource_snap_get_snapshot_vm_resource_id(context, vm_disk_resource_snap_id):
-    vm_disk_resource_snap = vm_disk_resource_snap_get(context, vm_disk_resource_snap_id)
+def vm_disk_resource_snap_get_snapshot_vm_resource_id(
+        context, vm_disk_resource_snap_id):
+    vm_disk_resource_snap = vm_disk_resource_snap_get(
+        context, vm_disk_resource_snap_id)
     return vm_disk_resource_snap.snapshot_vm_resource_id
+
 
 @require_context
 def vm_disk_resource_snap_delete(context, vm_disk_resource_snap_id):
@@ -1943,10 +2284,17 @@ def vm_disk_resource_snap_delete(context, vm_disk_resource_snap_id):
                     'deleted': True,
                     'deleted_at': timeutils.utcnow(),
                     'updated_at': literal_column('updated_at')})
-            
+
+
 """ network resource snapshot functions """
-def _set_metadata_for_vm_network_resource_snap(context, vm_network_resource_snap_ref, metadata,
-                                               purge_metadata, session):
+
+
+def _set_metadata_for_vm_network_resource_snap(
+        context,
+        vm_network_resource_snap_ref,
+        metadata,
+        purge_metadata,
+        session):
     """
     Create or update a set of vm_network_resource_snap_metadata for a given snapshot
 
@@ -1960,28 +2308,35 @@ def _set_metadata_for_vm_network_resource_snap(context, vm_network_resource_snap
         orig_metadata[metadata_ref.key] = metadata_ref
 
     for key, value in metadata.iteritems():
-        metadata_values = {'vm_network_resource_snap_id': vm_network_resource_snap_ref.vm_network_resource_snap_id,
-                           'key': key,
-                           'value': value}
+        metadata_values = {
+            'vm_network_resource_snap_id': vm_network_resource_snap_ref.vm_network_resource_snap_id,
+            'key': key,
+            'value': value}
         if key in orig_metadata:
             metadata_ref = orig_metadata[key]
-            _vm_network_resource_snap_metadata_update(context, metadata_ref, metadata_values, session)
+            _vm_network_resource_snap_metadata_update(
+                context, metadata_ref, metadata_values, session)
         else:
-            _vm_network_resource_snap_metadata_create(context, metadata_values, session)
+            _vm_network_resource_snap_metadata_create(
+                context, metadata_values, session)
 
     if purge_metadata:
         for key in orig_metadata.keys():
             if key not in metadata:
                 metadata_ref = orig_metadata[key]
-                _vm_network_resource_snap_metadata_delete(context, metadata_ref, session)
+                _vm_network_resource_snap_metadata_delete(
+                    context, metadata_ref, session)
+
 
 @require_context
 def _vm_network_resource_snap_metadata_create(context, values, session):
     """Create an VMNetworkResourceSnapMetadata object"""
     metadata_ref = models.VMNetworkResourceSnapMetadata()
     if not values.get('id'):
-        values['id'] = str(uuid.uuid4())    
-    return _vm_network_resource_snap_metadata_update(context, metadata_ref, values, session)
+        values['id'] = str(uuid.uuid4())
+    return _vm_network_resource_snap_metadata_update(
+        context, metadata_ref, values, session)
+
 
 @require_context
 def vm_network_resource_snap_metadata_create(context, values):
@@ -1989,7 +2344,9 @@ def vm_network_resource_snap_metadata_create(context, values):
     session = get_session()
     return _vm_network_resource_snap_metadata_create(context, values, session)
 
-def _vm_network_resource_snap_metadata_update(context, metadata_ref, values, session):
+
+def _vm_network_resource_snap_metadata_update(
+        context, metadata_ref, values, session):
     """
     Used internally by vm_network_resource_snap_metadata_create and vm_network_resource_snap_metadata_update
     """
@@ -1997,6 +2354,7 @@ def _vm_network_resource_snap_metadata_update(context, metadata_ref, values, ses
     metadata_ref.update(values)
     metadata_ref.save(session=session)
     return metadata_ref
+
 
 @require_context
 def _vm_network_resource_snap_metadata_delete(context, metadata_ref, session):
@@ -2006,63 +2364,84 @@ def _vm_network_resource_snap_metadata_delete(context, metadata_ref, session):
     metadata_ref.delete(session=session)
     return metadata_ref
 
-def _vm_network_resource_snap_update(context, vm_network_resource_snap_id, values, purge_metadata, session):
-    
+
+def _vm_network_resource_snap_update(
+        context, vm_network_resource_snap_id, values, purge_metadata, session):
+
     metadata = values.pop('metadata', {})
-    
+
     if vm_network_resource_snap_id:
-        vm_network_resource_snap_ref = vm_network_resource_snap_get(context, vm_network_resource_snap_id, session)
+        vm_network_resource_snap_ref = vm_network_resource_snap_get(
+            context, vm_network_resource_snap_id, session)
     else:
         vm_network_resource_snap_ref = models.VMNetworkResourceSnaps()
-    
+
     vm_network_resource_snap_ref.update(values)
     vm_network_resource_snap_ref.save(session)
-    
-    _set_metadata_for_vm_network_resource_snap(context, vm_network_resource_snap_ref, metadata, purge_metadata, session=session)  
-      
+
+    _set_metadata_for_vm_network_resource_snap(
+        context,
+        vm_network_resource_snap_ref,
+        metadata,
+        purge_metadata,
+        session=session)
+
     return vm_network_resource_snap_ref
 
 
 @require_context
 def vm_network_resource_snap_create(context, values):
     session = get_session()
-    return _vm_network_resource_snap_update(context, None, values, False, session)
+    return _vm_network_resource_snap_update(
+        context, None, values, False, session)
+
 
 @require_context
-def vm_network_resource_snap_update(context, vm_network_resource_snap_id, values, purge_metadata = False):
+def vm_network_resource_snap_update(
+        context, vm_network_resource_snap_id, values, purge_metadata=False):
     session = get_session()
-    return _vm_network_resource_snap_update(context, values, vm_network_resource_snap_id, purge_metadata, session)
+    return _vm_network_resource_snap_update(
+        context, values, vm_network_resource_snap_id, purge_metadata, session)
+
 
 @require_context
 def vm_network_resource_snaps_get(context, snapshot_vm_resource_id, **kwargs):
     session = kwargs.get('session') or get_session()
     try:
-        query = session.query(models.VMNetworkResourceSnaps)\
-                       .options(sa_orm.joinedload(models.VMNetworkResourceSnaps.metadata))\
-                       .filter_by(vm_network_resource_snap_id=snapshot_vm_resource_id)
+        query = session.query(
+            models.VMNetworkResourceSnaps) .options(
+            sa_orm.joinedload(
+                models.VMNetworkResourceSnaps.metadata)) .filter_by(
+                vm_network_resource_snap_id=snapshot_vm_resource_id)
 
-        #TODO(gbasava): filter out deleted snapshots if context disallows it
+        # TODO(gbasava): filter out deleted snapshots if context disallows it
         vm_network_resource_snaps = query.all()
 
     except sa_orm.exc.NoResultFound:
-        raise exception.VMNetworkResourceSnapsNotFound(snapshot_vm_resource_id = snapshot_vm_resource_id)
-    
+        raise exception.VMNetworkResourceSnapsNotFound(
+            snapshot_vm_resource_id=snapshot_vm_resource_id)
+
     return vm_network_resource_snaps
+
 
 @require_context
 def vm_network_resource_snap_get(context, vm_network_resource_snap_id):
     session = get_session()
     try:
-        query = session.query(models.VMNetworkResourceSnaps)\
-                       .options(sa_orm.joinedload(models.VMNetworkResourceSnaps.metadata))\
-                       .filter_by(vm_network_resource_snap_id=vm_network_resource_snap_id)
+        query = session.query(
+            models.VMNetworkResourceSnaps) .options(
+            sa_orm.joinedload(
+                models.VMNetworkResourceSnaps.metadata)) .filter_by(
+                vm_network_resource_snap_id=vm_network_resource_snap_id)
 
-        #TODO(gbasava): filter out deleted resource snapshots if context disallows it
+        # TODO(gbasava): filter out deleted resource snapshots if context
+        # disallows it
         vm_network_resource_snap = query.one()
 
     except sa_orm.exc.NoResultFound:
-        raise exception.VMNetworkResourceSnapNotFound(vm_network_resource_snap_id = vm_network_resource_snap_id)
-    
+        raise exception.VMNetworkResourceSnapNotFound(
+            vm_network_resource_snap_id=vm_network_resource_snap_id)
+
     return vm_network_resource_snap
 
 
@@ -2077,9 +2456,16 @@ def vm_network_resource_snap_delete(context, vm_network_resource_snap_id):
                     'deleted_at': timeutils.utcnow(),
                     'updated_at': literal_column('updated_at')})
 
+
 """ security group rule snapshot functions """
-def _set_metadata_for_vm_security_group_rule_snap(context, vm_security_group_rule_snap_ref, metadata,
-                                                  purge_metadata, session):
+
+
+def _set_metadata_for_vm_security_group_rule_snap(
+        context,
+        vm_security_group_rule_snap_ref,
+        metadata,
+        purge_metadata,
+        session):
     """
     Create or update a set of vm_security_group_rule_snap_metadata for a given snapshot
 
@@ -2093,36 +2479,46 @@ def _set_metadata_for_vm_security_group_rule_snap(context, vm_security_group_rul
         orig_metadata[metadata_ref.key] = metadata_ref
 
     for key, value in metadata.iteritems():
-        metadata_values = {'vm_security_group_rule_snap_id': vm_security_group_rule_snap_ref.id,
-                           'key': key,
-                           'value': value}
+        metadata_values = {
+            'vm_security_group_rule_snap_id': vm_security_group_rule_snap_ref.id,
+            'key': key,
+            'value': value}
         if key in orig_metadata:
             metadata_ref = orig_metadata[key]
-            _vm_security_group_rule_snap_metadata_update(context, metadata_ref, metadata_values, session)
+            _vm_security_group_rule_snap_metadata_update(
+                context, metadata_ref, metadata_values, session)
         else:
-            _vm_security_group_rule_snap_metadata_create(context, metadata_values, session)
+            _vm_security_group_rule_snap_metadata_create(
+                context, metadata_values, session)
 
     if purge_metadata:
         for key in orig_metadata.keys():
             if key not in metadata:
                 metadata_ref = orig_metadata[key]
-                _vm_security_group_rule_snap_metadata_delete(context, metadata_ref, session)
+                _vm_security_group_rule_snap_metadata_delete(
+                    context, metadata_ref, session)
+
 
 @require_context
 def _vm_security_group_rule_snap_metadata_create(context, values, session):
     """Create an VMSecurityGroupRuleSnapMetadata object"""
     metadata_ref = models.VMSecurityGroupRuleSnapMetadata()
     if not values.get('id'):
-        values['id'] = str(uuid.uuid4())    
-    return _vm_security_group_rule_snap_metadata_update(context, metadata_ref, values, session)
+        values['id'] = str(uuid.uuid4())
+    return _vm_security_group_rule_snap_metadata_update(
+        context, metadata_ref, values, session)
+
 
 @require_context
 def vm_security_group_rule_snap_metadata_create(context, values):
     """Create an VMSecurityGroupRuleSnapMetadata object"""
-    session = get_session() 
-    return _vm_security_group_rule_snap_metadata_create(context, values, session)
+    session = get_session()
+    return _vm_security_group_rule_snap_metadata_create(
+        context, values, session)
 
-def _vm_security_group_rule_snap_metadata_update(context, metadata_ref, values, session):
+
+def _vm_security_group_rule_snap_metadata_update(
+        context, metadata_ref, values, session):
     """
     Used internally by vm_security_group_rule_snap_metadata_create and vm_security_group_rule_snap_metadata_update
     """
@@ -2131,74 +2527,103 @@ def _vm_security_group_rule_snap_metadata_update(context, metadata_ref, values, 
     metadata_ref.save(session=session)
     return metadata_ref
 
+
 @require_context
-def _vm_security_group_rule_snap_metadata_delete(context, metadata_ref, session):
+def _vm_security_group_rule_snap_metadata_delete(
+        context, metadata_ref, session):
     """
     Used internally by vm_security_group_rule_snap_metadata_create and vm_security_group_rule_snap_metadata_update
     """
     metadata_ref.delete(session=session)
 
-def _vm_security_group_rule_snap_update(context, id, vm_security_group_snap_id, values, purge_metadata, session):
-    
+
+def _vm_security_group_rule_snap_update(
+        context,
+        id,
+        vm_security_group_snap_id,
+        values,
+        purge_metadata,
+        session):
+
     metadata = values.pop('metadata', {})
-    
+
     if id and vm_security_group_snap_id:
-        vm_security_group_rule_snap_ref = vm_security_group_rule_snap_get(context, id, vm_security_group_snap_id, session)
+        vm_security_group_rule_snap_ref = vm_security_group_rule_snap_get(
+            context, id, vm_security_group_snap_id, session)
     else:
         vm_security_group_rule_snap_ref = models.VMSecurityGroupRuleSnaps()
-    
+
     vm_security_group_rule_snap_ref.update(values)
     vm_security_group_rule_snap_ref.save(session)
-    
-    _set_metadata_for_vm_security_group_rule_snap(context, vm_security_group_rule_snap_ref, metadata, purge_metadata, session)  
-      
+
+    _set_metadata_for_vm_security_group_rule_snap(
+        context, vm_security_group_rule_snap_ref, metadata, purge_metadata, session)
+
     return vm_security_group_rule_snap_ref
+
 
 @require_context
 def vm_security_group_rule_snap_create(context, values):
     session = get_session()
-    return _vm_security_group_rule_snap_update(context, None, None, values, False, session)
+    return _vm_security_group_rule_snap_update(
+        context, None, None, values, False, session)
+
 
 @require_context
-def vm_security_group_rule_snap_update(context, id, vm_security_group_snap_id, values, purge_metadata=False):
+def vm_security_group_rule_snap_update(
+        context, id, vm_security_group_snap_id, values, purge_metadata=False):
     session = get_session()
-    return _vm_security_group_rule_snap_update(context, id, vm_security_group_snap_id, values, purge_metadata, session)
+    return _vm_security_group_rule_snap_update(
+        context, id, vm_security_group_snap_id, values, purge_metadata, session)
+
 
 @require_context
-def vm_security_group_rule_snaps_get(context, vm_security_group_snap_id, **kwargs):
+def vm_security_group_rule_snaps_get(
+        context, vm_security_group_snap_id, **kwargs):
     session = kwargs.get('session') or get_session()
     try:
-        query = session.query(models.VMSecurityGroupRuleSnaps)\
-                       .options(sa_orm.joinedload(models.VMSecurityGroupRuleSnaps.metadata))\
-                       .filter_by(vm_security_group_snap_id=vm_security_group_snap_id)
+        query = session.query(
+            models.VMSecurityGroupRuleSnaps) .options(
+            sa_orm.joinedload(
+                models.VMSecurityGroupRuleSnaps.metadata)) .filter_by(
+                vm_security_group_snap_id=vm_security_group_snap_id)
 
-        #TODO(gbasava): filter out deleted snapshots if context disallows it
+        # TODO(gbasava): filter out deleted snapshots if context disallows it
         vm_security_group_rule_snaps = query.all()
 
     except sa_orm.exc.NoResultFound:
-        raise exception.VMSecurityGroupRuleSnapsNotFound(vm_security_group_snap_id = vm_security_group_snap_id)
-    
+        raise exception.VMSecurityGroupRuleSnapsNotFound(
+            vm_security_group_snap_id=vm_security_group_snap_id)
+
     return vm_security_group_rule_snaps
+
 
 @require_context
 def vm_security_group_rule_snap_get(context, id, vm_security_group_snap_id):
     session = get_session()
     try:
-        query = session.query(models.VMSecurityGroupRuleSnaps)\
-                       .options(sa_orm.joinedload(models.VMSecurityGroupRuleSnaps.metadata))\
-                       .filter_by(id=id)\
-                       .filter_by(vm_security_group_snap_id=vm_security_group_snap_id)
+        query = session.query(
+            models.VMSecurityGroupRuleSnaps) .options(
+            sa_orm.joinedload(
+                models.VMSecurityGroupRuleSnaps.metadata)) .filter_by(
+                id=id) .filter_by(
+                    vm_security_group_snap_id=vm_security_group_snap_id)
 
-        #TODO(gbasava): filter out deleted resource snapshots if context disallows it
+        # TODO(gbasava): filter out deleted resource snapshots if context
+        # disallows it
         vm_security_group_rule_snap = query.one()
 
     except sa_orm.exc.NoResultFound:
-        raise exception.VMSecurityGroupRuleSnapNotFound(vm_security_group_rule_snap_id = id, vm_security_group_snap_id = vm_security_group_snap_id)
-    
+        raise exception.VMSecurityGroupRuleSnapNotFound(
+            vm_security_group_rule_snap_id=id,
+            vm_security_group_snap_id=vm_security_group_snap_id)
+
     return vm_security_group_rule_snap
 
+
 @require_context
-def vm_security_group_rule_snap_delete(context, id, vm_security_group_rule_snap_id):
+def vm_security_group_rule_snap_delete(
+        context, id, vm_security_group_rule_snap_id):
     session = get_session()
     with session.begin():
         session.query(models.VMSecurityGroupRuleSnaps).\
@@ -2208,35 +2633,41 @@ def vm_security_group_rule_snap_delete(context, id, vm_security_group_rule_snap_
                     'deleted': True,
                     'deleted_at': timeutils.utcnow(),
                     'updated_at': literal_column('updated_at')})
-            
+
+
 def get_metadata_value(metadata, key, default=None):
     for kvpair in metadata:
         if kvpair['key'] == key:
             return kvpair['value']
     return default
 
+
 #### Restore ################################################################
 """ restore functions """
+
+
 @require_admin_context
 def restore_mark_incomplete_as_error(context, host):
     """
     mark the restores that are left hanging from previous run on host as 'error'
     """
     session = get_session()
-    restores =  model_query(context, models.Restores, session=session).\
-                            filter_by(host=host).all()
+    restores = model_query(context, models.Restores, session=session).\
+        filter_by(host=host).all()
     for restore in restores:
         if restore.status != 'available' and restore.status != 'error' and\
            restore.status != 'cancelled':
-            values =  {'progress_percent': 100, 'progress_msg': '',
-                       'error_msg': 'Restore did not finish successfully',
-                       'status': 'error' }
+            values = {'progress_percent': 100, 'progress_msg': '',
+                      'error_msg': 'Restore did not finish successfully',
+                      'status': 'error'}
             restore.update(values)
             restore.save(session=session)
-            return snapshot_update(context, restore.snapshot_id, {'status': 'available' })            
-            
+            return snapshot_update(context, restore.snapshot_id, {
+                                   'status': 'available'})
+
+
 def _set_metadata_for_restore(context, restore_ref, metadata,
-                                    purge_metadata, session):
+                              purge_metadata, session):
     """
     Create or update a set of restore_metadata for a given restore
 
@@ -2255,7 +2686,8 @@ def _set_metadata_for_restore(context, restore_ref, metadata,
                            'value': value}
         if key in orig_metadata:
             metadata_ref = orig_metadata[key]
-            _restore_metadata_update(context, metadata_ref, metadata_values, session)
+            _restore_metadata_update(
+                context, metadata_ref, metadata_values, session)
         else:
             _restore_metadata_create(context, metadata_values, session)
 
@@ -2263,21 +2695,25 @@ def _set_metadata_for_restore(context, restore_ref, metadata,
         for key in orig_metadata.keys():
             if key not in metadata:
                 metadata_ref = orig_metadata[key]
-                _restore_metadata_delete(context, metadata_ref, session=session)
+                _restore_metadata_delete(
+                    context, metadata_ref, session=session)
+
 
 @require_context
 def _restore_metadata_create(context, values, session):
     """Create a RestoreMetadata object"""
     metadata_ref = models.RestoreMetadata()
     if not values.get('id'):
-        values['id'] = str(uuid.uuid4())    
+        values['id'] = str(uuid.uuid4())
     return _restore_metadata_update(context, metadata_ref, values, session)
+
 
 @require_context
 def restore_metadata_create(context, values, session):
     """Create an RestoreMetadata object"""
     session = get_session()
     return _restore_metadata_create(context, values, session)
+
 
 @require_context
 def _restore_metadata_update(context, metadata_ref, values, session):
@@ -2289,6 +2725,7 @@ def _restore_metadata_update(context, metadata_ref, values, session):
     metadata_ref.save(session=session)
     return metadata_ref
 
+
 @require_context
 def _restore_metadata_delete(context, metadata_ref, session):
     """
@@ -2296,23 +2733,31 @@ def _restore_metadata_delete(context, metadata_ref, session):
     """
     metadata_ref.delete(session=session)
 
+
 def _restore_update(context, values, restore_id, purge_metadata, session):
     try:
-        lock.acquire()    
+        lock.acquire()
         metadata = values.pop('metadata', {})
-        
+
         if restore_id:
-            restore_ref = model_query(context, models.Restores, session=session, read_deleted="yes").\
-                                        filter_by(id=restore_id).first()
+            restore_ref = model_query(
+                context,
+                models.Restores,
+                session=session,
+                read_deleted="yes"). filter_by(
+                id=restore_id).first()
             if not restore_ref:
                 lock.release()
-                raise exception.RestoreNotFound(restore_id = restore_id)
-                                                        
+                raise exception.RestoreNotFound(restore_id=restore_id)
+
             if not values.get('uploaded_size'):
                 if values.get('uploaded_size_incremental'):
-                    values['uploaded_size'] =  restore_ref.uploaded_size + values.get('uploaded_size_incremental') 
-                    if not values.get('progress_percent') and restore_ref.size > 0:
-                        values['progress_percent'] = min( 99, (100 * values.get('uploaded_size'))/restore_ref.size )
+                    values['uploaded_size'] = restore_ref.uploaded_size + \
+                        values.get('uploaded_size_incremental')
+                    if not values.get(
+                            'progress_percent') and restore_ref.size > 0:
+                        values['progress_percent'] = min(
+                            99, (100 * values.get('uploaded_size')) / restore_ref.size)
         else:
             restore_ref = models.Restores()
             if not values.get('id'):
@@ -2322,56 +2767,65 @@ def _restore_update(context, values, restore_id, purge_metadata, session):
             if not values.get('uploaded_size'):
                 values['uploaded_size'] = 0
             if not values.get('progress_percent'):
-                values['progress_percent'] = 0 
-                
+                values['progress_percent'] = 0
+
         restore_ref.update(values)
         restore_ref.save(session)
-        
+
         if metadata:
-            _set_metadata_for_restore(context, restore_ref, metadata, purge_metadata, session=session)  
-          
+            _set_metadata_for_restore(
+                context,
+                restore_ref,
+                metadata,
+                purge_metadata,
+                session=session)
+
         return restore_ref
     finally:
         lock.release()
-    return restore_ref               
-        
+    return restore_ref
+
+
 @require_context
 def _restore_get(context, restore_id, **kwargs):
-    if kwargs.get('session') == None:
+    if kwargs.get('session') is None:
         kwargs['session'] = get_session()
-    result = model_query(   context, models.Restores, **kwargs).\
-                            options(sa_orm.joinedload(models.Restores.metadata)).\
-                            filter_by(id=restore_id).\
-                            first()
+    result = model_query(context, models.Restores, **kwargs).\
+        options(sa_orm.joinedload(models.Restores.metadata)).\
+        filter_by(id=restore_id).\
+        first()
 
     if not result:
         raise exception.RestoreNotFound(restore_id=restore_id)
 
     return result
 
+
 @require_context
 def restore_get(context, restore_id, **kwargs):
-    if kwargs.get('session') == None:
-        kwargs['session'] = get_session()    
-    return _restore_get(context, restore_id, **kwargs) 
+    if kwargs.get('session') is None:
+        kwargs['session'] = get_session()
+    return _restore_get(context, restore_id, **kwargs)
 
 
 @require_context
-def restore_get_metadata_cancel_flag(context, restore_id, return_val=0, process=None, **kwargs):
-    flag='0'
+def restore_get_metadata_cancel_flag(
+        context, restore_id, return_val=0, process=None, **kwargs):
+    flag = '0'
     restore_obj = restore_get(context, restore_id)
     for meta in restore_obj.metadata:
         if meta.key == 'cancel_requested':
             flag = meta.value
-    
+
     if return_val == 1:
         return flag
 
-    if flag=='1': 
+    if flag == '1':
         if process:
-            process.kill() 
+            process.kill()
         error = _('Cancel requested for restore')
         raise exception.ErrorOccurred(reason=error)
+
 
 @require_context
 def restore_get_all(context, snapshot_id=None, **kwargs):
@@ -2379,9 +2833,10 @@ def restore_get_all(context, snapshot_id=None, **kwargs):
         if snapshot_id:
             return restore_get_all_by_snapshot(context, snapshot_id, **kwargs)
         else:
-            return restore_get_all_by_project(context, context.project_id, **kwargs)
-        
-    if snapshot_id == None:
+            return restore_get_all_by_project(
+                context, context.project_id, **kwargs)
+
+    if snapshot_id is None:
         if 'dashboard_item' in kwargs:
             if kwargs.get('dashboard_item') == 'activities':
                 if 'time_in_minutes' in kwargs:
@@ -2391,90 +2846,102 @@ def restore_get_all(context, snapshot_id=None, **kwargs):
                 time_delta = ((time_in_minutes / 60) / 24) * -1
                 result = \
                     model_query(context,
-                        models.Restores.id,
-                        models.Restores.deleted,
-                        models.Restores.deleted_at,
-                        models.Restores.display_name,
-                        models.Restores.status,
-                        models.Restores.created_at,
-                        models.Restores.user_id,
-                        models.Restores.project_id,
-                        (models.Snapshots.display_name).label('snapshot_name'),
-                        (models.Snapshots.created_at).label('snapshot_created_at'),
-                        (models.Workloads.display_name).label('workload_name'),
-                        (models.Workloads.created_at).label('workload_created_at'),
-                        **kwargs). \
+                                models.Restores.id,
+                                models.Restores.deleted,
+                                models.Restores.deleted_at,
+                                models.Restores.display_name,
+                                models.Restores.status,
+                                models.Restores.created_at,
+                                models.Restores.user_id,
+                                models.Restores.project_id,
+                                (models.Snapshots.display_name).label(
+                                    'snapshot_name'),
+                                (models.Snapshots.created_at).label(
+                                    'snapshot_created_at'),
+                                (models.Workloads.display_name).label(
+                                    'workload_name'),
+                                (models.Workloads.created_at).label(
+                                    'workload_created_at'),
+                                **kwargs). \
                     filter(or_(models.Restores.created_at > func.adddate(func.now(), time_delta),
                                models.Restores.deleted_at > func.adddate(func.now(), time_delta))). \
                     outerjoin(models.Snapshots,
-                            models.Restores.snapshot_id == models.Snapshots.id). \
+                              models.Restores.snapshot_id == models.Snapshots.id). \
                     outerjoin(models.Workloads,
-                            models.Snapshots.workload_id == models.Workloads.id). \
+                              models.Snapshots.workload_id == models.Workloads.id). \
                     order_by(models.Restores.created_at.desc()).all()
                 return result
         else:
             return model_query(context, models.Restores, **kwargs).\
-                            options(sa_orm.joinedload(models.Restores.metadata)).\
-                            order_by(models.Restores.created_at.desc()).all()        
+                options(sa_orm.joinedload(models.Restores.metadata)).\
+                order_by(models.Restores.created_at.desc()).all()
     else:
         return model_query(context, models.Restores, **kwargs).\
-                            options(sa_orm.joinedload(models.Restores.metadata)).\
-                            filter_by(snapshot_id=snapshot_id).\
-                            order_by(models.Restores.created_at.desc()).all()
+            options(sa_orm.joinedload(models.Restores.metadata)).\
+            filter_by(snapshot_id=snapshot_id).\
+            order_by(models.Restores.created_at.desc()).all()
 
-@require_context                            
+
+@require_context
 def restore_get_all_by_snapshot(context, snapshot_id, **kwargs):
-    if kwargs.get('session') == None:
+    if kwargs.get('session') is None:
         kwargs['session'] = get_session()
     return model_query(context, models.Restores, **kwargs).\
-                        options(sa_orm.joinedload(models.Restores.metadata)).\
-                        filter_by(snapshot_id=snapshot_id).\
-                        order_by(models.Restores.created_at.desc()).all()
-                                                        
+        options(sa_orm.joinedload(models.Restores.metadata)).\
+        filter_by(snapshot_id=snapshot_id).\
+        order_by(models.Restores.created_at.desc()).all()
+
+
 @require_context
 def restore_get_all_by_project(context, project_id, **kwargs):
-    if kwargs.get('session') == None:
+    if kwargs.get('session') is None:
         kwargs['session'] = get_session()
     authorize_project_context(context, project_id)
     return model_query(context, models.Restores, **kwargs).\
-                            options(sa_orm.joinedload(models.Restores.metadata)).\
-                            filter_by(project_id=project_id).all()
-        
+        options(sa_orm.joinedload(models.Restores.metadata)).\
+        filter_by(project_id=project_id).all()
+
+
 @require_context
-def restore_get_all_by_project_snapshot(context, project_id, snapshot_id, **kwargs):
-    if kwargs.get('session') == None:
+def restore_get_all_by_project_snapshot(
+        context, project_id, snapshot_id, **kwargs):
+    if kwargs.get('session') is None:
         kwargs['session'] = get_session()
     authorize_project_context(context, project_id)
     return model_query(context, models.Restores, **kwargs).\
-                            options(sa_orm.joinedload(models.Restores.metadata)).\
-                            filter_by(project_id=project_id).\
-                            filter_by(snapshot_id=snapshot_id).\
-                            order_by(models.Restores.created_at.desc()).all()
+        options(sa_orm.joinedload(models.Restores.metadata)).\
+        filter_by(project_id=project_id).\
+        filter_by(snapshot_id=snapshot_id).\
+        order_by(models.Restores.created_at.desc()).all()
+
 
 @require_context
 def restore_show(context, restore_id):
     session = get_session()
     result = model_query(context, models.Restores, session=session).\
-                            options(sa_orm.joinedload(models.Restores.metadata)).\
-                            filter_by(id=restore_id).\
-                            first()
+        options(sa_orm.joinedload(models.Restores.metadata)).\
+        filter_by(id=restore_id).\
+        first()
 
     if not result:
         raise exception.RestoreNotFound(restore_id=restore_id)
 
     return result
 
+
 @require_context
 def restore_create(context, values):
     session = get_session()
     return _restore_update(context, values, None, False, session)
 
+
 @require_context
 def restore_update(context, restore_id, values, purge_metadata=False):
     session = get_session()
-    return _restore_update(context, values, restore_id, purge_metadata, session)
+    return _restore_update(context, values, restore_id,
+                           purge_metadata, session)
 
-   
+
 @require_context
 def restore_delete(context, restore_id):
     session = get_session()
@@ -2486,10 +2953,13 @@ def restore_delete(context, restore_id):
                     'deleted_at': timeutils.utcnow(),
                     'updated_at': literal_column('updated_at')})
 
-#### RestoredVMs ################################################################
+
+#### RestoredVMs #########################################################
 """ restored_vms functions """
+
+
 def _set_metadata_for_restored_vms(context, restored_vm_ref, metadata,
-                                    purge_metadata, session):
+                                   purge_metadata, session):
     """
     Create or update a set of restored_vms_metadata for a given restored_vm
 
@@ -2508,7 +2978,8 @@ def _set_metadata_for_restored_vms(context, restored_vm_ref, metadata,
                            'value': value}
         if key in orig_metadata:
             metadata_ref = orig_metadata[key]
-            _restored_vms_metadata_update(context, metadata_ref, metadata_values, session)
+            _restored_vms_metadata_update(
+                context, metadata_ref, metadata_values, session)
         else:
             _restored_vms_metadata_create(context, metadata_values, session)
 
@@ -2516,21 +2987,26 @@ def _set_metadata_for_restored_vms(context, restored_vm_ref, metadata,
         for key in orig_metadata.keys():
             if key not in metadata:
                 metadata_ref = orig_metadata[key]
-                _restored_vms_metadata_delete(context, metadata_ref, session=session)
+                _restored_vms_metadata_delete(
+                    context, metadata_ref, session=session)
+
 
 @require_context
 def _restored_vms_metadata_create(context, values, session):
     """Create an RestoredMetadata object"""
     metadata_ref = models.RestoredVMMetadata()
     if not values.get('id'):
-        values['id'] = str(uuid.uuid4())    
-    return _restored_vms_metadata_update(context, metadata_ref, values, session)
+        values['id'] = str(uuid.uuid4())
+    return _restored_vms_metadata_update(
+        context, metadata_ref, values, session)
+
 
 @require_context
 def restored_vms_metadata_create(context, values, session):
     """Create an RestoredMetadata object"""
     session = get_session()
     return _restored_vms_metadata_create(context, values, session)
+
 
 @require_context
 def _restored_vms_metadata_update(context, metadata_ref, values, session):
@@ -2542,6 +3018,7 @@ def _restored_vms_metadata_update(context, metadata_ref, values, session):
     metadata_ref.save(session=session)
     return metadata_ref
 
+
 @require_context
 def _restored_vms_metadata_delete(context, metadata_ref, session):
     """
@@ -2549,10 +3026,12 @@ def _restored_vms_metadata_delete(context, metadata_ref, session):
     """
     metadata_ref.delete(session=session)
 
-def _restored_vm_update(context, values, vm_id, restore_id, purge_metadata, session):
-    
+
+def _restored_vm_update(context, values, vm_id,
+                        restore_id, purge_metadata, session):
+
     metadata = values.pop('metadata', {})
-    
+
     if vm_id:
         restored_vm_ref = _restored_vm_get(context, vm_id, restore_id, session)
     else:
@@ -2564,10 +3043,15 @@ def _restored_vm_update(context, values, vm_id, restore_id, purge_metadata, sess
 
     restored_vm_ref.update(values)
     restored_vm_ref.save(session)
-    
+
     if metadata:
-        _set_metadata_for_restored_vms(context, restored_vm_ref, metadata, purge_metadata, session=session)  
-      
+        _set_metadata_for_restored_vms(
+            context,
+            restored_vm_ref,
+            metadata,
+            purge_metadata,
+            session=session)
+
     return restored_vm_ref
 
 
@@ -2576,35 +3060,43 @@ def restored_vm_create(context, values):
     session = get_session()
     return _restored_vm_update(context, values, None, None, False, session)
 
+
 @require_context
-def restored_vm_update(context, vm_id, restore_id, values, purge_metadata=False):
+def restored_vm_update(context, vm_id, restore_id,
+                       values, purge_metadata=False):
     session = get_session()
-    return _restored_vm_update(context, values, vm_id, restore_id, purge_metadata, session)
+    return _restored_vm_update(
+        context, values, vm_id, restore_id, purge_metadata, session)
+
 
 @require_context
 def restored_vms_get(context, restore_id, **kwargs):
     session = kwargs.get('session') or get_session()
     try:
-        query = session.query(models.RestoredVMs)\
-                       .options(sa_orm.joinedload(models.RestoredVMs.metadata))\
-                       .filter_by(restore_id=restore_id)\
-
+        query = session.query(
+            models.RestoredVMs) .options(
+            sa_orm.joinedload(
+                models.RestoredVMs.metadata)) .filter_by(
+                restore_id=restore_id)
         restored_vms = query.all()
 
     except sa_orm.exc.NoResultFound:
         raise exception.RestoredVMsNotFound(restore_id=restore_id)
-    
-    return restored_vms    
-   
+
+    return restored_vms
+
+
 @require_context
 def _restored_vm_get(context, vm_id, restore_id, session):
     try:
-        query = session.query(models.RestoredVMs)\
-                       .options(sa_orm.joinedload(models.RestoredVMs.metadata))\
-                       .filter_by(vm_id=vm_id)\
-                       .filter_by(restore_id=restore_id)
+        query = session.query(
+            models.RestoredVMs) .options(
+            sa_orm.joinedload(
+                models.RestoredVMs.metadata)) .filter_by(
+                vm_id=vm_id) .filter_by(
+                    restore_id=restore_id)
 
-        #TODO(gbasava): filter out deleted restored_vm if context disallows it
+        # TODO(gbasava): filter out deleted restored_vm if context disallows it
         restored_vm = query.first()
 
     except sa_orm.exc.NoResultFound:
@@ -2612,11 +3104,13 @@ def _restored_vm_get(context, vm_id, restore_id, session):
 
     return restored_vm
 
+
 @require_context
 def restored_vm_get(context, vm_id, restore_id):
-    session = get_session() 
-    return _restored_vm_get(context, vm_id, restore_id, session)   
-    
+    session = get_session()
+    return _restored_vm_get(context, vm_id, restore_id, session)
+
+
 @require_context
 def restored_vm_delete(context, vm_id, restore_id):
     session = get_session()
@@ -2631,8 +3125,14 @@ def restored_vm_delete(context, vm_id, restore_id):
 
 
 """ restore vm resource functions """
-def _set_metadata_for_restored_vm_resource(context, restored_vm_resource_ref, metadata,
-                                           purge_metadata, session):
+
+
+def _set_metadata_for_restored_vm_resource(
+        context,
+        restored_vm_resource_ref,
+        metadata,
+        purge_metadata,
+        session):
     """
     Create or update a set of restored_vm_resource_metadata for a given restored resource
 
@@ -2646,36 +3146,45 @@ def _set_metadata_for_restored_vm_resource(context, restored_vm_resource_ref, me
         orig_metadata[metadata_ref.key] = metadata_ref
 
     for key, value in metadata.iteritems():
-        metadata_values = {'restored_vm_resource_id': restored_vm_resource_ref.id,
-                           'key': key,
-                           'value': value}
+        metadata_values = {
+            'restored_vm_resource_id': restored_vm_resource_ref.id,
+            'key': key,
+            'value': value}
         if key in orig_metadata:
             metadata_ref = orig_metadata[key]
-            _restored_vm_resource_metadata_update(context, metadata_ref, metadata_values, session)
+            _restored_vm_resource_metadata_update(
+                context, metadata_ref, metadata_values, session)
         else:
-            _restored_vm_resource_metadata_create(context, metadata_values, session)
+            _restored_vm_resource_metadata_create(
+                context, metadata_values, session)
 
     if purge_metadata:
         for key in orig_metadata.keys():
             if key not in metadata:
                 metadata_ref = orig_metadata[key]
-                restored_vm_resource_metadata_delete(context, metadata_ref, session=session)
+                restored_vm_resource_metadata_delete(
+                    context, metadata_ref, session=session)
+
 
 @require_context
 def _restored_vm_resource_metadata_create(context, values, session):
     """Create an RestoredVMResourceMetadata object"""
     metadata_ref = models.RestoredVMResourceMetadata()
     if not values.get('id'):
-        values['id'] = str(uuid.uuid4())    
-    return _restored_vm_resource_metadata_update(context, metadata_ref, values, session)
+        values['id'] = str(uuid.uuid4())
+    return _restored_vm_resource_metadata_update(
+        context, metadata_ref, values, session)
+
 
 @require_context
 def restored_vm_resource_metadata_create(context, values):
     """Create an RestoredVMResourceMetadata object"""
-    session = get_session()  
+    session = get_session()
     return _restored_vm_resource_metadata_create(context, values, session)
 
-def _restored_vm_resource_metadata_update(context, metadata_ref, values, session):
+
+def _restored_vm_resource_metadata_update(
+        context, metadata_ref, values, session):
     """
     Used internally by restored_vm_resource_metadata_create and restored_vm_resource_metadata_update
     """
@@ -2683,6 +3192,7 @@ def _restored_vm_resource_metadata_update(context, metadata_ref, values, session
     metadata_ref.update(values)
     metadata_ref.save(session=session)
     return metadata_ref
+
 
 @require_context
 def restored_vm_resource_metadata_delete(context, metadata_ref):
@@ -2693,20 +3203,28 @@ def restored_vm_resource_metadata_delete(context, metadata_ref):
     metadata_ref.delete(session=session)
     return metadata_ref
 
-def _restored_vm_resource_update(context, values, restored_vm_resource_id, purge_metadata, session):
-    
+
+def _restored_vm_resource_update(
+        context, values, restored_vm_resource_id, purge_metadata, session):
+
     metadata = values.pop('metadata', {})
 
     if restored_vm_resource_id:
-        restored_vm_resource_ref = restored_vm_resource_get(context, restored_vm_resource_id, session)
+        restored_vm_resource_ref = restored_vm_resource_get(
+            context, restored_vm_resource_id, session)
     else:
         restored_vm_resource_ref = models.RestoredVMResources()
-    
+
     restored_vm_resource_ref.update(values)
     restored_vm_resource_ref.save(session)
-    
-    _set_metadata_for_restored_vm_resource(context, restored_vm_resource_ref, metadata, purge_metadata, session)  
-      
+
+    _set_metadata_for_restored_vm_resource(
+        context,
+        restored_vm_resource_ref,
+        metadata,
+        purge_metadata,
+        session)
+
     return restored_vm_resource_ref
 
 
@@ -2715,63 +3233,77 @@ def restored_vm_resource_create(context, values):
     session = get_session()
     return _restored_vm_resource_update(context, values, None, False, session)
 
+
 @require_context
-def restored_vm_resource_update(context, restored_vm_resource_id, values, purge_metadata=False):
+def restored_vm_resource_update(
+        context, restored_vm_resource_id, values, purge_metadata=False):
     session = get_session()
-    return _restored_vm_resource_update(context, values, restored_vm_resource_id, purge_metadata, session)
+    return _restored_vm_resource_update(
+        context, values, restored_vm_resource_id, purge_metadata, session)
+
 
 @require_context
 def restored_vm_resources_get(context, vm_id, restore_id):
     session = get_session()
     try:
-        query = session.query(models.RestoredVMResources)\
-                       .options(sa_orm.joinedload(models.RestoredVMResources.metadata))\
-                       .filter_by(vm_id=vm_id)\
-                       .filter_by(restore_id=restore_id)
+        query = session.query(
+            models.RestoredVMResources) .options(
+            sa_orm.joinedload(
+                models.RestoredVMResources.metadata)) .filter_by(
+                vm_id=vm_id) .filter_by(
+                    restore_id=restore_id)
 
-        #TODO(gbasava): filter out deleted restores if context disallows it
+        # TODO(gbasava): filter out deleted restores if context disallows it
         restored_vm_resources = query.all()
 
     except sa_orm.exc.NoResultFound:
-        raise exception.RestoredVMResourcesNotFound(restore_vm_id = vm_id, restore_id = restore_id)
-    
+        raise exception.RestoredVMResourcesNotFound(
+            restore_vm_id=vm_id, restore_id=restore_id)
+
     return restored_vm_resources
 
+
 @require_context
-def restored_vm_resource_get_by_resource_name(context, vm_id, restore_id, resource_name):
+def restored_vm_resource_get_by_resource_name(
+        context, vm_id, restore_id, resource_name):
     session = get_session()
     try:
-        query = session.query(models.RestoredVMResources)\
-                       .options(sa_orm.joinedload(models.RestoredVMResources.metadata))\
-                       .filter_by(vm_id=vm_id)\
-                       .filter_by(restore_id=restore_id)\
-                       .filter_by(resource_name=resource_name)
+        query = session.query(
+            models.RestoredVMResources) .options(
+            sa_orm.joinedload(
+                models.RestoredVMResources.metadata)) .filter_by(
+                vm_id=vm_id) .filter_by(
+                    restore_id=restore_id) .filter_by(
+                        resource_name=resource_name)
 
-        #TODO(gbasava): filter out deleted restores if context disallows it
+        # TODO(gbasava): filter out deleted restores if context disallows it
         restored_vm_resources = query.first()
 
     except sa_orm.exc.NoResultFound:
-        raise exception.RestoredVMResourceWithNameNotFound(resource_name = resource_name,
-                                                           restore_vm_id = vm_id, 
-                                                           restore_id = restore_id)
+        raise exception.RestoredVMResourceWithNameNotFound(
+            resource_name=resource_name, restore_vm_id=vm_id, restore_id=restore_id)
 
     return restored_vm_resources
+
 
 @require_context
 def restored_vm_resource_get(context, id):
     session = get_session()
     try:
-        query = session.query(models.RestoredVMResources)\
-                       .options(sa_orm.joinedload(models.RestoredVMResources.metadata))\
-                       .filter_by(id=id)
+        query = session.query(
+            models.RestoredVMResources) .options(
+            sa_orm.joinedload(
+                models.RestoredVMResources.metadata)) .filter_by(
+            id=id)
 
-        #TODO(gbasava): filter out deleted restored if context disallows it
+        # TODO(gbasava): filter out deleted restored if context disallows it
         restored_vm_resources = query.first()
 
     except sa_orm.exc.NoResultFound:
-        raise exception.RestoredVMResourceWithIdNotFound(id = id)
+        raise exception.RestoredVMResourceWithIdNotFound(id=id)
 
     return restored_vm_resources
+
 
 @require_context
 def restored_vm_resource_delete(context, id, vm_id, restore_id):
@@ -2786,8 +3318,11 @@ def restored_vm_resource_delete(context, id, vm_id, restore_id):
                     'deleted_at': timeutils.utcnow(),
                     'updated_at': literal_column('updated_at')})
 
+
 #### Tasks ################################################################
 """ task functions """
+
+
 def _set_status_messages_for_task(context, task_ref, status_messages, session):
     """
     Create or update a set of task_status_messages for a given task
@@ -2798,16 +3333,21 @@ def _set_status_messages_for_task(context, task_ref, status_messages, session):
     :param session: A SQLAlchemy session to use (if present)
     """
     for key, status_message in status_messages.iteritems():
-        status_messages_values = {'task_id': task_ref.id, 'status_message': status_message}
+        status_messages_values = {
+            'task_id': task_ref.id,
+            'status_message': status_message}
         _task_status_messages_create(context, status_messages_values, session)
+
 
 @require_context
 def _task_status_messages_create(context, values, session):
     """Create a TaskStatusMessages object"""
-    status_messages_ref = models.TaskStatusMessages()    
+    status_messages_ref = models.TaskStatusMessages()
     if not values.get('id'):
-        values['id'] = str(uuid.uuid4())    
-    return _task_status_messages_update(context, status_messages_ref, values, session)
+        values['id'] = str(uuid.uuid4())
+    return _task_status_messages_update(
+        context, status_messages_ref, values, session)
+
 
 @require_context
 def task_status_messages_create(context, values, session):
@@ -2815,8 +3355,10 @@ def task_status_messages_create(context, values, session):
     session = get_session()
     return _task_status_messages_create(context, values, session)
 
+
 @require_context
-def _task_status_messages_update(context, status_messages_ref, values, session):
+def _task_status_messages_update(
+        context, status_messages_ref, values, session):
     """
     Used internally by task_status_messages_create and task_status_messages_update
     """
@@ -2825,6 +3367,7 @@ def _task_status_messages_update(context, status_messages_ref, values, session):
     status_messages_ref.save(session=session)
     return status_messages_ref
 
+
 @require_context
 def _task_status_messages_delete(context, status_messages_ref, session):
     """
@@ -2832,119 +3375,133 @@ def _task_status_messages_delete(context, status_messages_ref, session):
     """
     status_messages_ref.delete(session=session)
 
+
 def _task_update(context, values, task_id, session):
     try:
-        lock.acquire()    
+        lock.acquire()
         status_messages = values.pop('status_messages', {})
-        
+
         if task_id:
-            task_ref = model_query(context, models.Tasks, session=session, read_deleted="yes").\
-                                        filter_by(id=task_id).first()
+            task_ref = model_query(
+                context,
+                models.Tasks,
+                session=session,
+                read_deleted="yes"). filter_by(
+                id=task_id).first()
             if not task_ref:
                 lock.release()
-                raise exception.TasksNotFound(task_id = task_id)
-                                                        
+                raise exception.TasksNotFound(task_id=task_id)
+
         else:
             task_ref = models.Tasks()
             if not values.get('id'):
                 values['id'] = str(uuid.uuid4())
-                
+
         task_ref.update(values)
         task_ref.save(session)
-        
+
         if status_messages:
-            _set_status_messages_for_task(context, task_ref, status_messages, session=session)  
-          
+            _set_status_messages_for_task(
+                context, task_ref, status_messages, session=session)
+
         return task_ref
     finally:
         lock.release()
-    return task_ref               
-        
+    return task_ref
+
+
 @require_context
 def _task_get(context, task_id, **kwargs):
-    if kwargs.get('session') == None:
+    if kwargs.get('session') is None:
         kwargs['session'] = get_session()
-    result = model_query(   context, models.Tasks, **kwargs).\
-                            options(sa_orm.joinedload(models.Tasks.status_messages)).\
-                            filter_by(id=task_id).\
-                            first()
+    result = model_query(context, models.Tasks, **kwargs).\
+        options(sa_orm.joinedload(models.Tasks.status_messages)).\
+        filter_by(id=task_id).\
+        first()
 
     if not result:
         raise exception.TasksNotFound(task_id=task_id)
 
     return result
 
+
 @require_context
 def task_get(context, task_id, **kwargs):
-    if kwargs.get('session') == None:
-        kwargs['session'] = get_session()    
-    return _task_get(context, task_id, **kwargs) 
+    if kwargs.get('session') is None:
+        kwargs['session'] = get_session()
+    return _task_get(context, task_id, **kwargs)
+
 
 @require_context
 def task_get_all(context, **kwargs):
     if not is_admin_context(context):
         return task_get_all_by_project(context, context.project_id, **kwargs)
 
-    status = kwargs.get('status',None)    
-    size = kwargs.get('size',None)
-    page = kwargs.get('page',None)
-    time_in_minutes = kwargs.get('time_in_minutes',None)   
+    status = kwargs.get('status', None)
+    size = kwargs.get('size', None)
+    page = kwargs.get('page', None)
+    time_in_minutes = kwargs.get('time_in_minutes', None)
 
     offset = 0
     if page is not None and size is not None:
-       offset = (int(page) - 1) * int(size)
- 
-    query =  model_query(context, models.Tasks, **kwargs)
+        offset = (int(page) - 1) * int(size)
+
+    query = model_query(context, models.Tasks, **kwargs)
     query = query.options(sa_orm.joinedload(models.Tasks.status_messages))
 
     if status is not None:
-       query = query.filter_by(status=status)
-    
+        query = query.filter_by(status=status)
+
     if time_in_minutes is not None:
-       now = timeutils.utcnow()
-       minutes_ago = now - timedelta(minutes=int(time_in_minutes))
-       query = query.filter(models.Tasks.created_at > minutes_ago)  
- 
+        now = timeutils.utcnow()
+        minutes_ago = now - timedelta(minutes=int(time_in_minutes))
+        query = query.filter(models.Tasks.created_at > minutes_ago)
+
     query = query.order_by(models.Tasks.created_at.desc())
     if size is not None:
-       query = query.limit(int(size))
+        query = query.limit(int(size))
 
     if page is not None:
-       query = query.offset(offset)
+        query = query.offset(offset)
 
     return query.all()
-     
+
+
 @require_context
 def task_get_all_by_project(context, project_id, **kwargs):
-    if kwargs.get('session') == None:
+    if kwargs.get('session') is None:
         kwargs['session'] = get_session()
     authorize_project_context(context, project_id)
     return model_query(context, models.Tasks, **kwargs).\
-                            options(sa_orm.joinedload(models.Tasks.status_messages)).\
-                            filter_by(project_id=project_id).all()
+        options(sa_orm.joinedload(models.Tasks.status_messages)).\
+        filter_by(project_id=project_id).all()
+
 
 @require_context
 def task_show(context, task_id):
     session = get_session()
     result = model_query(context, models.Tasks, session=session).\
-                            options(sa_orm.joinedload(models.Tasks.status_messages)).\
-                            filter_by(id=task_id).\
-                            first()
+        options(sa_orm.joinedload(models.Tasks.status_messages)).\
+        filter_by(id=task_id).\
+        first()
 
     if not result:
         raise exception.TasksNotFound(task_id=task_id)
 
     return result
 
+
 @require_context
 def task_create(context, values):
     session = get_session()
     return _task_update(context, values, None, session)
 
+
 @require_context
 def task_update(context, task_id, values):
     session = get_session()
     return _task_update(context, values, task_id, session)
+
 
 @require_context
 def task_delete(context, task_id):
@@ -2956,12 +3513,14 @@ def task_delete(context, task_id):
                     'deleted': True,
                     'deleted_at': timeutils.utcnow(),
                     'updated_at': literal_column('updated_at')})
-            
-            
+
+
 #### Setting ################################################################
 """ setting functions """
+
+
 def _set_metadata_for_setting(context, setting_ref, metadata,
-                                    purge_metadata, session):
+                              purge_metadata, session):
     """
     Create or update a set of setting_metadata for a given setting
 
@@ -2976,12 +3535,13 @@ def _set_metadata_for_setting(context, setting_ref, metadata,
 
     for key, value in metadata.iteritems():
         metadata_values = {'settings_name': setting_ref.name,
-                           'settings_project_id' : setting_ref.project_id,
+                           'settings_project_id': setting_ref.project_id,
                            'key': key,
                            'value': value}
         if key in orig_metadata:
             metadata_ref = orig_metadata[key]
-            _setting_metadata_update(context, metadata_ref, metadata_values, session)
+            _setting_metadata_update(
+                context, metadata_ref, metadata_values, session)
         else:
             _setting_metadata_create(context, metadata_values, session)
 
@@ -2989,21 +3549,25 @@ def _set_metadata_for_setting(context, setting_ref, metadata,
         for key in orig_metadata.keys():
             if key not in metadata:
                 metadata_ref = orig_metadata[key]
-                _setting_metadata_delete(context, metadata_ref, session=session)
+                _setting_metadata_delete(
+                    context, metadata_ref, session=session)
+
 
 @require_context
 def _setting_metadata_create(context, values, session):
     """Create a SettingMetadata object"""
     metadata_ref = models.SettingMetadata()
     if not values.get('id'):
-        values['id'] = str(uuid.uuid4())    
+        values['id'] = str(uuid.uuid4())
     return _setting_metadata_update(context, metadata_ref, values, session)
+
 
 @require_context
 def setting_metadata_create(context, values, session):
     """Create a SettingMetadata object"""
     session = get_session()
     return _setting_metadata_create(context, values, session)
+
 
 @require_context
 def _setting_metadata_update(context, metadata_ref, values, session):
@@ -3015,6 +3579,7 @@ def _setting_metadata_update(context, metadata_ref, values, session):
     metadata_ref.save(session=session)
     return metadata_ref
 
+
 @require_context
 def _setting_metadata_delete(context, metadata_ref, session):
     """
@@ -3022,50 +3587,60 @@ def _setting_metadata_delete(context, metadata_ref, session):
     """
     metadata_ref.delete(session=session)
 
+
 def _setting_update(context, values, setting_name, purge_metadata, session):
     try:
-        lock.acquire()    
+        lock.acquire()
         metadata = values.pop('metadata', {})
-        
+
         if setting_name:
-            setting_ref = model_query(context, models.Settings, session=session, read_deleted="yes").\
-                                        filter_by(name=setting_name).\
-                                        filter_by(project_id=context.project_id).\
-                                        first()
+            setting_ref = model_query(
+                context,
+                models.Settings,
+                session=session,
+                read_deleted="yes"). filter_by(
+                name=setting_name). filter_by(
+                project_id=context.project_id). first()
             if not setting_ref:
                 lock.release()
-                raise exception.SettingNotFound(setting_name = setting_name)
-                                                        
+                raise exception.SettingNotFound(setting_name=setting_name)
+
         else:
             setting_ref = models.Settings()
             if not values.get('status'):
                 values['status'] = 'available'
             if not values.get('project_id'):
-                values['project_id'] = context.project_id                
+                values['project_id'] = context.project_id
         if 'is_hidden' in values:
-           values['hidden'] = int(values['is_hidden'])
+            values['hidden'] = int(values['is_hidden'])
         setting_ref.update(values)
         setting_ref.save(session)
-        
+
         if metadata:
-            _set_metadata_for_setting(context, setting_ref, metadata, purge_metadata, session=session)  
-          
+            _set_metadata_for_setting(
+                context,
+                setting_ref,
+                metadata,
+                purge_metadata,
+                session=session)
+
         return setting_ref
     finally:
         lock.release()
-    return setting_ref               
-        
+    return setting_ref
+
+
 @require_context
 def _setting_get(context, setting_name, **kwargs):
-    if kwargs.get('session') == None:
+    if kwargs.get('session') is None:
         kwargs['session'] = get_session()
-    get_hidden = kwargs.get('get_hidden', False)         
-    result = model_query(   context, models.Settings, **kwargs).\
-                    filter_by(hidden=get_hidden).\
-                    options(sa_orm.joinedload(models.Settings.metadata)).\
-                    filter_by(name=setting_name).\
-                    filter_by(project_id=context.project_id).\
-                    first()
+    get_hidden = kwargs.get('get_hidden', False)
+    result = model_query(context, models.Settings, **kwargs).\
+        filter_by(hidden=get_hidden).\
+        options(sa_orm.joinedload(models.Settings.metadata)).\
+        filter_by(name=setting_name).\
+        filter_by(project_id=context.project_id).\
+        first()
 
     if not result:
         if setting_name == 'page_size':
@@ -3073,62 +3648,83 @@ def _setting_get(context, setting_name, **kwargs):
         else:
             raise exception.SettingNotFound(setting_name=setting_name)
 
-
     return result
+
 
 @require_context
 def setting_get(context, setting_name, **kwargs):
-    if kwargs.get('session') == None:
-        kwargs['session'] = get_session()    
-    return _setting_get(context, setting_name, **kwargs) 
+    if kwargs.get('session') is None:
+        kwargs['session'] = get_session()
+    return _setting_get(context, setting_name, **kwargs)
+
 
 def setting_get_all(context, **kwargs):
     if context and not is_admin_context(context):
-        return setting_get_all_by_project(context, context.project_id, **kwargs)
-    
+        return setting_get_all_by_project(
+            context, context.project_id, **kwargs)
+
     get_hidden = kwargs.get('get_hidden', False)
 
     qs = model_query(context, models.Settings, **kwargs).\
-                        options(sa_orm.joinedload(models.Settings.metadata))
+        options(sa_orm.joinedload(models.Settings.metadata))
 
     if 'backup_settings' in kwargs:
-       qs = qs.filter(and_(or_(models.Settings.type != 'trust_id', models.Settings.type == None), models.Settings.project_id != 'Configurator'))
+        qs = qs.filter(and_(or_(models.Settings.type != 'trust_id',
+                                models.Settings.type is None),
+                            models.Settings.project_id != 'Configurator'))
     else:
-          qs = qs.filter_by(hidden=get_hidden)
+        qs = qs.filter_by(hidden=get_hidden)
 
     return qs.order_by(models.Settings.created_at.desc()).all()
 
+
 @require_context
 def setting_get_all_by_project(context, project_id, **kwargs):
-    if kwargs.get('session') == None:
+    if kwargs.get('session') is None:
         kwargs['session'] = get_session()
     authorize_project_context(context, project_id)
     return model_query(context, models.Settings, **kwargs).\
-                            options(sa_orm.joinedload(models.Settings.metadata)).\
-                            filter_by(project_id=project_id).all()
-        
+        options(sa_orm.joinedload(models.Settings.metadata)).\
+        filter_by(project_id=project_id).all()
+
+
 @require_context
 def setting_create(context, values):
     session = get_session()
     return _setting_update(context, values, None, False, session)
 
+
 @require_context
 def setting_update(context, setting_name, values, purge_metadata=False):
     session = get_session()
-    return _setting_update(context, values, setting_name, purge_metadata, session)
+    return _setting_update(context, values, setting_name,
+                           purge_metadata, session)
+
 
 @require_context
 def setting_delete(context, setting_name):
     session = get_session()
-    setting = _setting_get(context, setting_name, session = session)
+
+    try:
+        setting = _setting_get(context, setting_name, session=session)
+    except BaseException:
+        setting = _setting_get(
+            context,
+            setting_name,
+            session=session,
+            get_hidden=True)
+
     for metadata_ref in setting.metadata:
         metadata_ref.purge(session=session)
+
     session.refresh(setting)
     setting.purge(session=session)
-     
 
-#### VaultStorage ################################################################
+
+#### VaultStorage ########################################################
 """ vault_storage functions """
+
+
 def _set_metadata_for_vault_storage(context, vault_storage_ref, metadata,
                                     purge_metadata, session):
     """
@@ -3149,7 +3745,8 @@ def _set_metadata_for_vault_storage(context, vault_storage_ref, metadata,
                            'value': value}
         if key in orig_metadata:
             metadata_ref = orig_metadata[key]
-            _vault_storage_metadata_update(context, metadata_ref, metadata_values, session)
+            _vault_storage_metadata_update(
+                context, metadata_ref, metadata_values, session)
         else:
             _vault_storage_metadata_create(context, metadata_values, session)
 
@@ -3157,21 +3754,26 @@ def _set_metadata_for_vault_storage(context, vault_storage_ref, metadata,
         for key in orig_metadata.keys():
             if key not in metadata:
                 metadata_ref = orig_metadata[key]
-                _vault_storage_metadata_delete(context, metadata_ref, session=session)
+                _vault_storage_metadata_delete(
+                    context, metadata_ref, session=session)
+
 
 @require_context
 def _vault_storage_metadata_create(context, values, session):
     """Create a VaultStorageMetadata object"""
     metadata_ref = models.VaultStorageMetadata()
     if not values.get('id'):
-        values['id'] = str(uuid.uuid4())    
-    return _vault_storage_metadata_update(context, metadata_ref, values, session)
+        values['id'] = str(uuid.uuid4())
+    return _vault_storage_metadata_update(
+        context, metadata_ref, values, session)
+
 
 @require_context
 def vault_storage_metadata_create(context, values, session):
     """Create an VaultStorageMetadata object"""
     session = get_session()
     return _vault_storage_metadata_create(context, values, session)
+
 
 @require_context
 def _vault_storage_metadata_update(context, metadata_ref, values, session):
@@ -3183,6 +3785,7 @@ def _vault_storage_metadata_update(context, metadata_ref, values, session):
     metadata_ref.save(session=session)
     return metadata_ref
 
+
 @require_context
 def _vault_storage_metadata_delete(context, metadata_ref, session):
     """
@@ -3190,18 +3793,25 @@ def _vault_storage_metadata_delete(context, metadata_ref, session):
     """
     metadata_ref.delete(session=session)
 
-def _vault_storage_update(context, values, vault_storage_id, purge_metadata, session):
+
+def _vault_storage_update(
+        context, values, vault_storage_id, purge_metadata, session):
     try:
-        lock.acquire()    
+        lock.acquire()
         metadata = values.pop('metadata', {})
-        
+
         if vault_storage_id:
-            vault_storage_ref = model_query(context, models.VaultStorages, session=session, read_deleted="yes").\
-                                            filter_by(id=vault_storage_id).first()
+            vault_storage_ref = model_query(
+                context,
+                models.VaultStorages,
+                session=session,
+                read_deleted="yes"). filter_by(
+                id=vault_storage_id).first()
             if not vault_storage_ref:
                 lock.release()
-                raise exception.VaultStorageNotFound(vault_storage_id = vault_storage_id)
-                                                        
+                raise exception.VaultStorageNotFound(
+                    vault_storage_id=vault_storage_id)
+
         else:
             vault_storage_ref = models.VaultStorages()
             if not values.get('id'):
@@ -3209,82 +3819,98 @@ def _vault_storage_update(context, values, vault_storage_id, purge_metadata, ses
             if not values.get('capacity'):
                 values['capacity'] = 0
             if not values.get('used'):
-                values['used'] = 0                
-                
+                values['used'] = 0
+
         vault_storage_ref.update(values)
         vault_storage_ref.save(session)
-        
+
         if metadata:
-            _set_metadata_for_vault_storage(context, vault_storage_ref, metadata, purge_metadata, session=session)  
-          
+            _set_metadata_for_vault_storage(
+                context,
+                vault_storage_ref,
+                metadata,
+                purge_metadata,
+                session=session)
+
         return vault_storage_ref
     finally:
         lock.release()
-    return vault_storage_ref               
-        
+    return vault_storage_ref
+
+
 @require_context
 def _vault_storage_get(context, vault_storage_id, **kwargs):
-    if kwargs.get('session') == None:
+    if kwargs.get('session') is None:
         kwargs['session'] = get_session()
-    result = model_query(   context, models.VaultStorages, **kwargs).\
-                            options(sa_orm.joinedload(models.VaultStorages.metadata)).\
-                            filter_by(id=vault_storage_id).\
-                            first()
+    result = model_query(context, models.VaultStorages, **kwargs).\
+        options(sa_orm.joinedload(models.VaultStorages.metadata)).\
+        filter_by(id=vault_storage_id).\
+        first()
 
     if not result:
         raise exception.VaultStorageNotFound(vault_storage_id=vault_storage_id)
 
     return result
 
+
 @require_context
 def vault_storage_get(context, vault_storage_id, **kwargs):
-    if kwargs.get('session') == None:
-        kwargs['session'] = get_session()    
-    return _vault_storage_get(context, vault_storage_id, **kwargs) 
+    if kwargs.get('session') is None:
+        kwargs['session'] = get_session()
+    return _vault_storage_get(context, vault_storage_id, **kwargs)
+
 
 @require_context
 def vault_storage_get_all(context, workload_id=None, **kwargs):
     if not is_admin_context(context):
-        return vault_storage_get_all_by_project(context, context.project_id, **kwargs)
-    
-    if workload_id == None:
+        return vault_storage_get_all_by_project(
+            context, context.project_id, **kwargs)
+
+    if workload_id is None:
         return model_query(context, models.VaultStorages, **kwargs).\
-                            options(sa_orm.joinedload(models.VaultStorages.metadata)).\
-                            order_by(models.VaultStorages.created_at.desc()).all()        
+            options(sa_orm.joinedload(models.VaultStorages.metadata)).\
+            order_by(models.VaultStorages.created_at.desc()).all()
     else:
         return model_query(context, models.VaultStorages, **kwargs).\
-                            options(sa_orm.joinedload(models.VaultStorages.metadata)).\
-                            filter_by(workload_id=workload_id).\
-                            order_by(models.VaultStorages.created_at.desc()).all()
-                            
+            options(sa_orm.joinedload(models.VaultStorages.metadata)).\
+            filter_by(workload_id=workload_id).\
+            order_by(models.VaultStorages.created_at.desc()).all()
+
+
 @require_admin_context
 def vault_storage_get_all_by_workload(context, workload_id, **kwargs):
-    if kwargs.get('session') == None:
+    if kwargs.get('session') is None:
         kwargs['session'] = get_session()
-        
+
     return model_query(context, models.VaultStorages, **kwargs).\
-                        options(sa_orm.joinedload(models.VaultStorages.metadata)).\
-                        filter_by(workload_id=workload_id).\
-                        order_by(models.VaultStorages.created_at.desc()).all()
-                                                        
+        options(sa_orm.joinedload(models.VaultStorages.metadata)).\
+        filter_by(workload_id=workload_id).\
+        order_by(models.VaultStorages.created_at.desc()).all()
+
+
 @require_context
 def vault_storage_get_all_by_project(context, project_id, **kwargs):
-    if kwargs.get('session') == None:
+    if kwargs.get('session') is None:
         kwargs['session'] = get_session()
     authorize_project_context(context, project_id)
     return model_query(context, models.VaultStorages, **kwargs).\
-                            options(sa_orm.joinedload(models.VaultStorages.metadata)).\
-                            filter_by(project_id=project_id).all()
-        
+        options(sa_orm.joinedload(models.VaultStorages.metadata)).\
+        filter_by(project_id=project_id).all()
+
+
 @require_context
 def vault_storage_create(context, values):
     session = get_session()
     return _vault_storage_update(context, values, None, False, session)
 
+
 @require_context
-def vault_storage_update(context, vault_storage_id, values, purge_metadata=False):
+def vault_storage_update(context, vault_storage_id,
+                         values, purge_metadata=False):
     session = get_session()
-    return _vault_storage_update(context, values, vault_storage_id, purge_metadata, session)
+    return _vault_storage_update(
+        context, values, vault_storage_id, purge_metadata, session)
+
 
 @require_context
 def vault_storage_delete(context, vault_storage_id):
@@ -3296,60 +3922,70 @@ def vault_storage_delete(context, vault_storage_id):
                     'deleted': True,
                     'deleted_at': timeutils.utcnow(),
                     'updated_at': literal_column('updated_at')})
-            
+
+
 """
 Permanent Deletes
 """
+
+
 @require_context
 def purge_snapshot(context, id, session=None):
-    if session == None:
+    if session is None:
         session = get_session()
-    for snapshot_vm_resource in snapshot_resources_get(context, id, session=session):
+    for snapshot_vm_resource in snapshot_resources_get(
+            context, id, session=session):
         if snapshot_vm_resource.resource_type == 'disk':
-            for vm_disk_resource_snap in vm_disk_resource_snaps_get(context, snapshot_vm_resource.id, session=session):
+            for vm_disk_resource_snap in vm_disk_resource_snaps_get(
+                    context, snapshot_vm_resource.id, session=session):
                 for metadata_ref in vm_disk_resource_snap.metadata:
                     metadata_ref.purge(session)
                 session.refresh(vm_disk_resource_snap)
                 vm_disk_resource_snap.purge(session)
         if snapshot_vm_resource.resource_type == 'network' or \
-            snapshot_vm_resource.resource_type == 'subnet' or \
-            snapshot_vm_resource.resource_type == 'router' or \
-            snapshot_vm_resource.resource_type == 'nic':
-            for vm_network_resource_snap in vm_network_resource_snaps_get(context, snapshot_vm_resource.id, session=session):
+                snapshot_vm_resource.resource_type == 'subnet' or \
+                snapshot_vm_resource.resource_type == 'router' or \
+                snapshot_vm_resource.resource_type == 'nic':
+            for vm_network_resource_snap in vm_network_resource_snaps_get(
+                    context, snapshot_vm_resource.id, session=session):
                 for metadata_ref in vm_network_resource_snap.metadata:
                     metadata_ref.purge(session)
                 session.refresh(vm_network_resource_snap)
                 vm_network_resource_snap.purge(session)
         if snapshot_vm_resource.resource_type == 'security_group':
-            for vm_security_group_rule_snap in vm_security_group_rule_snaps_get(context, snapshot_vm_resource.id, session=session):
+            for vm_security_group_rule_snap in vm_security_group_rule_snaps_get(
+                    context, snapshot_vm_resource.id, session=session):
                 for metadata_ref in vm_network_resource_snap.metadata:
                     metadata_ref.purge(session)
                 session.refresh(vm_security_group_rule_snap)
                 vm_security_group_rule_snap.purge(session)
-        
+
         for metadata_ref in snapshot_vm_resource.metadata:
             metadata_ref.purge(session)
         session.refresh(snapshot_vm_resource)
         snapshot_vm_resource.purge(session)
-    
+
     for snapshot_vm in snapshot_vms_get(context, id, session=session):
         for metadata_ref in snapshot_vm.metadata:
             metadata_ref.purge(session)
-        vm_recent_snapshot = vm_recent_snapshot_get(context, snapshot_vm.vm_id, session=session)
+        vm_recent_snapshot = vm_recent_snapshot_get(
+            context, snapshot_vm.vm_id, session=session)
         if vm_recent_snapshot:
             vm_recent_snapshot.purge(session)
         session.refresh(snapshot_vm)
         snapshot_vm.purge(session)
-        
+
     snapshot = snapshot_get(context, id, session=session, read_deleted='yes')
     if snapshot:
         snapshot.purge(session)
-    
+
+
 @require_admin_context
 def purge_workload(context, id):
     try:
         session = get_session()
-        for snapshot in snapshot_get_all(context, session=session, read_deleted='yes'):
+        for snapshot in snapshot_get_all(
+                context, session=session, read_deleted='yes'):
             purge_snapshot(context, snapshot.id, session)
         for workload_vm in workload_vms_get(context, id, session=session):
             for metadata_ref in workload_vm.metadata:
@@ -3366,21 +4002,256 @@ def purge_workload(context, id):
     except Exception as ex:
         LOG.exception(ex)
 
-def delete_resource(context, resource_name, resources, metadata=True):
+
+@require_admin_context
+def config_workload_update(context, values):
+    session = get_session()
+    return _config_workload_update(context, values, session)
+
+
+@require_admin_context
+def config_workload_get(context, **kwargs):
+    session = get_session()
+    return _config_workload_get(context, session, **kwargs)
+
+
+def _config_workload_update(context, values, session):
+    metadata = values.pop('metadata', {})
     try:
-        session = get_session()
-        for resource in resources:
-            if metadata is True:
-                #First remove all entries from resource metadata table
-                session.query(eval('models.%s' % (resource_name[:-1] + "Metadata"))).\
-                    filter_by(map[resource_name]['resource_metadata_id_name'] = resource.id).delete()
-
-                #Remove entry from resource table
-                session.query(models.resource_name).filter_by(map[resource_name]\
-                                                        ['resource_id_name'] = resource.id).delete()
-            else:
-                session.query(models.resource_name).filter_by(map[resource_name]\
-                                                        ['resource_id_name'] = resource.id).delete()
+        config_workload_ref = _config_workload_get(context, session)
     except Exception as ex:
-        LOG.exception(ex)
+        config_workload_ref = models.ConfigWorkloads()
+        if not values.get('id'):
+            values['id'] = CONF.cloud_unique_id
 
+    config_workload_ref.update(values)
+    config_workload_ref.save(session)
+
+    if metadata:
+        _set_metadata_for_config_workload(
+            context, config_workload_ref, metadata, session=session)
+
+    return config_workload_ref
+
+
+def _config_workload_get(context, session, **kwargs):
+    try:
+        config_workload = model_query(
+            context, models.ConfigWorkloads, session=session, **kwargs).\
+            options(sa_orm.joinedload(models.ConfigWorkloads.metadata)).\
+            filter_by(id=CONF.cloud_unique_id).first()
+
+        if config_workload is None:
+            raise exception.ConfigWorkloadNotFound(id=CONF.cloud_unique_id)
+
+    except sa_orm.exc.NoResultFound:
+        raise exception.ConfigWorkloadNotFound(id=CONF.cloud_unique_id)
+
+    return config_workload
+
+
+def _set_metadata_for_config_workload(
+        context, config_workload_ref, metadata, session):
+    """
+    Create or update a set of config_workload_metadata for a given config_workload
+    """
+    orig_metadata = {}
+    for metadata_ref in config_workload_ref.metadata:
+        orig_metadata[metadata_ref.key] = metadata_ref
+
+    for key, value in metadata.iteritems():
+        metadata_values = {'config_workload_id': config_workload_ref.id,
+                           'key': key,
+                           'value': value}
+        if key in orig_metadata:
+            metadata_ref = orig_metadata[key]
+            _config_workload_metadata_update(
+                context, metadata_ref, metadata_values, session)
+        else:
+            _config_workload_metadata_create(context, metadata_values, session)
+
+
+def _config_workload_metadata_create(context, values, session):
+    """Create an ConfigWorkloadMetadata object"""
+    metadata_ref = models.ConfigWorkloadMetadata()
+    if not values.get('id'):
+        values['id'] = str(uuid.uuid4())
+    return _config_workload_metadata_update(
+        context, metadata_ref, values, session)
+
+
+@require_admin_context
+def config_workload_metadata_create(context, values, session):
+    """Create an ConfigWorkloadMetadata object"""
+    session = get_session()
+    return _config_workload_metadata_create(context, values, session)
+
+
+def _config_workload_metadata_update(context, metadata_ref, values, session):
+    """
+    Used internally by config_workload_metadata_create and config_workload_metadata_update
+    """
+    values["deleted"] = False
+    metadata_ref.update(values)
+    metadata_ref.save(session=session)
+    return metadata_ref
+
+
+def _config_workload_metadata_delete(context, metadata_ref, session):
+    """
+    Used internally by config_workload_metadata_create and config_workload_metadata_create
+    """
+    metadata_ref.delete(session=session)
+
+
+@require_admin_context
+def config_backup_create(context, values):
+    session = get_session()
+    return _config_backup_update(context, None, values, session)
+
+
+@require_admin_context
+def config_backup_update(context, backup_id, values):
+    session = get_session()
+    return _config_backup_update(context, backup_id, values, session)
+
+
+def _config_backup_update(context, backup_id, values, session):
+    try:
+        lock.acquire()
+        metadata = values.pop('metadata', {})
+
+        if backup_id:
+            backup_ref = model_query(
+                context,
+                models.ConfigBackups,
+                session=session,
+                read_deleted="yes"). options(
+                sa_orm.joinedload(
+                    models.ConfigBackups.metadata)). filter_by(
+                id=backup_id).first()
+            if not backup_ref:
+                lock.release()
+                raise exception.ConfigBackupNotFound(backup_id=backup_id)
+        else:
+            backup_ref = models.ConfigBackups()
+            if not values.get('id'):
+                values['id'] = str(uuid.uuid4())
+            if not values.get('size'):
+                values['size'] = 0
+        backup_ref.update(values)
+        backup_ref.save(session)
+
+        if metadata:
+            _set_metadata_for_config_backup(context, backup_ref,
+                                            metadata, session=session)
+
+        return backup_ref
+    finally:
+        lock.release()
+    return backup_ref
+
+
+def _config_backup_get(context, backup_id, **kwargs):
+    if kwargs.get('session') is None:
+        kwargs['session'] = get_session()
+    result = model_query(context, models.ConfigBackups, **kwargs).\
+        options(sa_orm.joinedload(models.ConfigBackups.metadata)).\
+        filter_by(id=backup_id).\
+        first()
+
+    if not result:
+        raise exception.ConfigBackupNotFound(backup_id=backup_id)
+
+    return result
+
+
+@require_admin_context
+def config_backup_get(context, backup_id, **kwargs):
+    if kwargs.get('session') is None:
+        kwargs['session'] = get_session()
+    return _config_backup_get(context, backup_id, **kwargs)
+
+
+@require_admin_context
+def config_backup_get_all(context, **kwargs):
+    qs = model_query(context, models.ConfigBackups, **kwargs).\
+        options(sa_orm.joinedload(models.ConfigBackups.metadata))
+
+    qs = qs.filter_by(config_workload_id=CONF.cloud_unique_id)
+
+    if 'date_from' in kwargs and kwargs['date_from'] is not None and kwargs['date_from'] != '':
+        if 'date_to' in kwargs and kwargs['date_to'] is not None and kwargs['date_to'] != '':
+            date_to = kwargs['date_to']
+        else:
+            date_to = datetime.now()
+        qs = qs.filter(
+            and_(
+                models.ConfigBackups.created_at >= func.date_format(
+                    kwargs['date_from'],
+                    '%y-%m-%dT%H:%i:%s'),
+                models.ConfigBackups.created_at <= func.date_format(
+                    date_to,
+                    '%y-%m-%dT%H:%i:%s')))
+
+    return qs.order_by(models.ConfigBackups.created_at.desc()).all()
+
+
+@require_admin_context
+def config_backup_delete(context, backup_id):
+    session = get_session()
+    with session.begin():
+        session.query(
+            models.ConfigBackupMetadata).filter_by(
+            config_backup_id=backup_id).delete()
+        session.query(models.ConfigBackups).filter_by(id=backup_id).delete()
+
+
+def _set_metadata_for_config_backup(context, backup_ref, metadata,
+                                    session):
+    """Create or update a set of config_backup_metadata for a given backup"""
+    orig_metadata = {}
+    for metadata_ref in backup_ref.metadata:
+        orig_metadata[metadata_ref.key] = metadata_ref
+
+    for key, value in metadata.iteritems():
+        metadata_values = {'config_backup_id': backup_ref.id,
+                           'key': key,
+                           'value': value}
+        if key in orig_metadata:
+            metadata_ref = orig_metadata[key]
+            _config_backup_metadata_update(
+                context, metadata_ref, metadata_values, session)
+        else:
+            _config_backup_metadata_create(context, metadata_values, session)
+
+
+def _config_backup_metadata_create(context, values, session):
+    """Create a ConfigBackupMetadata object"""
+    metadata_ref = models.ConfigBackupMetadata()
+    if not values.get('id'):
+        values['id'] = str(uuid.uuid4())
+    return _config_backup_metadata_update(
+        context, metadata_ref, values, session)
+
+
+@require_admin_context
+def config_backup_metadata_create(context, values, session):
+    """Create an ConfigBackupMetadata object"""
+    session = get_session()
+    return _config_backup_metadata_create(context, values, session)
+
+
+def _config_backup_metadata_update(context, metadata_ref, values, session):
+    """Update ConfigBackupMetadata object"""
+    values["deleted"] = False
+    metadata_ref.update(values)
+    metadata_ref.save(session=session)
+    return metadata_ref
+
+
+def _config_backup_metadata_delete(context, metadata_ref, session):
+    """
+    Used internally by config_metadata_create and _config_backup_metadata_update
+    """
+    metadata_ref.delete(session=session)
