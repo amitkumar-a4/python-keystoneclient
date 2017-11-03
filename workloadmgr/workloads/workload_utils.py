@@ -677,10 +677,11 @@ def get_compute_host(context):
         raise ex
 
 @autolog.log_method(logger=Logger)
-def validate_database_creds(context, databases):
+def validate_database_creds(context, databases, trust_creds):
     try:
+        host = get_compute_host(context)
         compute_service = nova.API(production=True)
-        params = {'databases':databases}
+        params = {'databases':databases, 'host': host, 'trust_creds': trust_creds}
         status = compute_service.validate_database_creds(context, params)
         if status['result'] != "success":
             message = "Please verify given database credentials."
