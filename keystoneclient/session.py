@@ -239,6 +239,19 @@ class Session(object):
         for log_type in _LOG_CONTENT_TYPES:
             if content_type is not None and content_type.startswith(log_type):
                 text = _remove_service_catalog(response.text)
+        if json:
+            text = jsonutils.dumps(json)
+
+        string_parts = ['RESP:']
+
+        if status_code:
+            string_parts.append('[%s]' % status_code)
+        if headers:
+            for header in six.iteritems(headers):
+                string_parts.append('%s: %s' % Session.process_header(header))
+        if text:
+            string_parts.append('\nRESP BODY: %s\n' %
+                                strutils.mask_password(text))
                 break
         else:
             text = ('Omitted, Content-Type is set to %s. Only '
