@@ -21,16 +21,15 @@ from workloadmgr import test
 from workloadmgr import utils
 
 try:
-     from oslo.config import cfg
+    from oslo.config import cfg
 except ImportError:
-     from oslo_config import cfg
+    from oslo_config import cfg
 
 CONF = cfg.CONF
 
 
 class ExecuteTestCase(test.TestCase):
-          
-     
+
     def test_no_retry_on_success(self):
         fd, tmpfilename = tempfile.mkstemp()
         _, tmpfilename2 = tempfile.mkstemp()
@@ -398,7 +397,7 @@ class GenericUtilsTestCase(test.TestCase):
         self.assertIsNone(utils.check_ssh_injection(cmd_list))
         cmd_list = ['echo', "'quoted arg with space'"]
         self.assertIsNone(utils.check_ssh_injection(cmd_list))
-     
+
     '''
     def test_check_ssh_injection_on_error(self):
         with_unquoted_space = ['ssh', 'my_name@      name_of_remote_computer']
@@ -437,7 +436,7 @@ class GenericUtilsTestCase(test.TestCase):
         self.assertRaises(exception.SSHInjectionThreat,
                           utils.check_ssh_injection,
                           with_multiple_quotes)
-    '''        
+    '''
 
     def test_create_channel(self):
         client = paramiko.SSHClient()
@@ -509,14 +508,15 @@ class GenericUtilsTestCase(test.TestCase):
 
 class MonkeyPatchTestCase(test.TestCase):
     """Unit test for utils.monkey_patch()."""
+
     def setUp(self):
         super(MonkeyPatchTestCase, self).setUp()
         self.example_package = 'workloadmgr.tests.unit.monkey_patch_example.'
         self.flags(
             monkey_patch=True,
-            monkey_patch_modules=[self.example_package + 'example_a' + ':'
-                                  + self.example_package
-                                  + 'example_decorator'])
+            monkey_patch_modules=[self.example_package + 'example_a' + ':' +
+                                  self.example_package +
+                                  'example_decorator'])
 
     def test_monkey_patch(self):
         utils.monkey_patch()
@@ -557,7 +557,7 @@ class AuditPeriodTest(test.TestCase):
 
     def setUp(self):
         super(AuditPeriodTest, self).setUp()
-        #a fairly random time to test with
+        # a fairly random time to test with
         self.test_time = datetime.datetime(second=23,
                                            minute=12,
                                            hour=8,

@@ -38,10 +38,10 @@ class ViewBuilder(common.ViewBuilder):
         if 'instances' in snapshot:
             instances = []
             for vm in snapshot['instances']:
-                instance = {'id':vm['id'],
-                            'name':vm['name'],
-                            'status':vm['status'],
-                            'metadata':vm['metadata'],
+                instance = {'id': vm['id'],
+                            'name': vm['name'],
+                            'status': vm['status'],
+                            'metadata': vm['metadata'],
                             }
                 if 'flavor' in vm:
                     instance['flavor'] = vm['flavor']
@@ -49,14 +49,13 @@ class ViewBuilder(common.ViewBuilder):
                     instance['nics'] = vm['nics']
                 if 'vdisks' in vm:
                     instance['vdisks'] = vm['vdisks']
-                instances.append(instance)   
+                instances.append(instance)
             d['instances'] = instances
         #d['links'] = self._get_links(request, snapshot['id'])
         d['name'] = snapshot['display_name']
-        d['description'] =  snapshot['display_description']
-        d['host'] = snapshot['host']       
-        return {'snapshot': d}       
-
+        d['description'] = snapshot['display_description']
+        d['host'] = snapshot['host']
+        return {'snapshot': d}
 
     def detail(self, request, snapshot):
         """Detailed view of a single snapshot."""
@@ -73,10 +72,10 @@ class ViewBuilder(common.ViewBuilder):
         if 'instances' in snapshot:
             instances = []
             for vm in snapshot['instances']:
-                instance = {'id':vm['id'],
-                            'name':vm['name'],
-                            'status':vm['status'],
-                            'metadata':vm['metadata'],
+                instance = {'id': vm['id'],
+                            'name': vm['name'],
+                            'status': vm['status'],
+                            'metadata': vm['metadata'],
                             }
                 if 'flavor' in vm:
                     instance['flavor'] = vm['flavor']
@@ -86,39 +85,40 @@ class ViewBuilder(common.ViewBuilder):
                     instance['nics'] = vm['nics']
                 if 'vdisks' in vm:
                     instance['vdisks'] = vm['vdisks']
-                instances.append(instance)    
-                
+                instances.append(instance)
+
             d['instances'] = instances
         #d['links'] = self._get_links(request, snapshot['id'])
         d['name'] = snapshot['display_name']
-        d['description'] =  snapshot['display_description']
-        d['host'] = snapshot['host']       
+        d['description'] = snapshot['display_description']
+        d['host'] = snapshot['host']
         d['size'] = snapshot['size']
         d['restore_size'] = snapshot['restore_size']
-        d['uploaded_size'] =  min(snapshot['uploaded_size'],snapshot['size']) 
-        d['progress_percent'] =  snapshot['progress_percent']          
-        d['progress_msg'] =  snapshot['progress_msg'] 
-        d['warning_msg'] =  snapshot['warning_msg']
-        d['error_msg'] =  snapshot['error_msg'] 
+        d['uploaded_size'] = min(snapshot['uploaded_size'], snapshot['size'])
+        d['progress_percent'] = snapshot['progress_percent']
+        d['progress_msg'] = snapshot['progress_msg']
+        d['warning_msg'] = snapshot['warning_msg']
+        d['error_msg'] = snapshot['error_msg']
         d['time_taken'] = snapshot['time_taken']
         d['pinned'] = snapshot['pinned']
         d['metadata'] = snapshot['metadata']
         d['restores_info'] = ''
         if hasattr(snapshot, 'instances'):
-           d['instances'] = snapshot.instances
-        return {'snapshot': d}      
+            d['instances'] = snapshot.instances
+        return {'snapshot': d}
 
     def _list_view(self, func, request, snapshots):
         """Provide a view for a list of snapshots."""
-        snapshots_list = [func(request, snapshot)['snapshot'] for snapshot in snapshots]
-        #snapshots_links = self._get_collection_links(request,
+        snapshots_list = [func(request, snapshot)['snapshot']
+                          for snapshot in snapshots]
+        # snapshots_links = self._get_collection_links(request,
         #                                           snapshots,
         #                                           self._collection_name)
         snapshots_list = sorted(snapshots_list,
-                           key=lambda snapshot: snapshot['created_at'])
+                                key=lambda snapshot: snapshot['created_at'])
         snapshots_dict = dict(snapshots=snapshots_list)
 
-        #if snapshots_links:
+        # if snapshots_links:
         #    snapshots_dict['snapshots_links'] = snapshots_links
 
         return snapshots_dict
@@ -129,4 +129,3 @@ class ViewBuilder(common.ViewBuilder):
                 'id': task_id,
             },
         }
-

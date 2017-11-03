@@ -36,45 +36,49 @@ class SchedulerAPI(workloadmgr.openstack.common.rpc.proxy.RpcProxy):
                     request_spec=None, filter_properties=None):
         request_spec_p = jsonutils.to_primitive(request_spec)
         return self.cast(ctxt, self.make_msg(
-                                  'file_search', topic=topic,
-                                  search_id=search_id,
-                                  request_spec=request_spec_p,
-                                  filter_properties=filter_properties),
-                                  version='1.2')
+            'file_search', topic=topic,
+            search_id=search_id,
+            request_spec=request_spec_p,
+            filter_properties=filter_properties),
+            version='1.2')
 
     def workload_snapshot(self, ctxt, topic, snapshot_id,
                           request_spec=None, filter_properties=None):
         request_spec_p = jsonutils.to_primitive(request_spec)
         return self.cast(ctxt, self.make_msg(
-                                  'workload_snapshot', topic=topic,
-                                  snapshot_id=snapshot_id,
-                                  request_spec=request_spec_p,
-                                  filter_properties=filter_properties),
-                                  version='1.2')
+            'workload_snapshot', topic=topic,
+            snapshot_id=snapshot_id,
+            request_spec=request_spec_p,
+            filter_properties=filter_properties),
+            version='1.2')
 
     def snapshot_restore(self, ctxt, topic, restore_id,
-                          request_spec=None, filter_properties=None):
+                         request_spec=None, filter_properties=None):
         request_spec_p = jsonutils.to_primitive(request_spec)
         return self.cast(ctxt, self.make_msg(
-                                  'snapshot_restore', topic=topic,
-                                  restore_id=restore_id,
-                                  request_spec=request_spec_p,
-                                  filter_properties=filter_properties),
-                                  version='1.2')
+            'snapshot_restore', topic=topic,
+            restore_id=restore_id,
+            request_spec=request_spec_p,
+            filter_properties=filter_properties),
+            version='1.2')
 
     def config_backup(self, ctxt, topic, backup_id,
-                             request_spec=None, filter_properties=None):
+                      request_spec=None, filter_properties=None):
         request_spec_p = jsonutils.to_primitive(request_spec)
         return self.cast(ctxt, self.make_msg(
             'config_backup', topic=topic,
             backup_id=backup_id,
             request_spec=request_spec_p,
             filter_properties=filter_properties),
-                         version='1.2')
+            version='1.2')
 
     def update_service_capabilities(self, ctxt,
                                     service_name, host,
                                     capabilities):
-        self.fanout_cast(ctxt, self.make_msg('update_service_capabilities',
-                         service_name=service_name, host=host,
-                         capabilities=capabilities))
+        self.fanout_cast(
+            ctxt,
+            self.make_msg(
+                'update_service_capabilities',
+                service_name=service_name,
+                host=host,
+                capabilities=capabilities))

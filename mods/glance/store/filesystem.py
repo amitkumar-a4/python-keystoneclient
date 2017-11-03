@@ -262,12 +262,12 @@ class Store(glance.store.base.Store):
 
         if os.path.exists(filepath):
             ####### giri ######################################
-            LOG.debug(_("Image file %(filepath)s exists") % locals())            
+            LOG.debug(_("Image file %(filepath)s exists") % locals())
             checksum = hashlib.md5()
             bytes_written = 0
             try:
                 with open(filepath, 'rb') as f:
-                    for buf in utils.chunkreadable(f,ChunkedFile.CHUNKSIZE):
+                    for buf in utils.chunkreadable(f, ChunkedFile.CHUNKSIZE):
                         bytes_written += len(buf)
                         checksum.update(buf)
             except IOError as e:
@@ -275,12 +275,19 @@ class Store(glance.store.base.Store):
                               errno.ENOSPC: exception.StorageFull(),
                               errno.EACCES: exception.StorageWriteDenied()}
                 raise exceptions.get(e.errno, e)
-    
+
             checksum_hex = checksum.hexdigest()
             metadata = self._get_metadata()
-            LOG.debug(_("Returning Image file %(filepath)s metadata") % locals())
-            return ('file://%s' % filepath, bytes_written, checksum_hex, metadata) 
-            #####################################################################
+            LOG.debug(
+                _("Returning Image file %(filepath)s metadata") %
+                locals())
+            return (
+                'file://%s' %
+                filepath,
+                bytes_written,
+                checksum_hex,
+                metadata)
+            ###################################################################
             raise exception.Duplicate(_("Image file %s already exists!")
                                       % filepath)
 
@@ -300,7 +307,7 @@ class Store(glance.store.base.Store):
                           errno.ENOSPC: exception.StorageFull(),
                           errno.EACCES: exception.StorageWriteDenied()}
             raise exceptions.get(e.errno, e)
-        except:
+        except BaseException:
             self._delete_partial(filepath, image_id)
             raise
 

@@ -26,14 +26,15 @@ LOG = logging.getLogger(__name__)
 
 FLAGS = flags.FLAGS
 
+
 class GlobalJobSchedulerController(wsgi.Controller):
     """The global job scheduler API controller for the workload manager API."""
-    
+
     def __init__(self, ext_mgr=None):
         self.workload_api = workloadAPI.API()
         self.ext_mgr = ext_mgr
         super(GlobalJobSchedulerController, self).__init__()
-        
+
     def enable(self, req):
         """Enable global job scheduler"""
         try:
@@ -55,12 +56,13 @@ class GlobalJobSchedulerController(wsgi.Controller):
         try:
             context = req.environ['workloadmgr.context']
             try:
-                self.workload_api.workload_disable_global_job_scheduler(context)
+                self.workload_api.workload_disable_global_job_scheduler(
+                    context)
                 return {'global_job_scheduler': False}
             except wlm_exceptions.NotFound:
                 raise exc.HTTPNotFound()
             except wlm_exceptions.InvalidState as error:
-                raise exc.HTTPBadRequest(explanation= unicode(error))
+                raise exc.HTTPBadRequest(explanation=unicode(error))
         except exc.HTTPNotFound as error:
             LOG.exception(error)
             raise error
@@ -72,7 +74,7 @@ class GlobalJobSchedulerController(wsgi.Controller):
             raise error
         except Exception as error:
             LOG.exception(error)
-            raise exc.HTTPServerError(explanation=unicode(error)) 
+            raise exc.HTTPServerError(explanation=unicode(error))
 
     def index(self, req):
         """Return status of global job scheduler."""
@@ -80,8 +82,9 @@ class GlobalJobSchedulerController(wsgi.Controller):
             context = req.environ['workloadmgr.context']
             get_hidden = False
             try:
-                enabled = self.workload_api.workload_get_global_job_scheduler(context)
-                return {'global_job_scheduler' : enabled}
+                enabled = self.workload_api.workload_get_global_job_scheduler(
+                    context)
+                return {'global_job_scheduler': enabled}
             except wlm_exceptions.NotFound:
                 raise exc.HTTPNotFound()
         except exc.HTTPNotFound as error:
@@ -95,7 +98,8 @@ class GlobalJobSchedulerController(wsgi.Controller):
             raise error
         except Exception as error:
             LOG.exception(error)
-            raise exc.HTTPServerError(explanation=unicode(error))       
-        
+            raise exc.HTTPServerError(explanation=unicode(error))
+
+
 def create_resource(ext_mgr):
     return wsgi.Resource(GlobalJobSchedulerController(ext_mgr))

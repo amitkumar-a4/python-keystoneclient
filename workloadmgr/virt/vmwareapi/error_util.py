@@ -81,9 +81,8 @@ class FaultCheckers(object):
                         fault_list.append(fault_type.__name__)
         if fault_list:
             exc_msg_list = ', '.join(fault_list)
-            raise VimFaultException(fault_list, Exception(_("Error(s) %s "
-                    "occurred in the call to RetrievePropertiesEx") %
-                    exc_msg_list))
+            raise VimFaultException(fault_list, Exception(
+                _("Error(s) %s " "occurred in the call to RetrievePropertiesEx") % exc_msg_list))
 
 
 class VMwareDriverException(exception.WorkloadMgrException):

@@ -21,6 +21,7 @@ from taskflow.utils import reflection
 
 LOG = logging.getLogger(__name__)
 
+
 class tVaultTask(Task):
     """Base class for tvault-defined tasks.
 
@@ -35,6 +36,7 @@ class tVaultTask(Task):
         if provides is None:
             provides = self.default_provides
         super(tVaultTask, self).__init__(name, provides=provides)
+
 
 @six.add_metaclass(abc.ABCMeta)
 class tValutFlow(Flow):

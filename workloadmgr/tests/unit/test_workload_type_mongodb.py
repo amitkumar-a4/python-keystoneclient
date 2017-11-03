@@ -136,10 +136,10 @@ class BaseWorkloadTypeMongoDBTestCase(test.TestCase):
         """Test workload can be created and deleted."""
 
         workload_type = self.workloadAPI.workload_type_create(self.context,
-			    self.workload_params['display_name'],
-                            self.workload_params['display_description'],
-                            self.workload_params['is_public'],
-                            self.workload_params['metadata'],)
+                        self.workload_params['display_name'],
+                        self.workload_params['display_description'],
+                        self.workload_params['is_public'],
+                        self.workload_params['metadata'],)
 
         workload_type = self.db.workload_type_get(self.context,
                                                   workload_type['id'])
@@ -208,7 +208,7 @@ class BaseWorkloadTypeMongoDBTestCase(test.TestCase):
             mclient.is_locked = True
             mclient.fsync.return_value = True
             admin = mdb.return_value
-            
+
             instance.admin = admin
             _mock_connect_server.return_value = instance
 
@@ -230,7 +230,7 @@ class BaseWorkloadTypeMongoDBTestCase(test.TestCase):
             mclient.is_locked = True
             mclient.fsync.return_value = True
             admin = mdb.return_value
-            
+
             instance.admin = admin
             _mock_connect_server.return_value = instance
 
@@ -251,7 +251,7 @@ class BaseWorkloadTypeMongoDBTestCase(test.TestCase):
         ) as (mclient, mdb):
             instance = mclient.return_value
             admin = mdb.return_value
-            
+
             instance.admin = admin
             _mock_connect_server.return_value = instance
 
@@ -266,12 +266,12 @@ class BaseWorkloadTypeMongoDBTestCase(test.TestCase):
                                                 _mock_sshclient,
                                                 _mock_connect_server):
         class sshclient(object):
-                
+
               def load_system_host_keys(self):
-                  return 
+                  return
               def set_missing_host_key_policy(self, policy):
                   return
-  
+
               def connect(self, hostname, port, username, password):
                   self.hostname = hostname
                   self.port = port
@@ -372,12 +372,12 @@ class BaseWorkloadTypeMongoDBTestCase(test.TestCase):
                              _mock_getShards):
 
         class sshclient(object):
-                
+
               def load_system_host_keys(self):
-                  return 
+                  return
               def set_missing_host_key_policy(self, policy):
                   return
-  
+
               def connect(self, hostname, port, username, password):
                   self.hostname = hostname
                   self.port = port
@@ -386,7 +386,7 @@ class BaseWorkloadTypeMongoDBTestCase(test.TestCase):
 
               def exec_command(self, cmd):
                   assert cmd == 'ifconfig eth0 | grep HWaddr'
-  
+
                   eth = ""
                   if self.hostname == "mongodb1":
                       eth = 'eth0      Link encap:Ethernet  HWaddr fa:16:3e:5b:9b:bb'
@@ -419,7 +419,7 @@ class BaseWorkloadTypeMongoDBTestCase(test.TestCase):
         ) as (mclient, mdb):
             instance = mclient.return_value
             admin = mdb.return_value
-            
+
             instance.admin = admin
 
             _mock_connect_server.return_value = instance
@@ -441,7 +441,7 @@ class BaseWorkloadTypeMongoDBTestCase(test.TestCase):
     def test_mongodb_secondary_hosts_to_backup(self,
                                             _mock_connect_server,
                                             _mock_getShards):
-   
+
         statuses = [repl1Status, repl2Status, repl3Status, repl4Status]
         replnum = len(statuses)
 
@@ -456,7 +456,7 @@ class BaseWorkloadTypeMongoDBTestCase(test.TestCase):
 
             instance = mclient.return_value
             admin = mdb.return_value
-            
+
             admin.command.side_effect = multicall
             instance.admin = admin
 
@@ -468,7 +468,7 @@ class BaseWorkloadTypeMongoDBTestCase(test.TestCase):
                                              self.store['DBPort'],
                                              self.store['HostUsername'],
                                              self.store['HostPassword'])
-            self.assertDictMatch(hosts[0], {'replicaSetName': u'replica3', 
+            self.assertDictMatch(hosts[0], {'replicaSetName': u'replica3',
                                             'secondaryReplica': u'mongodb3:27023'})
             self.assertDictMatch(hosts[1], {'replicaSetName': u'replica2',
                                             'secondaryReplica': u'mongodb2:27022'})
@@ -488,12 +488,12 @@ class BaseWorkloadTypeMongoDBTestCase(test.TestCase):
         statuses = [repl1Status, repl2Status, repl3Status, repl4Status]
         replnum = len(statuses)
         class sshclient(object):
-                
+
               def load_system_host_keys(self):
-                  return 
+                  return
               def set_missing_host_key_policy(self, policy):
                   return
-  
+
               def connect(self, hostname, port, username, password):
                   self.hostname = hostname
                   self.port = port
@@ -502,7 +502,7 @@ class BaseWorkloadTypeMongoDBTestCase(test.TestCase):
 
               def exec_command(self, cmd):
                   assert cmd == 'ifconfig eth0 | grep HWaddr'
-  
+
                   eth = ""
                   if self.hostname == "mongodb1":
                       eth = 'eth0      Link encap:Ethernet  HWaddr fa:16:3e:5b:9b:bb'
@@ -539,7 +539,7 @@ class BaseWorkloadTypeMongoDBTestCase(test.TestCase):
             instance = mclient.return_value
             admin = mdb.return_value
             admin.command.side_effect = multicall
-            
+
             instance.admin = admin
 
             _mock_connect_server.return_value = instance
@@ -563,12 +563,12 @@ class BaseWorkloadTypeMongoDBTestCase(test.TestCase):
         statuses = [repl1Status, repl2Status, repl3Status, repl4Status]
         replnum = len(statuses)
         class sshclient(object):
-                
+
               def load_system_host_keys(self):
-                  return 
+                  return
               def set_missing_host_key_policy(self, policy):
                   return
-  
+
               def connect(self, hostname, port, username, password):
                   self.hostname = hostname
                   self.port = port
@@ -577,7 +577,7 @@ class BaseWorkloadTypeMongoDBTestCase(test.TestCase):
 
               def exec_command(self, cmd):
                   assert cmd == 'ifconfig eth0 | grep HWaddr'
-  
+
                   eth = ""
                   if self.hostname == "mongodb1":
                       eth = 'eth0      Link encap:Ethernet  HWaddr fa:16:3e:5b:9b:bb'
@@ -614,7 +614,7 @@ class BaseWorkloadTypeMongoDBTestCase(test.TestCase):
             instance = mclient.return_value
             admin = mdb.return_value
             admin.command.side_effect = multicall
-            
+
             instance.admin = admin
 
             _mock_connect_server.return_value = instance
@@ -643,12 +643,12 @@ class BaseWorkloadTypeMongoDBTestCase(test.TestCase):
                              _mock_getShards):
 
         class sshclient(object):
-                
+
               def load_system_host_keys(self):
-                  return 
+                  return
               def set_missing_host_key_policy(self, policy):
                   return
-  
+
               def connect(self, hostname, port, username, password):
                   self.hostname = hostname
                   self.port = port
@@ -657,7 +657,7 @@ class BaseWorkloadTypeMongoDBTestCase(test.TestCase):
 
               def exec_command(self, cmd):
                   assert cmd == 'ifconfig eth0 | grep HWaddr'
-  
+
                   eth = ""
                   if self.hostname == "mongodb1":
                       eth = 'eth0      Link encap:Ethernet  HWaddr fa:16:3e:5b:9b:bb'
@@ -690,7 +690,7 @@ class BaseWorkloadTypeMongoDBTestCase(test.TestCase):
         ) as (mclient, mdb):
             instance = mclient.return_value
             admin = mdb.return_value
-            
+
             instance.admin = admin
 
             _mock_connect_server.return_value = instance
@@ -715,12 +715,12 @@ class BaseWorkloadTypeMongoDBTestCase(test.TestCase):
         statuses = [repl1Status, repl2Status, repl3Status, repl4Status]
         replnum = len(statuses)
         class sshclient(object):
-                
+
               def load_system_host_keys(self):
-                  return 
+                  return
               def set_missing_host_key_policy(self, policy):
                   return
-  
+
               def connect(self, hostname, port, username, password):
                   self.hostname = hostname
                   self.port = port
@@ -728,7 +728,7 @@ class BaseWorkloadTypeMongoDBTestCase(test.TestCase):
                   self.password = password
 
               def exec_command(self, cmd):
-  
+
                   eth = ""
                   if cmd == 'ifconfig eth0 | grep HWaddr':
                       if self.hostname == "mongodb1":
@@ -828,12 +828,12 @@ class BaseWorkloadTypeMongoDBTestCase(test.TestCase):
         statuses = [repl1Status, repl2Status, repl3Status, repl4Status]
         replnum = len(statuses)
         class sshclient(object):
-                
+
               def load_system_host_keys(self):
-                  return 
+                  return
               def set_missing_host_key_policy(self, policy):
                   return
-  
+
               def connect(self, hostname, port, username, password):
                   self.hostname = hostname
                   self.port = port
@@ -841,7 +841,7 @@ class BaseWorkloadTypeMongoDBTestCase(test.TestCase):
                   self.password = password
 
               def exec_command(self, cmd):
-  
+
                   eth = ""
                   if cmd == 'ifconfig eth0 | grep HWaddr':
                       if self.hostname == "mongodb1":
@@ -933,8 +933,7 @@ class BaseWorkloadTypeMongoDBTestCase(test.TestCase):
             mdbflow = mongodbflow.MongoDBWorkflow("test_mongodb", self.store)
             mdbflow.initflow()
             workflow = mdbflow.execute()
-           
-            vmtasks.UploadSnapshotDBEntry(self.context, 
+
+            vmtasks.UploadSnapshotDBEntry(self.context,
                      db.snapshot_get(self.context, self.store['snapshot']['id']))
 '''
-
