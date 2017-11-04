@@ -928,8 +928,8 @@ class WorkloadMgrsController(wsgi.Controller):
         try:
             context = req.environ['workloadmgr.context']
 
-            license_text = body['license']
-            license = self.workload_api.license_create(context, license_text)
+            license_data = body['license']
+            license = self.workload_api.license_create(context, license_data)
             return {'license': license}
         except exc.HTTPNotFound as error:
             raise error
