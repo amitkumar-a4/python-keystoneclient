@@ -26,9 +26,9 @@ BASE = declarative_base()
 
 
 <<<<<<< HEAD
-DB_VERSION = '2.6.9'
+DB_VERSION = '2.6.10'
 =======
-DB_VERSION = '2.6.9'
+DB_VERSION = '2.6.10'
 >>>>>>> upstream/master
 
 
