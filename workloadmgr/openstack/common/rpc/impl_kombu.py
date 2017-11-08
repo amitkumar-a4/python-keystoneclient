@@ -28,7 +28,7 @@ import kombu
 import kombu.connection
 import kombu.entity
 import kombu.messaging
-from oslo.config import cfg
+from oslo_config import cfg
 
 from workloadmgr.openstack.common.gettextutils import _
 from workloadmgr.openstack.common import network_utils

@@ -21,7 +21,7 @@ import copy
 import sys
 import traceback
 
-from oslo.config import cfg
+from oslo_config import cfg
 
 from workloadmgr.openstack.common.gettextutils import _
 from workloadmgr.openstack.common import importutils

@@ -1,7 +1,7 @@
 import os
 import json
 
-from oslo.config import cfg
+from oslo_config import cfg
 
 from workloadmgr.openstack.common import log as logging
 from workloadmgr import autolog

@@ -15,7 +15,7 @@ import time
 
 import eventlet
 import greenlet
-from oslo.config import cfg
+from oslo_config import cfg
 
 from workloadmgr import context
 from workloadmgr import db

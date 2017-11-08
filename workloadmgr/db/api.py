@@ -29,7 +29,7 @@ these objects be simple dictionaries.
 
 """
 
-from oslo.config import cfg
+from oslo_config import cfg
 
 from workloadmgr import exception
 from workloadmgr import flags

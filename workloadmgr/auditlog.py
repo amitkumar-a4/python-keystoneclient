@@ -8,7 +8,7 @@ from datetime import datetime
 from datetime import timedelta
 from workloadmgr.openstack.common import timeutils
 from workloadmgr.openstack.common import fileutils
-from oslo.config import cfg
+from oslo_config import cfg
 from keystoneclient.v2_0 import client as keystone_v2
 from workloadmgr.openstack.common import log as logging
 from workloadmgr.vault import vault

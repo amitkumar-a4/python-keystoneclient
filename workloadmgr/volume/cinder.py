@@ -11,7 +11,7 @@ import copy
 import sys
 from functools import wraps
 
-from oslo.config import cfg
+from oslo_config import cfg
 
 from cinderclient import exceptions as cinder_exception
 from cinderclient import service_catalog

@@ -11,7 +11,7 @@ Handles all requests relating to network + neutron.
 from threading import Lock
 from functools import wraps
 
-from oslo.config import cfg
+from oslo_config import cfg
 from neutronclient import client
 from neutronclient.v2_0 import client as clientv20
 from neutronclient.common import exceptions as qexceptions

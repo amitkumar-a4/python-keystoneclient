@@ -11,7 +11,7 @@ Driver base-classes:
 
 import sys
 
-from oslo.config import cfg
+from oslo_config import cfg
 
 from workloadmgr.openstack.common.gettextutils import _
 from workloadmgr.openstack.common import importutils

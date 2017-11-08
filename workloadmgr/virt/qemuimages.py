@@ -12,7 +12,7 @@ import re
 import time
 import subprocess
 
-from oslo.config import cfg
+from oslo_config import cfg
 
 from workloadmgr import exception
 from workloadmgr.image import glance

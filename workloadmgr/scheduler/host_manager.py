@@ -8,7 +8,7 @@ Manage hosts in the current zone.
 
 import UserDict
 
-from oslo.config import cfg
+from oslo_config import cfg
 
 from workloadmgr import db
 from workloadmgr import exception

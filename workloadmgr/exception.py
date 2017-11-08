@@ -11,7 +11,7 @@ SHOULD include dedicated exception logging.
 
 """
 
-from oslo.config import cfg
+from oslo_config import cfg
 import webob.exc
 
 from workloadmgr.openstack.common.gettextutils import _

@@ -17,7 +17,7 @@ import urlparse
 
 import glanceclient
 import glanceclient.exc
-from oslo.config import cfg
+from oslo_config import cfg
 
 from workloadmgr import exception
 from workloadmgr.openstack.common import jsonutils

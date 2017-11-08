@@ -17,7 +17,7 @@ import socket
 import sys
 import multiprocessing
 
-from oslo.config import cfg
+from oslo_config import cfg
 
 from workloadmgr.openstack.common.gettextutils import _
 from workloadmgr import version

@@ -41,7 +41,7 @@ import sys
 import traceback
 from eventlet import greenthread
 
-from oslo.config import cfg
+from oslo_config import cfg
 
 from workloadmgr.openstack.common.gettextutils import _
 from workloadmgr.openstack.common import importutils
