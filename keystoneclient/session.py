@@ -239,6 +239,7 @@ class Session(object):
         for log_type in _LOG_CONTENT_TYPES:
             if content_type is not None and content_type.startswith(log_type):
                 text = _remove_service_catalog(response.text)
+		break
         if json:
             text = jsonutils.dumps(json)
 
@@ -252,7 +253,6 @@ class Session(object):
         if text:
             string_parts.append('\nRESP BODY: %s\n' %
                                 strutils.mask_password(text))
-                break
         else:
             text = ('Omitted, Content-Type is set to %s. Only '
                     '%s responses have their bodies logged.')
