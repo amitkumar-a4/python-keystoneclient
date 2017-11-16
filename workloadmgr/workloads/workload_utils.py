@@ -3,6 +3,7 @@ import os
 from oslo.config import cfg
 
 from workloadmgr.openstack.common import log as logging
+from workloadmgr import utils
 from workloadmgr import autolog
 from workloadmgr import flags
 from workloadmgr import settings
@@ -834,3 +835,35 @@ def get_compute_nodes(context, host=None, up_only=False):
         return contego_nodes
     except Exception as ex:
         raise ex
+
+@autolog.log_method(logger=Logger)
+@utils.run_async
+def update_storage_stats(context, workload_id=None):
+    def __update_workload_size(context, workload):
+        try:
+            workload_to_update = {}
+            options = {}
+            for meta in workload.metadata:
+                if meta["key"] == "backup_media_target":
+                    backup_target = vault.get_backup_target(meta['value'])
+                    break
+            workload_url = backup_target.get_workload_path(
+                {'workload_id': workload.id})
+            workload_size = vault.get_directory_size(workload_url)
+            options['metadata'] = {'workload_size': int(workload_size)}
+            db.workload_update(context, workload.id, options, False)
+            upload_workload_db_entry(context, workload.id)
+        except Exception as ex:
+            LOG.exception(ex)
+
+    try:
+        if workload_id is not None:
+            workload = db.workload_get(context, workload_id)
+            __update_workload_size(context, workload)
+        else:
+            workloads = db.workload_get_all(context)
+            for workload in workloads:
+                __update_workload_size(context, workload)
+    except Exception as ex:
+        LOG.exception(ex)
+

@@ -681,3 +681,8 @@ def config_backup_get_all(context, **kwargs):
 def config_backup_delete(context, backup_id, **kwargs):
     """get all backups for OpenStack config"""
     return IMPL.config_backup_delete(context, backup_id, **kwargs)
+
+
+def get_tenant_storage_usage(context, tenant_id, **kwargs):
+    """Get storage usage of a tenant."""
+    return IMPL.get_tenant_storage_usage(context, tenant_id, **kwargs)

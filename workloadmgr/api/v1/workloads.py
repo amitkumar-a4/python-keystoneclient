@@ -1060,6 +1060,29 @@ class WorkloadMgrsController(wsgi.Controller):
             LOG.exception(error)
             raise exc.HTTPServerError(explanation=unicode(error))
 
+    def get_tenant_storage_usage(self, req, tenant_id):
+        try:
+            context = req.environ['workloadmgr.context']
+            try:
+                tenant_storages_usage = self.workload_api.get_tenant_storage_usage(
+                    context, tenant_id)
+                return tenant_storages_usage
+            except Exception as ex:
+                LOG.exception(ex)
+                raise ex
+        except exc.HTTPNotFound as error:
+            LOG.exception(error)
+            raise error
+        except exc.HTTPBadRequest as error:
+            LOG.exception(error)
+            raise error
+        except exc.HTTPServerError as error:
+            LOG.exception(error)
+            raise error
+        except Exception as error:
+            LOG.exception(error)
+            raise exc.HTTPServerError(explanation=unicode(error))
+
 
 def create_resource():
     return wsgi.Resource(WorkloadMgrsController())

@@ -4255,3 +4255,16 @@ def _config_backup_metadata_delete(context, metadata_ref, session):
     Used internally by config_metadata_create and _config_backup_metadata_update
     """
     metadata_ref.delete(session=session)
+
+
+def get_tenant_storage_usage(context, tenant_id, **kwargs):
+    """Give storage used by tenant workloads"""
+    try:
+        kwargs = {'project_list': [tenant_id]}
+        workloads = workload_get_all(context, **kwargs)
+        workload_ids = [workload.id for workload in workloads]
+        qs = model_query(context, models.WorkloadMetadata, **kwargs).filter(and_(
+            models.WorkloadMetadata.workload_id.in_(workload_ids), models.WorkloadMetadata.key.in_(['workload_size'])))
+        return qs.all()
+    except Exception as ex:
+        LOG.exception(ex)
