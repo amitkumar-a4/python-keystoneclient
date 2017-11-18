@@ -807,7 +807,7 @@ class LibvirtDriver(driver.ComputeDriver):
             cntx = nova._get_tenant_context(cntx)
             
             snapshot_vm_resource_metadata =  {'disk_info': json.dumps(disk_info)}
-            if disk_info['dev'] == 'vda' and nova_instance.image and len(nova_instance.image) > 0:
+            if (disk_info['dev'] == 'vda' or disk_info['dev'] == 'sda') and nova_instance.image and len(nova_instance.image) > 0:
                 glance_image = image_service.show(cntx, nova_instance.image['id'])
                 snapshot_vm_resource_metadata['image_id'] = glance_image['id']
                 snapshot_vm_resource_metadata['image_name'] = glance_image['name']
