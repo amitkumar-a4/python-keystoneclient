@@ -1456,7 +1456,6 @@ def restore_vm(cntx, db, instance, restore, restored_net_resources,
                 'instance_options': instance_options,
             }
 
-    vol_flow = 0
     for snapshot_vm_resource in snapshot_vm_resources:
         store[snapshot_vm_resource.id] = snapshot_vm_resource.id
         store['devname_'+snapshot_vm_resource.id] = snapshot_vm_resource.resource_name
@@ -1474,7 +1473,6 @@ def restore_vm(cntx, db, instance, restore, restored_net_resources,
                                                       volume_id.lower(),
                                                       volume_type)
                 store['volume_type_'+snapshot_vm_resource.id] = new_volume_type
-                vol_flow = vol_flow + 1
             else:
                 store['volume_type_'+snapshot_vm_resource.id] = None
                 store['volume_id_'+snapshot_vm_resource.id] = None
@@ -1502,7 +1500,7 @@ def restore_vm(cntx, db, instance, restore, restored_net_resources,
     # create nova/cinder objects from image ids
     childflow = RestoreVolumes(cntx, instance, instance_options,
                                snapshot_obj, restore['id'])
-    if childflow and vol_flow != 0:
+    if childflow:
         _restorevmflow.add(childflow)
 
     # create nova from image id
