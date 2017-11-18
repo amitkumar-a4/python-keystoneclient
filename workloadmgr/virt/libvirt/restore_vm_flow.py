@@ -1475,7 +1475,6 @@ def restore_vm(cntx, db, instance, restore, restored_net_resources,
                 store['volume_type_'+snapshot_vm_resource.id] = new_volume_type
             else:
                 store['volume_type_'+snapshot_vm_resource.id] = None
-                store['volume_id_'+snapshot_vm_resource.id] = None
 
             store['progress_tracking_file_path_'+snapshot_vm_resource.id] = progress_tracking_file_path
 
