@@ -322,6 +322,12 @@ class UploadImageToGlance(task.Task):
         self.cntx = nova._get_tenant_context(self.cntx)
         
         # Add hw_qemu_guest_agent information to image metadata if available
+        image_properties = db.get_metadata_value(snapshot_vm_resource.metadata, 'iprops')
+        if image_properties is not None and len(image_properties) > 1:
+           props = json.loads(image_properties)
+           for prop in props:
+               image_metadata['properties'][prop] = props[prop]
+ 
         status_hw_qemu_guest_agent = db.get_metadata_value(snapshot_vm_resource.metadata, 'hw_qemu_guest_agent')
         if str(status_hw_qemu_guest_agent).lower() in ['yes', 'no']:
             image_metadata['properties']['hw_qemu_guest_agent'] = status_hw_qemu_guest_agent
