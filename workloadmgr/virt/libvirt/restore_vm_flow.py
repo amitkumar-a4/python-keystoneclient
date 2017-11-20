@@ -1307,7 +1307,7 @@ def RestoreInstance(context, instance, snapshotobj, restore_id):
             continue        
         if db.get_metadata_value(snapshot_vm_resource.metadata, 'image_id'):
             flow.add(RestoreInstanceFromImage("RestoreInstanceFromImage" + instance['vm_id'],
-                                rebind=dict(image_id='image_id_' + str(snapshot_vm_resource.id), disk_name=snapshot_vm_resource.resource_name),
+                                rebind=dict(image_id='image_id_' + str(snapshot_vm_resource.id)),
                                 provides='restored_instance_id'))            
         else:
             flow.add(RestoreInstanceFromVolume("RestoreInstanceFromVolume" + instance['vm_id'],
