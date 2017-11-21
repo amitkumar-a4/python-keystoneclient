@@ -820,7 +820,7 @@ class LibvirtDriver(driver.ComputeDriver):
                     if prop != 'hw_qemu_guest_agent':
                        d[prop] = glance_image['properties'][prop]
                 if len(d) > 0:
-                   snapshot_vm_resource_metadata['iprops'] = json.dump(d)
+                   snapshot_vm_resource_metadata['iprops'] = json.dumps(d)
                 if 'hw_qemu_guest_agent' in glance_image['properties'].keys():
                     snapshot_vm_resource_metadata['hw_qemu_guest_agent'] = glance_image['properties']['hw_qemu_guest_agent']               
             else:
