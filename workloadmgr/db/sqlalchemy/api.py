@@ -725,7 +725,9 @@ def workload_get_all(context, **kwargs):
                             models.Workloads.deleted_at > func.adddate(
                                 func.now(),
                                 time_delta)))
-        if 'all_workloads' in kwargs and kwargs['all_workloads'] is not True:
+        if 'project_id' in kwargs and  kwargs['project_id'] is not None and kwargs['project_id'] != '':
+            qs = qs.filter_by(project_id=kwargs['project_id'])
+        elif 'all_workloads' in kwargs and kwargs['all_workloads'] is not True:
             qs = qs.filter_by(project_id=context.project_id)
     else:
         qs = qs.filter_by(project_id=context.project_id)
