@@ -1063,13 +1063,12 @@ class WorkloadMgrsController(wsgi.Controller):
             LOG.exception(error)
             raise exc.HTTPServerError(explanation=unicode(error))
 
-    def get_tenant_storage_usage(self, req, tenant_id):
+    def get_tenants_usage(self, req):
         try:
             context = req.environ['workloadmgr.context']
             try:
-                tenant_storages_usage = self.workload_api.get_tenant_storage_usage(
-                    context, tenant_id)
-                return tenant_storages_usage
+                tenants_usage = self.workload_api.get_tenants_usage(context)
+                return tenants_usage
             except Exception as ex:
                 LOG.exception(ex)
                 raise ex

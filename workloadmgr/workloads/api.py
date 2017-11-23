@@ -438,7 +438,6 @@ class API(base.Base):
             context = wlm_context.get_admin_context()
             self.workload_ensure_global_job_scheduler(context)
 
-
     @autolog.log_method(logger=Logger)
     @wrap_check_policy
     def search(self, context, data):
@@ -3844,27 +3843,41 @@ class API(base.Base):
 
     @autolog.log_method(logger=Logger)
     @wrap_check_policy
-    def get_tenant_storage_usage(self, context, tenant_id):
+    def get_tenants_usage(self, context):
         """
-        Get storage used by given tenant.
+        Get storage used and vm's protected by different tenants.
         """
         try:
-            # Validate tenant_id existance
-            clients.initialise()
-            keystoneclient = clients.Clients(context).client("keystone")
-            keystoneclient.client.projects.get(tenant_id)
-            storage_usage = self.db.get_tenant_storage_usage(
-                context, tenant_id)
-            tenant_storage_usage = 0
+            total_usage = 0
             total_capacity = 0
-            for usage in storage_usage:
-                tenant_storage_usage += int(usage.value)
+            total_vms_protected = 0
+            tenants_usage = self.db.get_tenants_usage(
+                context)
+            for tenant, usage in tenants_usage.iteritems():
+                total_vms_protected += usage['vms_protected']
+            nova_client = workloadmgr_keystoneclient.KeystoneClientBase(
+                context).nova_client
+            search_opts = {'all_tenants': 1}
+            servers = nova_client.servers.list(search_opts=search_opts)
+            for server in servers:
+                if server.tenant_id in tenants_usage:
+                    if 'total_vms' not in tenants_usage[server.tenant_id]:
+                        tenants_usage[server.tenant_id]['total_vms'] = 1
+                    else:
+                        tenants_usage[server.tenant_id]['total_vms'] += 1
+                else:
+                    tenants_usage[server.tenant_id] = {
+                        'total_vms': 1, 'vms_protected': 0, 'used_capacity': 0}
 
             backends_storage_stats = self.get_storage_usage(context)
+
             for backend in backends_storage_stats['storage_usage']:
                 total_capacity += int(backend['total_capacity'])
-
-            return {'total_storage': utils.sizeof_fmt(total_capacity), 'used_storage': utils.sizeof_fmt(tenant_storage_usage)}
+                total_usage += int(backend['total_utilization'])
+            global_usage = {'total_capacity': total_capacity, 'total_usage': total_usage, 'total_vms': len(
+                servers), 'vms_protected': total_vms_protected}
+            return {'tenants_usage': tenants_usage,
+                    'global_usage': global_usage}
         except Exception as ex:
             LOG.exception(ex)
             raise wlm_exceptions.ErrorOccurred(

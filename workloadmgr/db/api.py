@@ -683,6 +683,6 @@ def config_backup_delete(context, backup_id, **kwargs):
     return IMPL.config_backup_delete(context, backup_id, **kwargs)
 
 
-def get_tenant_storage_usage(context, tenant_id, **kwargs):
+def get_tenants_usage(context, **kwargs):
     """Get storage usage of a tenant."""
-    return IMPL.get_tenant_storage_usage(context, tenant_id, **kwargs)
+    return IMPL.get_tenants_usage(context, **kwargs)

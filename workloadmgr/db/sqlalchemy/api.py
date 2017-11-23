@@ -726,7 +726,7 @@ def workload_get_all(context, **kwargs):
                                 func.now(),
                                 time_delta)))
 
-        if 'project_id' in kwargs and  kwargs['project_id'] is not None and kwargs['project_id'] != '':
+        if 'project_id' in kwargs and kwargs['project_id'] is not None and kwargs['project_id'] != '':
             qs = qs.filter_by(project_id=kwargs['project_id'])
         elif 'all_workloads' in kwargs and kwargs['all_workloads'] is not True:
             qs = qs.filter_by(project_id=context.project_id)
@@ -4261,14 +4261,34 @@ def _config_backup_metadata_delete(context, metadata_ref, session):
     metadata_ref.delete(session=session)
 
 
-def get_tenant_storage_usage(context, tenant_id, **kwargs):
+def get_tenants_usage(context, **kwargs):
     """Give storage used by tenant workloads"""
     try:
-        kwargs = {'project_list': [tenant_id]}
-        workloads = workload_get_all(context, **kwargs)
-        workload_ids = [workload.id for workload in workloads]
-        qs = model_query(context, models.WorkloadMetadata, **kwargs).filter(and_(
-            models.WorkloadMetadata.workload_id.in_(workload_ids), models.WorkloadMetadata.key.in_(['workload_size'])))
-        return qs.all()
+        tenant_chargeback = {}
+        chargeback = {}
+        workloads = workload_get_all(context)
+        for w in workloads:
+            # Create dictionary for avaialable tenants and there respective workloads
+            if w.project_id in chargeback:
+                chargeback[w.project_id].append(w.id)
+            else:
+                chargeback[w.project_id] = [w.id]
+
+        for tenant_id in chargeback.keys():
+            tenant_storage_usage = 0
+            tenant_chargeback[tenant_id] = {}
+            qs = model_query(context, models.WorkloadMetadata).filter(
+                and_(models.WorkloadMetadata.workload_id.in_(chargeback[tenant_id]),
+                     models.WorkloadMetadata.key.in_(['workload_size'])))
+            storage_usage = qs.all()
+            for usage in storage_usage:
+                tenant_storage_usage += int(usage.value)
+            tenant_chargeback[tenant_id]['used_capacity'] = tenant_storage_usage
+
+            # Get no of vm's protected
+            qs = model_query(context, models.WorkloadVMs).filter(
+                models.WorkloadVMs.workload_id.in_(chargeback[tenant_id]))
+            tenant_chargeback[tenant_id]['vms_protected'] = len(qs.all())
+        return tenant_chargeback
     except Exception as ex:
         LOG.exception(ex)

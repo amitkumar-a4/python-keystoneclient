@@ -223,11 +223,11 @@ class APIRouter(workloadmgr.api.APIRouter):
                        action='get_storage_usage',
                        conditions={"method": ['GET']})
 
-        # get total storage used by tenant
-        mapper.connect("tenant_storage_usage",
-                       "/{project_id}/workloads/metrics/{tenant_id}/tenant_storage_usage",
+        # get total storage used and vms protected by tenants
+        mapper.connect("tenants_usage",
+                       "/{project_id}/workloads/metrics/tenants_usage",
                        controller=self.resources['workloads'],
-                       action='get_tenant_storage_usage',
+                       action='get_tenants_usage',
                        conditions={"method": ['GET']})
 
         # get recent activities
