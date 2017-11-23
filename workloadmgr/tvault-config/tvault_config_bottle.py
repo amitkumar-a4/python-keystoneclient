@@ -936,7 +936,7 @@ def _authenticate_with_keystone():
     configure_nova()
     configure_neutron()
     configure_glance()
-    configure_horizon()
+    #configure_horizon()
 
     # image
     if keystone.version == 'v3':
