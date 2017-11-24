@@ -1205,9 +1205,25 @@ def _register_service():
         wlm_service = keystone.services.create(
             'TrilioVaultWLM', 'workloads', 'Trilio Vault Workload Manager Service')
 
-    appliance_name = socket.gethostname()
+    if config_data['enable_ha'] == 'on':
+       command = "/sbin/ifconfig eth0 | awk '/Mask:/{ print $4;} '"
+       result = subprocess.check_output(command, shell=True)
+       byte = int(result.replace('\n','').split('.')[-1])
+       ef byte != 0:
+          byte = 255 - byte + 1
+       arr1 = config_data['floating_ipaddress'].split('.')
+       arr2 = config_data['floating_ipaddress'].split('.')
+       arr1[-1] = str(byte + 1)
+       arr2[-1] = str(byte)
+       virtual_ip = '.'.join(arr1)
+       bindaddr = '.'.join(arr2)
+       config_data['virtual_ip'] = virtual_ip
+       config_data['bindaddr'] = bindaddr
+       return {'status': 'Success'}
+
     #wlm_url = 'https://' + config_data['tvault_primary_node'] + ':8780' + '/v1/$(tenant_id)s'
     if config_data['enable_tls'] == 'on':
+        appliance_name = socket.gethostname()
         wlm_url = 'https://' + appliance_name + ':8780' + '/v1/$(tenant_id)s'
     else:
         wlm_url = 'http://' + \
@@ -3428,6 +3444,10 @@ def configure_service():
                      'enable_tls = ' + config_data.get('enable_tls', 'off'),
                      starts_with=True)
 
+        replace_line('/etc/workloadmgr/workloadmgr.conf', 'enable_ha = ',
+                     'enable_ha = ' + config_data.get('enable_ha', 'off'),
+                     starts_with=True)
+
         if config_data.get('enable_tls', 'off') == 'off':
             replace_line(
                 '/etc/workloadmgr/workloadmgr.conf',
@@ -3537,6 +3557,30 @@ def configure_service():
             '/etc/workloadmgr/api-paste.ini',
             'insecure = ',
             'insecure = True')
+
+        if config_data['nodetype'] == 'controller' and config_data['enable_ha'] == 'on':
+           replace_line(
+            '/etc/corosync/corosync.conf',
+            'bindnetaddr: ',
+            'bindnetaddr: '+config_data['bindaddr'])
+           try:
+               command = ['sudo', 'service', 'corosync', 'start']
+               subprocess.call(command, shell=False) 
+               command = ['sudo', 'service', 'pacemaker', 'start']
+               subprocess.call(command, shell=False)
+               command = ['sudo', 'service', 'tvault-ha', 'restart']
+               subprocess.call(command, shell=False)
+               command = 'crm configure property pe-warn-series-max="1000" pe-input-series-max="1000" 
+                          pe-error-series-max="1000" cluster-recheck-interval="5min"'
+               subprocess.check_call(command, shell=True)
+               command = 'crm configure property stonith-enabled=false'
+               subprocess.check_call(command, shell=True)
+               command = 'crm attribute '+socket.hostname()+' set ip '+config_data['floating_ipaddress']
+               subprocess.check_call(command, shell=True)
+               command = 'crm attribute '+socket.hostname()+' set virtip '+config_data['virtual_ip']
+               subprocess.check_call(command, shell=True)
+           except Exception as ex:
+                  pass
 
     except Exception as exception:
         bottle.request.environ['beaker.session']['error_message'] = "Error: %(exception)s" % {
@@ -4036,6 +4080,7 @@ def configure_openstack():
                 raise Exception(
                     "cert or private key is empty. Please enter valid values")
 
+        config_data['enable_ha'] = config_inputs.get('enable_ha', 'off')
         config_data['guest_name'] = config_inputs['guest-name'].strip()
 
         parse_result = urlparse(config_data['keystone_admin_url'])
