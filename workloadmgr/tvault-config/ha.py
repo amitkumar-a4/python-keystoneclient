@@ -1,4 +1,4 @@
-#!/usr/bin/env python
+#!/usr/bin/env import pdb;pdb.set_trace()
 # vim: tabstop=4 shiftwidth=4 softtabstop=4
 
 # Copyright (c) 2014 TrilioData, Inc.
@@ -21,6 +21,8 @@ except ImportError:
     from nova.openstack.common import log as logging
 
 _DEFAULT_LOG_DATE_FORMAT = "%Y-%m-%d %H:%M:%S"
+import tvault_config_bottle as tv
+
 
 common_cli_opts = [
     cfg.BoolOpt('debug',
@@ -42,6 +44,12 @@ tvault_opts = [
     cfg.StrOpt('rabbit_host',
                default='none',
                help='node ip address'),
+    cfg.StrOpt('rabbit_password',
+               default='52T8FVYZJse',
+               help='password'),
+    cfg.StrOpt('region_name_for_services',
+               default='RegionOne',
+               help='Service region'),
 ]
 
 logging_cli_opts = [
@@ -190,7 +198,7 @@ def enable_ha():
      node_str = ",".join(node_list_ip)
      if len(node_list) >= 3 and node_host_name not in configured_host:
 
-        fl = open("/etc/hosts", "a+"):
+        fl = open("/etc/hosts", "a+")
         fl.write(host_string)
         fl.close()
 
@@ -208,12 +216,14 @@ def enable_ha():
         fl.write("START=1")
         fl.close()
 
+        command = 'service rabbitmq-server stop'
+        subprocess.check_call(command, shell=True)
         if node_number == 1:
            command = "/sbin/ifconfig eth0 | awk '/Mask:/{ print $4;} '"
            result = subprocess.check_output(command, shell=True)
            netmask = result.replace('\n','').replace('Mask:','')
            netmask = str(IPAddress(netmask).netmask_bits())
-           command = 'crm configure primitive vip ocf:heartbeat:IPaddr2 params ip="'+virtual_ip+'" cidr_netmask="'+netmask+'" 
+           command = 'crm configure primitive vip ocf:heartbeat:IPaddr2 params ip="'+virtual_ip+'" cidr_netmask="'+netmask+'"\
                       op monitor interval="30s"'
            subprocess.check_call(command, shell=True)        
            command = 'crm cib new conf-haproxy'
@@ -226,14 +236,117 @@ def enable_ha():
            subprocess.check_call(command, shell=True)
            command = 'crm configure order haproxy-after-vip mandatory: vip haproxy-clone'
            subprocess.check_call(command, shell=True)
+           for np in node_list_ip:
+               if np != node_address:
+                  command = 'sshpass -p "'+CONF.rabbit_password+'" scp /var/lib/rabbitmq/.erlang.cookie root@'+np+':/var/lib/rabbitmq/.erlang.cookie'
+                  subprocess.check_call(command, shell=True)
+
+
+        command = 'chown rabbitmq:rabbitmq /var/lib/rabbitmq/.erlang.cookie'
+        subprocess.check_call(command, shell=True)
+        command = 'chmod 400 /var/lib/rabbitmq/.erlang.cookie'
+        subprocess.check_call(command, shell=True)
+        command = 'service rabbitmq-server start'
+        subprocess.check_call(command, shell=True)
+        command = 'rabbitmqctl stop_app'
+        subprocess.check_call(command, shell=True)
+        command = 'rabbitqmctl force_reset'
+        subprocess.check_call(command, shell=True)
+        if node_number != 1:
+           command = 'rabbitqmctl join_cluster --ram rabbit@'+node_list[0]
+           subprocess.check_call(command, shell=True)
+        command = 'rabbitmqctl start_app'
+        subprocess.check_call(command, shell=True)       
+        command = 'rabbitmqctl change_password guest '+CONF.rabbit_password
+        subprocess.check_call(command, shell=True)
+
+        if node_number == 1:
+           command = "rabbitmqctl set_policy ha-all '^(?!amq\.).*' '{\"ha-mode\": \"all\"}'"
+           subprocess.check_call(command, shell=True)
+
+        command = 'service rabbitmq-server restart'
+        subprocess.check_call(command, shell=True)
 
         command = 'crm attribute '+node_host_name+' set configured yes'
         subprocess.check_call(command, shell=True)
         threading.Timer(5.0, enable_ha).start()
 
      elif len(configured_host) >= 3:
-          print "test"
-          
+          if node_number == 1:
+             command = "mysql -h"+node_address+" -u root -p"+CONF.rabbit_password+" -e \"SHOW STATUS LIKE 'wsrep_cluster_size'\""
+             result = subprocess.check_output(command, shell=True)
+             if result == "":
+                command = 'service mysql start --wsrep-new-cluster'
+                subprocess.check_call(command, shell=True)
+             else:
+                  command = 'service mysql restart'
+                  subprocess.check_call(command, shell=True)
+          else:
+               command = 'service mysql restart'
+               subprocess.check_call(command, shell=True)
 
+          command = "mysql -h"+node_address+" -u root -p"+CONF.rabbit_password+" -e \"SHOW STATUS LIKE 'wsrep_cluster_size'\""
+          result = subprocess.check_output(command, shell=True)
+          if node_number == 1:
+             if result != '' and int(result.split('\n')[1].split('\t')[1]) >= 0:
+                command = 'mysql --host='+node_address+' -u root -p'+CONF.rabbit_password+' -e "CREATE USER \'haproxy\'@\''+virtual_ip+'\';'
+                subprocess.check_call(command, shell=True)
+                command = 'mysql --host='+node_address+' -u root -p'+CONF.rabbit_password+' -e "GRANT ALL PRIVILEGES ON *.* \
+                           TO \'root\'@\'%\' IDENTIFIED BY \'galera\' WITH GRANT OPTION;FLUSH PRIVILEGES;'
+                subprocess.check_call(command, shell=True)
+                command = 'service mysql restart'
+                subprocess.check_call(command, shell=True)
+
+          if result != '' and int(result.split('\n')[1].split('\t')[1]) >= 0:
+             sql_connection = 'mysql://root:'+CONF.rabbit_password+'@'+virtual_ip+':33308/workloadmgr?charset=utf8'
+             tv.replace_line(
+                '/etc/workloadmgr/workloadmgr.conf',
+                'sql_connection = ',
+                'sql_connection = ' +
+                sql_connection)
+
+          fl = open('/etc/workloadmgr/workloadmgr.conf', 'r')
+          contents = fl.readlines()
+          fl.close()
+
+          rb_st = ''
+          for np in node_list:
+              rb_st= rb_st+np+':5672,'
+          rb_st = rb_st[:-1]
+          rabbit_str = '\nrabbit_hosts = '+rb_st+'\nrabbit_ha_queues=true\nrabbit_durable_queues=true\n \
+                        rabbit_max_retries=0\nrabbit_retry_backoff=2\n  \
+                        rabbit_retry_interval=1\n'
+          contents.insert(42, rabbit_str)
+
+          fl = open("/etc/workloadmgr/workloadmgr.conf", "w")
+          contents = "".join(contents)
+          fl.write(contents)
+          fl.close()
+
+          if node_number == 1:
+             wlm_url = 'http://' + virtual_ip + ':8781' + '/v1/$(tenant_id)s'
+             tv.change_service_endpoint(wlm_url, CONF.region_name_for_services)
+
+          command = 'service haproxy restart'
+          subprocess.check_call(command, shell=True)     
+
+          command = 'service wml-api restart'
+          subprocess.check_call(command, shell=True)  
+
+          command = 'service wlm-scheduler restart'
+          subprocess.check_call(command, shell=True)       
+  
+          command = 'service wlm-workloads restart'
+          subprocess.check_call(command, shell=True) 
+
+     else:
+          threading.Timer(5.0, enable_ha).start()
+  else:
+        threading.Timer(50.0, enable_ha).start()
+ 
 if __name__ == '__main__':
-   enable_ha()
+   try:
+       enable_ha()
+   except Exception as ex:
+          LOG.exception(ex)
+          pass

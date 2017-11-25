@@ -204,7 +204,6 @@ def update_service_account_password():
     else:
         return {'error': ''}
 
-
 @bottle.post('/update_service_account_password')
 @authorize()
 def change_service_password():
@@ -554,6 +553,54 @@ def send_tvaultlogs_all():
 
 
 """############################ tvault config API's ########################"""
+
+
+def change_service_endpoint(wlm_url, region_name):
+    try:
+        Config = ConfigParser.RawConfigParser()
+        Config.read('/etc/workloadmgr/workloadmgr.conf')
+        service_tenant_name = Config.get(
+            'keystone_authtoken', 'admin_tenant_name')
+        data = {}
+        data['admin_username'] = Config.get('DEFAULT', 'nova_admin_username')
+        data['admin_password'] = Config.get('DEFAULT', 'nova_admin_password')
+        data['admin_tenant_name'] = Config.get(
+            'DEFAULT', 'neutron_admin_tenant_name')
+        data['keystone_admin_url'] = Config.get(
+            'keystone_authtoken', 'auth_url')
+        data['keystone_public_url'] = Config.get(
+            'keystone_authtoken', 'auth_uri')
+        data['domain_name'] = Config.get('DEFAULT', 'domain_name')
+
+        if data['domain_name'] == '':
+            data['domain_name'] = 'default'
+
+        global config_data
+        config_data = data
+        try:
+            keystone, tenants = _validate_keystone_client_and_version(
+                is_admin_url=False)
+        except Exception as e:
+            raise Exception(
+                "KeystoneError:Unable to connect to keystone Public URL " +
+                e.message)
+
+        services = keystone.services.list()
+        for service in services:
+            if service.type == 'workloads':
+               ser_id = service.id
+
+        if keystone.version == 'v3':
+           keystone.endpoints.create(region=region_name,
+                                  service=ser_id,
+                                  url=wlm_url,
+                                  interface='public',
+                                  enabled=True)
+        else:
+             keystone.endpoints.create(region_name,
+                                  ser_id, wlm_url, wlm_url, wlm_url)
+    except Exception as ex:
+           raise ex
 
 
 def replace_line(file_path, pattern, substitute, starts_with=False):
@@ -1209,7 +1256,7 @@ def _register_service():
        command = "/sbin/ifconfig eth0 | awk '/Mask:/{ print $4;} '"
        result = subprocess.check_output(command, shell=True)
        byte = int(result.replace('\n','').split('.')[-1])
-       ef byte != 0:
+       if byte != 0:
           byte = 255 - byte + 1
        arr1 = config_data['floating_ipaddress'].split('.')
        arr2 = config_data['floating_ipaddress'].split('.')
@@ -3570,7 +3617,7 @@ def configure_service():
                subprocess.call(command, shell=False)
                command = ['sudo', 'service', 'tvault-ha', 'restart']
                subprocess.call(command, shell=False)
-               command = 'crm configure property pe-warn-series-max="1000" pe-input-series-max="1000" 
+               command = 'crm configure property pe-warn-series-max="1000" pe-input-series-max="1000" \
                           pe-error-series-max="1000" cluster-recheck-interval="5min"'
                subprocess.check_call(command, shell=True)
                command = 'crm configure property stonith-enabled=false'
