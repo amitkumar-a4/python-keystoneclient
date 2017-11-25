@@ -686,6 +686,7 @@ def workload_update(context, id, values, purge_metadata=False):
 
 @require_context
 def workload_get_all(context, **kwargs):
+    import pdb;pdb.set_trace()
     qs = model_query(context, models.Workloads, **kwargs).\
         options(sa_orm.joinedload(models.Workloads.metadata))
 
@@ -4255,3 +4256,75 @@ def _config_backup_metadata_delete(context, metadata_ref, session):
     Used internally by config_metadata_create and _config_backup_metadata_update
     """
     metadata_ref.delete(session=session)
+
+@require_context
+def _policy_field_update(context, policy_field_id, values, purge_metadata, session):
+    if policy_field_id:
+        policy_field_ref = _policy_field_get(context, policy_field_id, session)
+    else:
+        policy_field_ref = models.WorkloadPolicyFields()
+        if not values.get('id'):
+            values['id'] = str(uuid.uuid4())
+
+    policy_field_ref.update(values)
+    policy_field_ref.save(session)
+
+    return policy_field_ref
+
+@require_context
+def policy_field_create(context, values):
+    session = get_session()
+    return _policy_field_update(context, None, values, False, session)
+
+@require_context
+def policy_field_update(context, id, values, purge_metadata=False):
+    session = get_session()
+    return _policy_field_update(context, id, values, purge_metadata, session)
+
+
+@require_context
+def policy_fields_get_all(context):
+    session = get_session()
+    try:
+        query = model_query(context, models.WorkloadPolicyFields, session=session,
+                            read_deleted="no")
+
+        policy_fields = query.all()
+
+    except sa_orm.exc.NoResultFound:
+        raise exception.PolicyFieldNotFound()
+
+    return policy_fields
+
+@require_context
+def policy_field_get(context, id):
+    session = get_session()
+    return _policy_field_get(context, id, session)
+
+@require_context
+def _policy_field_get(context, id, session):
+    try:
+        policy_field = model_query(
+                     context, models.WorkloadPolicyFields, session=session, read_deleted="no").\
+                     filter_by(id=id).first()
+
+    except sa_orm.exc.NoResultFound:
+        raise exception.PolicyFieldNotFound(policy_field_id=id)
+
+    if policy_field is None:
+            raise exception.PolicyFieldNotFound(policy_field_id=id)
+
+    return policy_field
+
+
+@require_context
+def policy_field_delete(context, id):
+    session = get_session()
+    with session.begin():
+        session.query(models.WorkloadPolicyFields). \
+            filter_by(id=id). \
+            update({'status': 'deleted',
+                    'deleted': True,
+                    'deleted_at': timeutils.utcnow(),
+                    'updated_at': literal_column('updated_at')})
+

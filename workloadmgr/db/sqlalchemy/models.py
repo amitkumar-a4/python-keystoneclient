@@ -791,6 +791,56 @@ class ConfigBackupMetadata(BASE, WorkloadsBase):
     key = Column(String(255), index=True, nullable=False)
     value = Column(Text)
 
+class WorkloadPolicy(BASE, WorkloadsBase):
+    """Workload policy"""
+    __tablename__ = 'workload_policy'
+    id = Column(String(255), primary_key=True)
+
+    user_id = Column(String(255), nullable=False)
+    project_id = Column(String(255), nullable=False)
+
+    display_name = Column(String(255))
+    display_description = Column(String(255))
+
+class WorkloadPolicyMetadata(BASE, WorkloadsBase):
+    """Represents  metadata for the workload policy"""
+    __tablename__ = 'workload_policy_metadata'
+
+    id = Column(String(255), primary_key=True)
+    policy_id = Column(String(255), ForeignKey('workload_policy.id'), nullable=False)
+    workload_type = relationship(WorkloadPolicy, backref=backref('metadata'))
+    key = Column(String(255), index=True, nullable=False)
+    value = Column(Text)
+
+
+class WorkloadPolicyFields(BASE, WorkloadsBase):
+    """Represents fields for the workload policy"""
+    __tablename__ = 'workload_policy_fields'
+
+    id = Column(String(255), primary_key=True)
+    field_name = Column(String(255), nullable=False)
+    type = Column(String(255), nullable=False)
+    status = Column(String(255), nullable=False)
+
+class WorkloadPolicyValues(BASE, WorkloadsBase):
+    """Represents  values for the workload policy fields"""
+    __tablename__ = 'workload_policy_values'
+
+    id = Column(String(255), primary_key=True)
+    policy_id = Column(String(255), ForeignKey('workload_policy.id'), nullable=False)
+    policy_field_id = Column(String(255), ForeignKey('workload_policy_fields.id'), nullable=False)
+    value = Column(String(255), nullable=False)
+
+
+class WorkloadPolicyAssignmnets(BASE, WorkloadsBase):
+    """Represents  values for the workload policy fields"""
+    __tablename__ = 'workload_policy_assignments'
+
+    id = Column(String(255), primary_key=True)
+    policy_id = Column(String(255), ForeignKey('workload_policy.id'), nullable=False)
+    workload_id = Column(String(255), ForeignKey('workloads.id'), nullable=False)
+    value = Column(String(255), nullable=False)
+
 
 def register_models():
     """Register Models and create metadata.
