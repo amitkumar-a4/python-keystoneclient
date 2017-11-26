@@ -586,9 +586,13 @@ def change_service_endpoint(wlm_url, region_name):
                 e.message)
 
         services = keystone.services.list()
+        endpoints = keystone.endpoints.list()
         for service in services:
             if service.type == 'workloads':
                ser_id = service.id
+               for endpoint in endpoints:
+                   if endpoint.service_id == service.id and endpoint.region == region_name:
+                      keystone.endpoints.delete(endpoint.id)
 
         if keystone.version == 'v3':
            keystone.endpoints.create(region=region_name,
@@ -1266,7 +1270,6 @@ def _register_service():
        bindaddr = '.'.join(arr2)
        config_data['virtual_ip'] = virtual_ip
        config_data['bindaddr'] = bindaddr
-       return {'status': 'Success'}
 
     #wlm_url = 'https://' + config_data['tvault_primary_node'] + ':8780' + '/v1/$(tenant_id)s'
     if config_data['enable_tls'] == 'on':
@@ -3608,24 +3611,30 @@ def configure_service():
         if config_data['nodetype'] == 'controller' and config_data['enable_ha'] == 'on':
            replace_line(
             '/etc/corosync/corosync.conf',
-            'bindnetaddr: ',
-            'bindnetaddr: '+config_data['bindaddr'])
+            '                bindnetaddr: ',
+            '                bindnetaddr: '+config_data['bindaddr'])
            try:
-               command = ['sudo', 'service', 'corosync', 'start']
+               command = ['sudo', 'service', 'corosync', 'restart']
                subprocess.call(command, shell=False) 
-               command = ['sudo', 'service', 'pacemaker', 'start']
+               command = ['sudo', 'service', 'pacemaker', 'restart']
                subprocess.call(command, shell=False)
                command = ['sudo', 'service', 'tvault-ha', 'restart']
-               subprocess.call(command, shell=False)
+               #subprocess.call(command, shell=False)
                command = 'crm configure property pe-warn-series-max="1000" pe-input-series-max="1000" \
                           pe-error-series-max="1000" cluster-recheck-interval="5min"'
                subprocess.check_call(command, shell=True)
                command = 'crm configure property stonith-enabled=false'
                subprocess.check_call(command, shell=True)
-               command = 'crm attribute '+socket.hostname()+' set ip '+config_data['floating_ipaddress']
-               subprocess.check_call(command, shell=True)
-               command = 'crm attribute '+socket.hostname()+' set virtip '+config_data['virtual_ip']
-               subprocess.check_call(command, shell=True)
+               try:
+                   command = 'crm node attribute '+socket.gethostname()+' set ip '+config_data['floating_ipaddress']
+                   subprocess.check_call(command, shell=True)
+               except:
+                      pass
+               try:
+                   command = 'crm node attribute '+socket.gethostname()+' set virtip '+config_data['virtual_ip']
+                   subprocess.check_call(command, shell=True)
+               except:
+                      pass
            except Exception as ex:
                   pass
 

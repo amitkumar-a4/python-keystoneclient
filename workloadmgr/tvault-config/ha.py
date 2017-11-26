@@ -1,4 +1,4 @@
-#!/usr/bin/env import pdb;pdb.set_trace()
+#!/usr/bin/env
 # vim: tabstop=4 shiftwidth=4 softtabstop=4
 
 # Copyright (c) 2014 TrilioData, Inc.
@@ -47,9 +47,9 @@ tvault_opts = [
     cfg.StrOpt('rabbit_password',
                default='52T8FVYZJse',
                help='password'),
-    cfg.StrOpt('region_name_for_services',
-               default='RegionOne',
-               help='Service region'),
+    cfg.StrOpt('rabbit_hosts',
+               default=None,
+               help='password'),
 ]
 
 logging_cli_opts = [
@@ -250,11 +250,14 @@ def enable_ha():
         subprocess.check_call(command, shell=True)
         command = 'rabbitmqctl stop_app'
         subprocess.check_call(command, shell=True)
-        command = 'rabbitqmctl force_reset'
+        command = 'rabbitmqctl force_reset'
         subprocess.check_call(command, shell=True)
         if node_number != 1:
-           command = 'rabbitqmctl join_cluster --ram rabbit@'+node_list[0]
-           subprocess.check_call(command, shell=True)
+           try:
+               command = 'rabbitmqctl join_cluster --ram rabbit@'+node_list[0]
+               subprocess.check_call(command, shell=True)
+           except:
+                  raise
         command = 'rabbitmqctl start_app'
         subprocess.check_call(command, shell=True)       
         command = 'rabbitmqctl change_password guest '+CONF.rabbit_password
@@ -267,7 +270,7 @@ def enable_ha():
         command = 'service rabbitmq-server restart'
         subprocess.check_call(command, shell=True)
 
-        command = 'crm attribute '+node_host_name+' set configured yes'
+        command = 'crm node attribute '+node_host_name+' set configured yes'
         subprocess.check_call(command, shell=True)
         threading.Timer(5.0, enable_ha).start()
 
@@ -309,19 +312,17 @@ def enable_ha():
           contents = fl.readlines()
           fl.close()
 
-          rb_st = ''
-          for np in node_list:
-              rb_st= rb_st+np+':5672,'
-          rb_st = rb_st[:-1]
-          rabbit_str = '\nrabbit_hosts = '+rb_st+'\nrabbit_ha_queues=true\nrabbit_durable_queues=true\n \
-                        rabbit_max_retries=0\nrabbit_retry_backoff=2\n  \
-                        rabbit_retry_interval=1\n'
-          contents.insert(42, rabbit_str)
-
-          fl = open("/etc/workloadmgr/workloadmgr.conf", "w")
-          contents = "".join(contents)
-          fl.write(contents)
-          fl.close()
+          if CONF.rabbit_hosts == None:
+             rb_st = ''
+             for np in node_list:
+                 rb_st= rb_st+np+':5672,'
+             rb_st = rb_st[:-1]
+             rabbit_str = 'rabbit_hosts = \''+rb_st+'\'\nrabbit_ha_queues=true\nrabbit_durable_queues=true\nrabbit_max_retries=0\nrabbit_retry_backoff=2\nrabbit_retry_interval=1\n'
+             contents.insert(42, rabbit_str)
+             fl = open("/etc/workloadmgr/workloadmgr.conf", "w")
+             contents = "".join(contents)
+             fl.write(contents)
+             fl.close()
 
           if node_number == 1:
              wlm_url = 'http://' + virtual_ip + ':8781' + '/v1/$(tenant_id)s'
@@ -330,7 +331,7 @@ def enable_ha():
           command = 'service haproxy restart'
           subprocess.check_call(command, shell=True)     
 
-          command = 'service wml-api restart'
+          command = 'service wlm-api restart'
           subprocess.check_call(command, shell=True)  
 
           command = 'service wlm-scheduler restart'
