@@ -7,6 +7,7 @@
 import threading
 import sys
 import subprocess
+import os
 import xml.etree.ElementTree as ET
 from netaddr import IPAddress
 
@@ -194,7 +195,9 @@ def enable_ha():
                     node_list_ip.append(c2.get('value'))
                     mysql_ha_string = mysql_ha_string+"server "+child.get('uname')+" "+c2.get('value')+":3306 check port 3306\n"
                     api_ha_string = api_ha_string+"server "+child.get('uname')+" "+c2.get('value')+":8780 check inter 18000 rise 2 fall 5\n"
-                    host_string = host_string+child.get('uname')+" "+c2.get('value')+"\n"
+                    response = os.system("ping -c 1 " + child.get('uname'))
+                    if response != 0:
+                       host_string = host_string+child.get('uname')+" "+c2.get('value')+"\n"
      node_str = ",".join(node_list_ip)
      if len(node_list) >= 3 and node_host_name not in configured_host:
 
