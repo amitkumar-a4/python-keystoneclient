@@ -207,13 +207,13 @@ def enable_ha():
         fl.write(data)
         fl.close()
 
-        data1 = "global\nchroot  /var/lib/haproxy\ndaemon\ngroup  haproxy\nmaxconn  4000\npidfile  /var/run/haproxy.pid\nuser  haproxy\n\ndefaults\nlog  global\nmaxconn  4000\noption  redispatch\nretries  3\ntimeout  http-request 10s\ntimeout  queue 1m\ntimeout  connect 10s\ntimeout  client 1m\ntimeout  server 1m\ntimeout  check 10s\n\nlisten galera_cluster\n"+virtual_ip+":33308\nbalance roundrobin\noption tcpka\noption mysql-check user haproxy\n"+mysql_ha_string+"\nlisten wlm_api_cluster\nbind "+virtual_ip+":8781\nbalance roundrobin\noption  tcpka\noption  httpchk\n"+api_ha_string
+        data1 = "global\nchroot  /var/lib/haproxy\ndaemon\ngroup  haproxy\nmaxconn  4000\npidfile  /var/run/haproxy.pid\nuser  haproxy\n\ndefaults\nlog  global\nmaxconn  4000\noption  redispatch\nretries  3\ntimeout  http-request 10s\ntimeout  queue 1m\ntimeout  connect 10s\ntimeout  client 1m\ntimeout  server 1m\ntimeout  check 10s\n\nbind listen galera_cluster\n"+virtual_ip+":33308\nbalance roundrobin\noption tcpka\noption mysql-check user haproxy\n"+mysql_ha_string+"\nlisten wlm_api_cluster\nbind "+virtual_ip+":8781\nbalance roundrobin\noption  tcpka\noption  httpchk\n"+api_ha_string
         fl = open("/etc/haproxy/haproxy.cfg", "w+")
         fl.write(data1)
         fl.close()
 
         fl = open("/etc/default/haproxy", "w+")
-        fl.write("START=1")
+        fl.write("ENABLED=1")
         fl.close()
 
         command = 'service rabbitmq-server stop'
@@ -225,20 +225,26 @@ def enable_ha():
            netmask = str(IPAddress(netmask).netmask_bits())
            command = 'crm configure primitive vip ocf:heartbeat:IPaddr2 params ip="'+virtual_ip+'" cidr_netmask="'+netmask+'"\
                       op monitor interval="30s"'
-           subprocess.check_call(command, shell=True)        
-           command = 'crm cib new conf-haproxy'
-           subprocess.check_call(command, shell=True)
-           command = 'crm configure primitive haproxy lsb:haproxy op monitor interval="1s"'
-           subprocess.check_call(command, shell=True)
-           command = 'crm configure clone haproxy-clone haproxy'
-           subprocess.check_call(command, shell=True)
-           command = 'crm configure colocation vip-with-haproxy inf: vip haproxy-clone'
-           subprocess.check_call(command, shell=True)
-           command = 'crm configure order haproxy-after-vip mandatory: vip haproxy-clone'
-           subprocess.check_call(command, shell=True)
+           try:
+               subprocess.check_call(command, shell=True)        
+           except:
+                  pass
+           try:
+               command = 'crm cib new conf-haproxy'
+               subprocess.check_call(command, shell=True)
+               command = 'crm configure primitive haproxy lsb:haproxy op monitor interval="1s"'
+               subprocess.check_call(command, shell=True)
+               command = 'crm configure clone haproxy-clone haproxy'
+               subprocess.check_call(command, shell=True)
+               command = 'crm configure colocation vip-with-haproxy inf: vip haproxy-clone'
+               subprocess.check_call(command, shell=True)
+               command = 'crm configure order haproxy-after-vip mandatory: vip haproxy-clone'
+               subprocess.check_call(command, shell=True)
+           except:
+                  pass
            for np in node_list_ip:
                if np != node_address:
-                  command = 'sshpass -p "'+CONF.rabbit_password+'" scp /var/lib/rabbitmq/.erlang.cookie root@'+np+':/var/lib/rabbitmq/.erlang.cookie'
+                  command = 'sshpass -p "'+CONF.rabbit_password+'" scp -o StrictHostKeyChecking=no /var/lib/rabbitmq/.erlang.cookie root@'+np+':/var/lib/rabbitmq/.erlang.cookie'
                   subprocess.check_call(command, shell=True)
 
 
@@ -292,11 +298,26 @@ def enable_ha():
           result = subprocess.check_output(command, shell=True)
           if node_number == 1:
              if result != '' and int(result.split('\n')[1].split('\t')[1]) >= 0:
-                command = 'mysql --host='+node_address+' -u root -p'+CONF.rabbit_password+' -e "CREATE USER \'haproxy\'@\''+virtual_ip+'\';'
-                subprocess.check_call(command, shell=True)
-                command = 'mysql --host='+node_address+' -u root -p'+CONF.rabbit_password+' -e "GRANT ALL PRIVILEGES ON *.* \
-                           TO \'root\'@\'%\' IDENTIFIED BY \'galera\' WITH GRANT OPTION;FLUSH PRIVILEGES;'
-                subprocess.check_call(command, shell=True)
+                command = 'mysql --host='+node_address+' -u root -p'+CONF.rabbit_password+' -e "CREATE USER \'haproxy\'@\''+virtual_ip+'\';"'
+                try:
+                    subprocess.check_call(command, shell=True)
+                except:
+                       pass
+                command = 'mysql --host='+node_address+' -u root -p'+CONF.rabbit_password+' -e "GRANT ALL PRIVILEGES ON *.* TO \'root\'@\'%\' IDENTIFIED BY \'galera\' WITH GRANT OPTION;FLUSH PRIVILEGES;"'
+                try:
+                    subprocess.check_call(command, shell=True)
+                except:
+                       pass
+                command = 'mysql --host='+node_address+' -u root -p'+CONF.rabbitt_password+' -e "insert into mysql.user (Host,User, ssl_cipher, x509_issuer, x509_subject) values (\''+node_address+'\',\'root\', \'\', \'\', \'\');"'
+                try:
+                    subprocess.check_call(command, shell=True)
+                except:
+                       pass
+                command = 'mysql --host='+node_address+' -u root -p'+CONF.rabbit_password+' -e "UPDATE mysql.user SET Password=PASSWORD(\''+CONF.rabbit_password+'\') WHERE User=\'root\';FLUSH PRIVILEGES;"'
+                try: 
+                    subprocess.check_call(command, shell=True)
+                except:
+                       pass
                 command = 'service mysql restart'
                 subprocess.check_call(command, shell=True)
 

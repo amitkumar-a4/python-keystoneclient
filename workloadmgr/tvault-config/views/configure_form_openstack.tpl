@@ -311,7 +311,7 @@ function setSwiftRequired(checked, val) {
                <input name="enable_ha" checked id="enable_ha" checked type="checkbox"> Enable HA <span style="font-size:11px;">Choose this option if you are setting up High Availability, Minimum 3 controller nodes required</span>
 %else:
       <input name="enable_ha" id="enable_ha" type="checkbox"> Enable HA <span style="font-size:11px;">Choose this option if you are setting up High Availability, Minimum 3 controller nodes required</span>
-
+%end
                                                       </div>
                                                  </div>
                                             </div>
