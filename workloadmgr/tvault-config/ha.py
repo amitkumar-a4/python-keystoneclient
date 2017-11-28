@@ -7,6 +7,7 @@
 import threading
 import sys
 import subprocess
+import socket
 import os
 import xml.etree.ElementTree as ET
 from netaddr import IPAddress
@@ -165,12 +166,13 @@ except BaseException:
 
 
 def enable_ha():
-  if CONF.enable_ha == 'on':
+  if CONF.enable_ha == 'on' or CONF.enable_ha == 'off':
      result = subprocess.check_output(['crm','node','status'])
      root = ET.fromstring(result)
      node_list = []
      node_list_ip = []
      configured_host = []
+     disabled_host = []
      node_address = CONF.rabbit_host
      node_host_name = ''
      node_name = "galera"
@@ -179,12 +181,18 @@ def enable_ha():
      api_ha_string = ''
      host_string = "\n"
      node_number = 0
+     no_match = False
      for child in root:
          node_list.append(child.get('uname'))
          for c1 in child.getchildren():
              for c2 in c1.getchildren():
                  if c2.get('name') == 'configured' and c2.get('value') == 'yes':
                     configured_host.append(child.get('uname'))
+                 if c2.get('name') == 'configured' and c2.get('value') == 'disabled':
+                    disabled_host.append(child.get('uname'))
+                 if c2.get('name') == 'configured' and c2.get('value') == 'once' and \
+                    socket.gethostname() == child.get('uname'):
+                    no_match = True
                  if c2.get('name') == 'virtip':
                     virtual_ip = c2.get('value')
                  if c2.get('name') == 'ip':
@@ -197,20 +205,21 @@ def enable_ha():
                     api_ha_string = api_ha_string+"server "+child.get('uname')+" "+c2.get('value')+":8780 check inter 18000 rise 2 fall 5\n"
                     response = os.system("ping -c 1 " + child.get('uname'))
                     if response != 0:
-                       host_string = host_string+child.get('uname')+" "+c2.get('value')+"\n"
+                       host_string = host_string+c2.get('value')+" "+child.get('uname')+"\n"
      node_str = ",".join(node_list_ip)
-     if len(node_list) >= 3 and node_host_name not in configured_host:
+     if len(node_list) >= 3 and (node_host_name not in configured_host and node_host_name not in disabled_host) \
+        and no_match is False:
 
         fl = open("/etc/hosts", "a+")
         fl.write(host_string)
         fl.close()
 
-        data = "[mysqld]\nbinlog_format=ROW\ndefault-storage-engine=innodb\ninnodb_autoinc_lock_mode=2\nbind-address="+node_address+"\n# Galera Provider Configuration\nwsrep_on=ON\nwsrep_provider=/usr/lib/galera/libgalera_smm.so\n# Galera Cluster Configuration\nwsrep_cluster_name=\"unique\"\nwsrep_cluster_address=\"gcomm://"+node_str+"\"\n# Galera Synchronization Configuration\nwsrep_sst_method=rsync\n# Galera Node Configuration\nwsrep_node_address=\""+node_address+"\"\nwsrep_node_name=\""+node_name+"\" "
+        data = "[mysqld]\nbinlog_format=ROW\ndefault-storage-engine=innodb\ninnodb_autoinc_lock_mode=2\nbind-address=0.0.0.0\n# Galera Provider Configuration\nwsrep_on=ON\nwsrep_provider=/usr/lib/galera/libgalera_smm.so\n# Galera Cluster Configuration\nwsrep_cluster_name=\"unique\"\nwsrep_cluster_address=\"gcomm://"+node_str+"\"\n# Galera Synchronization Configuration\nwsrep_sst_method=rsync\n# Galera Node Configuration\nwsrep_node_address=\""+node_address+"\"\nwsrep_node_name=\""+node_name+"\" "
         fl = open("/etc/mysql/conf.d/galera.cnf", "w+")
         fl.write(data)
         fl.close()
 
-        data1 = "global\nchroot  /var/lib/haproxy\ndaemon\ngroup  haproxy\nmaxconn  4000\npidfile  /var/run/haproxy.pid\nuser  haproxy\n\ndefaults\nlog  global\nmaxconn  4000\noption  redispatch\nretries  3\ntimeout  http-request 10s\ntimeout  queue 1m\ntimeout  connect 10s\ntimeout  client 1m\ntimeout  server 1m\ntimeout  check 10s\n\nbind listen galera_cluster\n"+virtual_ip+":33308\nbalance roundrobin\noption tcpka\noption mysql-check user haproxy\n"+mysql_ha_string+"\nlisten wlm_api_cluster\nbind "+virtual_ip+":8781\nbalance roundrobin\noption  tcpka\noption  httpchk\n"+api_ha_string
+        data1 = "global\nchroot  /var/lib/haproxy\ndaemon\ngroup  haproxy\nmaxconn  4000\npidfile  /var/run/haproxy.pid\nuser  haproxy\n\ndefaults\nlog  global\nmaxconn  4000\noption  redispatch\nretries  3\ntimeout  http-request 10s\ntimeout  queue 1m\ntimeout  connect 10s\ntimeout  client 1m\ntimeout  server 1m\ntimeout  check 10s\n\nlisten galera_cluster\nbind "+virtual_ip+":33308\nbalance roundrobin\noption tcpka\noption mysql-check user haproxy\n"+mysql_ha_string+"\nlisten wlm_api_cluster\nbind "+virtual_ip+":8781\nbalance roundrobin\noption  tcpka\noption  httpchk\n"+api_ha_string
         fl = open("/etc/haproxy/haproxy.cfg", "w+")
         fl.write(data1)
         fl.close()
@@ -219,8 +228,6 @@ def enable_ha():
         fl.write("ENABLED=1")
         fl.close()
 
-        command = 'service rabbitmq-server stop'
-        subprocess.check_call(command, shell=True)
         if node_number == 1:
            command = "/sbin/ifconfig eth0 | awk '/Mask:/{ print $4;} '"
            result = subprocess.check_output(command, shell=True)
@@ -245,11 +252,18 @@ def enable_ha():
                subprocess.check_call(command, shell=True)
            except:
                   pass
-           for np in node_list_ip:
+
+           """for np in node_list_ip:
                if np != node_address:
                   command = 'sshpass -p "'+CONF.rabbit_password+'" scp -o StrictHostKeyChecking=no /var/lib/rabbitmq/.erlang.cookie root@'+np+':/var/lib/rabbitmq/.erlang.cookie'
-                  subprocess.check_call(command, shell=True)
+                  subprocess.check_call(command, shell=True) """
 
+
+        command = 'service rabbitmq-server stop'
+        subprocess.check_call(command, shell=True)
+
+        command = 'sshpass -p "'+CONF.rabbit_password+'" scp -o StrictHostKeyChecking=no  root@'+node_list_ip[0]+':/var/lib/rabbitmq/.erlang.cookie /var/lib/rabbitmq/.erlang.cookie'
+        subprocess.check_call(command, shell=True)
 
         command = 'chown rabbitmq:rabbitmq /var/lib/rabbitmq/.erlang.cookie'
         subprocess.check_call(command, shell=True)
@@ -257,6 +271,7 @@ def enable_ha():
         subprocess.check_call(command, shell=True)
         command = 'service rabbitmq-server start'
         subprocess.check_call(command, shell=True)
+
         command = 'rabbitmqctl stop_app'
         subprocess.check_call(command, shell=True)
         command = 'rabbitmqctl force_reset'
@@ -266,24 +281,25 @@ def enable_ha():
                command = 'rabbitmqctl join_cluster --ram rabbit@'+node_list[0]
                subprocess.check_call(command, shell=True)
            except:
-                  raise
+                  pass
         command = 'rabbitmqctl start_app'
-        subprocess.check_call(command, shell=True)       
+        subprocess.check_call(command, shell=True)
         command = 'rabbitmqctl change_password guest '+CONF.rabbit_password
+        subprocess.check_call(command, shell=True)
+
+        command = 'service rabbitmq-server restart'
         subprocess.check_call(command, shell=True)
 
         if node_number == 1:
            command = "rabbitmqctl set_policy ha-all '^(?!amq\.).*' '{\"ha-mode\": \"all\"}'"
            subprocess.check_call(command, shell=True)
 
-        command = 'service rabbitmq-server restart'
-        subprocess.check_call(command, shell=True)
-
         command = 'crm node attribute '+node_host_name+' set configured yes'
         subprocess.check_call(command, shell=True)
         threading.Timer(5.0, enable_ha).start()
 
-     elif len(configured_host) >= 3:
+     elif len(configured_host) >= 1 and node_host_name in configured_host:
+
           if node_number == 1:
              command = "mysql -h"+node_address+" -u root -p"+CONF.rabbit_password+" -e \"SHOW STATUS LIKE 'wsrep_cluster_size'\""
              result = subprocess.check_output(command, shell=True)
@@ -363,6 +379,68 @@ def enable_ha():
   
           command = 'service wlm-workloads restart'
           subprocess.check_call(command, shell=True) 
+
+          command = 'crm node attribute '+node_host_name+' set configured once'
+          subprocess.check_call(command, shell=True)
+
+          threading.Timer(5.0, enable_ha).start()
+
+     elif len(disabled_host) >= 1 and node_host_name in disabled_host and CONF.enable_ha == 'off':
+          command = 'mv /etc/mysql/conf.d/galera.cnf /opt/stack/'
+          subprocess.check_call(command, shell=True)
+          command = 'service haproxy stop'
+          subprocess.check_call(command, shell=True)
+          fl = open("/etc/default/haproxy", "w+")
+          fl.write("ENABLED=0")
+          fl.close()
+          command = 'rabbitmqctl stop_app'
+          subprocess.check_call(command, shell=True)
+          command = 'rabbitmqctl force_reset'
+          subprocess.check_call(command, shell=True)
+          command = 'rabbitmqctl start_app'
+          subprocess.check_call(command, shell=True)
+          command = 'rabbitmqctl change_password guest '+CONF.rabbit_password
+          subprocess.check_call(command, shell=True)
+          command = 'service rabbitmq-server restart'
+          subprocess.check_call(command, shell=True)
+          sql_connection = 'mysql://root:'+CONF.rabbit_password+'@'+node_address+':3306/workloadmgr?charset=utf8'
+          tv.replace_line(
+                '/etc/workloadmgr/workloadmgr.conf',
+                'sql_connection = ',
+                'sql_connection = ' +
+                sql_connection)
+
+          f = open("/etc/workloadmgr/workloadmgr.conf","r+")
+          d = f.readlines()
+          f.seek(0)
+          for i in d:
+              if 'rabbit_' in i and ('rabbit_host ' not in i and 'rabbit_password' not in i):
+                 continue
+              f.write(i)
+          f.truncate()
+          f.close()
+          command = 'service mysql restart'
+          subprocess.check_call(command, shell=True) 
+
+          command = 'service wlm-api restart'
+          subprocess.check_call(command, shell=True)
+
+          command = 'service wlm-scheduler restart'
+          subprocess.check_call(command, shell=True)
+
+          command = 'service wlm-workloads restart'
+          subprocess.check_call(command, shell=True)
+
+          command = 'crm node attribute '+socket.gethostname()+' delete configured'
+          subprocess.check_call(command, shell=True)
+
+          command = 'service pacemaker stop'
+          subprocess.check_call(command, shell=True)
+
+          command = 'service corosync stop'
+          subprocess.check_call(command, shell=True)
+
+          threading.Timer(5.0, enable_ha).start()
 
      else:
           threading.Timer(5.0, enable_ha).start()

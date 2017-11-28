@@ -3608,6 +3608,15 @@ def configure_service():
             'insecure = ',
             'insecure = True')
 
+        if config_data['nodetype'] == 'controller' and config_data['enable_ha'] == 'off':
+           try:
+               command = 'crm node attribute '+socket.gethostname()+' show configured'
+               subprocess.check_call(command, shell=True)
+               command = 'crm node attribute '+socket.gethostname()+' set configured disabled'
+               subprocess.check_call(command, shell=True)
+           except:
+                  pass
+
         if config_data['nodetype'] == 'controller' and config_data['enable_ha'] == 'on':
            replace_line(
             '/etc/corosync/corosync.conf',
