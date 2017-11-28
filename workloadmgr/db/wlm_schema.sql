@@ -496,10 +496,7 @@ CREATE TABLE `setting_metadata` (
   `value` text,
   PRIMARY KEY (`id`),
   UNIQUE KEY `settings_name` (`settings_name`,`settings_project_id`,`key`),
-  KEY `ix_setting_metadata_settings_name` (`settings_name`),
-  KEY `del2` (`settings_project_id`),
-  CONSTRAINT `del1` FOREIGN KEY (`settings_name`) REFERENCES `settings` (`name`) ON DELETE CASCADE ON UPDATE NO ACTION,
-  CONSTRAINT `del2` FOREIGN KEY (`settings_project_id`) REFERENCES `settings` (`project_id`) ON DELETE CASCADE ON UPDATE NO ACTION
+  CONSTRAINT `setting_metadata_settings` FOREIGN KEY (`settings_name`, `settings_project_id`) REFERENCES `settings` (`name`, `project_id`) ON DELETE CASCADE
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8;
 /*!40101 SET character_set_client = @saved_cs_client */;
 
