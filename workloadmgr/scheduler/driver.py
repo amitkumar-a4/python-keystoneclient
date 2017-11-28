@@ -6,7 +6,10 @@
 Scheduler base class that all Schedulers should inherit from
 """
 
-from oslo_config import cfg
+try:
+   from oslo_config import cfg
+except ImportError:
+   from oslo.config import cfg
 
 from workloadmgr import db
 from workloadmgr import flags

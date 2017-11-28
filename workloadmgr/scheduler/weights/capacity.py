@@ -11,7 +11,10 @@ number and the weighing has the opposite effect of the default.
 
 import math
 
-from oslo_config import cfg
+try:
+   from oslo_config import cfg
+except ImportError:
+   from oslo.config import cfg
 
 from workloadmgr import flags
 from workloadmgr.openstack.common.scheduler import weights

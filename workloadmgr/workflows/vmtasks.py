@@ -16,7 +16,10 @@ from Queue import Queue
 import json
 import shutil
 
-from oslo_config import cfg
+try:
+   from oslo_config import cfg
+except ImportError:
+   from oslo.config import cfg
 
 from taskflow import engines
 from taskflow.listeners import printing

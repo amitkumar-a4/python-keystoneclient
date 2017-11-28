@@ -8,7 +8,11 @@ Common Auth Middleware.
 """
 import os
 
-from oslo_config import cfg
+try:
+   from oslo_config import cfg
+except ImportError:
+   from oslo.config import cfg
+
 import webob.dec
 import webob.exc
 

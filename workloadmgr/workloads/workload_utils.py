@@ -1,7 +1,10 @@
 import os
 import json
 
-from oslo_config import cfg
+try:
+   from oslo_config import cfg
+except ImportError:
+   from oslo.config import cfg
 
 from workloadmgr.openstack.common import log as logging
 from workloadmgr import autolog

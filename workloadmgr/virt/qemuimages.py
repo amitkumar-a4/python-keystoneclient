@@ -12,7 +12,10 @@ import re
 import time
 import subprocess
 
-from oslo_config import cfg
+try:
+   from oslo_config import cfg
+except ImportError:
+   from oslo.config import cfg
 
 from workloadmgr import exception
 from workloadmgr.image import glance

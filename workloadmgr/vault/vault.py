@@ -25,7 +25,10 @@ import socket
 import uuid
 import threading
 
-from oslo_config import cfg
+try:
+   from oslo_config import cfg
+except ImportError:
+   from oslo.config import cfg
 
 from workloadmgr.db import base
 from workloadmgr import exception
