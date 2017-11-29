@@ -7,7 +7,7 @@ eventlet>=0.13.0
 greenlet>=0.3.2
 iso8601>=0.1.8
 kombu>=2.4.8
-lockfile>=0.8,<0.12
+lockfile>=0.8,<0.11
 lxml>=2.3
 netaddr
 oslo.config==1.9.3

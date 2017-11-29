@@ -29,10 +29,7 @@ these objects be simple dictionaries.
 
 """
 
-try:
-   from oslo_config import cfg
-except ImportError:
-   from oslo.config import cfg
+from oslo.config import cfg
 
 from workloadmgr import exception
 from workloadmgr import flags

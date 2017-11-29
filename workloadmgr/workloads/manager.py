@@ -36,10 +36,7 @@ import os
 from email.mime.multipart import MIMEMultipart
 from email.mime.text import MIMEText
 
-try:
-   from oslo_config import cfg
-except ImportError:
-   from oslo.config import cfg
+from oslo.config import cfg
 
 from taskflow.patterns import linear_flow as lf
 from taskflow import engines

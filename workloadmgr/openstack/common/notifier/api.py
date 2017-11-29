@@ -15,10 +15,7 @@
 
 import uuid
 
-try:
-   from oslo_config import cfg
-except ImportError:
-   from oslo.config import cfg
+from oslo.config import cfg
 
 from workloadmgr.openstack.common import context
 from workloadmgr.openstack.common.gettextutils import _

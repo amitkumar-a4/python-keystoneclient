@@ -5,10 +5,7 @@
 
 """Base class for classes that need modular database access."""
 
-try:
-   from oslo_config import cfg
-except ImportError:
-   from oslo.config import cfg
+from oslo.config import cfg
 
 from workloadmgr import flags
 from workloadmgr.openstack.common import importutils

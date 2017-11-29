@@ -3,10 +3,7 @@
 # Copyright (c) 2013 TrilioData, Inc.
 # All Rights Reserved.
 
-try:
-   from oslo_config import cfg
-except ImportError:
-   from oslo.config import cfg
+from oslo.config import cfg
 
 # Importing full names to not pollute the namespace and cause possible
 # collisions with use of 'from workloadmgr.volume import <foo>' elsewhere.

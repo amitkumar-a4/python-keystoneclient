@@ -28,10 +28,7 @@ For some wrappers that add message versioning to rpc, see:
 import inspect
 import logging
 
-try:
-   from oslo_config import cfg
-except ImportError:
-   from oslo.config import cfg
+from oslo.config import cfg
 
 from workloadmgr.openstack.common.gettextutils import _
 from workloadmgr.openstack.common import importutils

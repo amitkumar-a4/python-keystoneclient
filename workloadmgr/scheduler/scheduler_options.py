@@ -13,10 +13,7 @@ import datetime
 import json
 import os
 
-try:
-   from oslo_config import cfg
-except ImportError:
-   from oslo.config import cfg
+from oslo.config import cfg
 
 from workloadmgr import flags
 from workloadmgr.openstack.common import log as logging

@@ -21,20 +21,14 @@ from threading import Lock
 from collections import namedtuple
 from functools import wraps
 
-try:
-   from oslo_config import cfg
-except ImportError:
-   from oslo.config import cfg
+from oslo.config import cfg
 
 from novaclient import exceptions as nova_exception
 from novaclient import service_catalog
 from novaclient import client
 from novaclient import extension as nova_extension
 
-try:
-   from novaclient.v2 import client as nova_client
-except ImportError:
-   from novaclient.v1_1 import client as nova_client
+from novaclient.v1_1 import client as nova_client
 
 from neutronclient.common import exceptions as nc_exc
 

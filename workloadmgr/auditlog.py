@@ -9,10 +9,7 @@ from datetime import timedelta
 from workloadmgr.openstack.common import timeutils
 from workloadmgr.openstack.common import fileutils
 
-try:
-   from oslo_config import cfg
-except ImportError:
-   from oslo.config import cfg
+from oslo.config import cfg
 
 from keystoneclient.v2_0 import client as keystone_v2
 from workloadmgr.openstack.common import log as logging

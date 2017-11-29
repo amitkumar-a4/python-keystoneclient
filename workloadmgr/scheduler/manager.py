@@ -6,10 +6,7 @@
 Scheduler Service
 """
 
-try:
-   from oslo_config import cfg
-except ImportError:
-   from oslo.config import cfg
+from oslo.config import cfg
 
 from workloadmgr import context
 from workloadmgr import db

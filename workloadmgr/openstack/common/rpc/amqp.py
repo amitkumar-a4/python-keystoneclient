@@ -38,10 +38,7 @@ from eventlet import semaphore
 # This import should no longer be needed when the amqp_rpc_single_reply_queue
 # option is removed.
 
-try:
-   from oslo_config import cfg
-except ImportError:
-   from oslo.config import cfg
+from oslo.config import cfg
 
 from workloadmgr.openstack.common import excutils
 from workloadmgr.openstack.common.gettextutils import _
