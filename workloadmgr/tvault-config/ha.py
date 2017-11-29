@@ -298,7 +298,7 @@ def enable_ha():
         subprocess.check_call(command, shell=True)
         threading.Timer(5.0, enable_ha).start()
 
-     elif len(configured_host) >= 1 and node_host_name in configured_host:
+     elif len(configured_host) >= 1 and node_list_ip[0] == configured_host[0] and node_host_name in configured_host:
 
           if node_number == 1:
              command = "mysql -h"+node_address+" -u root -p"+CONF.rabbit_password+" -e \"SHOW STATUS LIKE 'wsrep_cluster_size'\""

@@ -3628,7 +3628,7 @@ def configure_service():
                command = ['sudo', 'service', 'pacemaker', 'restart']
                subprocess.call(command, shell=False)
                command = ['sudo', 'service', 'tvault-ha', 'restart']
-               #subprocess.call(command, shell=False)
+               subprocess.call(command, shell=False)
                command = 'crm configure property pe-warn-series-max="1000" pe-input-series-max="1000" \
                           pe-error-series-max="1000" cluster-recheck-interval="5min"'
                subprocess.check_call(command, shell=True)
