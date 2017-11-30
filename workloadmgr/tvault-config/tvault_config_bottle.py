@@ -1257,6 +1257,18 @@ def _register_service():
             'TrilioVaultWLM', 'workloads', 'Trilio Vault Workload Manager Service')
 
     if config_data['enable_ha'] == 'on':
+       command = 'iptables --append INPUT --in-interface  eth0 --protocol tcp --match tcp --dport 3306 \
+                  --source '+config_data['floating_ipaddress']+'  --jump ACCEPT'
+       subprocess.check_call(command, shell=True)
+       command = 'iptables --append INPUT --in-interface  eth0 --protocol tcp --match tcp --dport 4567 \
+                  --source '+config_data['floating_ipaddress']+'  --jump ACCEPT'
+       subprocess.check_call(command, shell=True)
+       command = 'iptables --append INPUT --in-interface  eth0 --protocol tcp --match tcp --dport 4568 \
+                  --source '+config_data['floating_ipaddress']+'  --jump ACCEPT'
+       subprocess.check_call(command, shell=True)
+       command = 'iptables --append INPUT --in-interface  eth0 --protocol tcp --match tcp --dport 4444 \
+                  --source '+config_data['floating_ipaddress']+'  --jump ACCEPT'
+       subprocess.check_call(command, shell=True)
        command = "/sbin/ifconfig eth0 | awk '/Mask:/{ print $4;} '"
        result = subprocess.check_output(command, shell=True)
        byte = int(result.replace('\n','').split('.')[-1])
