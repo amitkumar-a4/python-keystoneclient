@@ -131,6 +131,7 @@ class PrepareBackupImage(task.Task):
 
     @autolog.log_method(Logger, 'PrepareBackupImage.execute')
     def execute_with_log(self, context, restore_id, vm_resource_id, volume_type):
+        disk_name = 'vda'
         db = WorkloadMgrDB().db
         self.cntx = amqp.RpcContext.from_dict(context)
 
@@ -168,7 +169,7 @@ class PrepareBackupImage(task.Task):
             image_overlay_file_path = 'not-applicable'
             image_virtual_size = image_info.virtual_size
 
-        return restore_file_path, image_overlay_file_path, image_virtual_size
+        return restore_file_path, disk_name, image_overlay_file_path, image_virtual_size
 
         """
         if db.get_metadata_value(snapshot_vm_resource.metadata, 'image_id') == None and \
@@ -1225,6 +1226,7 @@ def LinearPrepareBackupImages(context, instance, instance_options, snapshotobj, 
                                     rebind=dict(vm_resource_id=snapshot_vm_resource.id,
                                                 volume_type='volume_type_'+snapshot_vm_resource.id),
                                     provides=('restore_file_path_' + str(snapshot_vm_resource.id),
+                                              'disk_name_' + snapshot_vm_resource.resource_name,
                                               'image_overlay_file_path_' + str(snapshot_vm_resource.id),
                                               'image_virtual_size_' + str(snapshot_vm_resource.id))))
     return flow
@@ -1317,7 +1319,7 @@ def RestoreInstance(context, instance, snapshotobj, restore_id):
                                 provides='restored_instance_id'))            
         else:
             flow.add(RestoreInstanceFromVolume("RestoreInstanceFromVolume" + instance['vm_id'],
-                                rebind=dict(volume_id='volume_id_' + str(snapshot_vm_resource.id), disk_name=snapshot_vm_resource.resource_name),
+                                rebind=dict(volume_id='volume_id_' + str(snapshot_vm_resource.id), disk_name='disk_name_'+snapshot_vm_resource.resource_name),
                                 provides='restored_instance_id'))
     return flow
 
@@ -1397,7 +1399,6 @@ def AssignFloatingIPFlow(context):
     return flow
 
 def FreezeNThawFlow(context):
-
     flow = lf.Flow("freezenthawlf")
     flow.add(FreezeVM("FreezeVM", rebind={'instance': 'restored_instance_id', 'snapshot': 'restored_instance_id', 
                  'source_platform': 'restored_instance_id', 'restored_instance_id': 'restored_instance_id'}))
@@ -1551,7 +1552,6 @@ def restore_vm(cntx, db, instance, restore, restored_net_resources,
 
     result = engines.run(_restorevmflow, engine_conf='serial',
                          backend={'connection': store['connection'] }, store=store)
-
     if result and 'restored_instance_id' in result:
         restored_instance_id = result['restored_instance_id']
         compute_service = nova.API(production = (not test))
