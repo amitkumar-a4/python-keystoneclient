@@ -3869,6 +3869,16 @@ class API(base.Base):
                     tenants_usage[server.tenant_id] = {
                         'total_vms': 1, 'vms_protected': 0, 'used_capacity': 0}
 
+            # Update tenants_usage for those tenants which doesn't have any workloads
+            clients.initialise()
+            keystoneclient = clients.Clients(context).client("keystone")
+            tenants = keystoneclient.client.projects.list()
+
+            for tenant in tenants:
+                if tenant.id not in tenants_usage:
+                    tenants_usage[tenant.id] = {
+                        'vms_protected': 0, 'total_vms': 0, 'used_capacity': 0}
+
             backends_storage_stats = self.get_storage_usage(context)
 
             for backend in backends_storage_stats['storage_usage']:

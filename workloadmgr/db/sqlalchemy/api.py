@@ -20,9 +20,10 @@ import sqlalchemy.sql as sa_sql
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy import or_
 from sqlalchemy.orm import joinedload
-from sqlalchemy.sql.expression import literal_column
+from sqlalchemy.sql.expression import literal_column, cast
 from sqlalchemy.sql import func
 from sqlalchemy import and_
+from sqlalchemy import Integer
 
 from workloadmgr.common import sqlalchemyutils
 from workloadmgr import db
@@ -4265,30 +4266,23 @@ def get_tenants_usage(context, **kwargs):
     """Give storage used by tenant workloads"""
     try:
         tenant_chargeback = {}
-        chargeback = {}
-        workloads = workload_get_all(context)
-        for w in workloads:
-            # Create dictionary for avaialable tenants and there respective workloads
-            if w.project_id in chargeback:
-                chargeback[w.project_id].append(w.id)
-            else:
-                chargeback[w.project_id] = [w.id]
+        session = get_session()
+        for workload in session.query(models.Workloads.project_id).distinct():
+            tenant_chargeback[workload.project_id] = {}
+            workload_ids = [w.id for w in session.query(
+                models.Workloads.id).filter_by(project_id=workload.project_id)]
+            qry = session.query(func.sum(cast(models.WorkloadMetadata.value, Integer))).filter(and_(
+                models.WorkloadMetadata.workload_id.in_(workload_ids), models.WorkloadMetadata.key.in_(['workload_size'])))
 
-        for tenant_id in chargeback.keys():
-            tenant_storage_usage = 0
-            tenant_chargeback[tenant_id] = {}
-            qs = model_query(context, models.WorkloadMetadata).filter(
-                and_(models.WorkloadMetadata.workload_id.in_(chargeback[tenant_id]),
-                     models.WorkloadMetadata.key.in_(['workload_size'])))
-            storage_usage = qs.all()
-            for usage in storage_usage:
-                tenant_storage_usage += int(usage.value)
-            tenant_chargeback[tenant_id]['used_capacity'] = tenant_storage_usage
+            tenant_chargeback[workload.project_id]['used_capacity'] = int(qry.first()[
+                                                                          0])
 
             # Get no of vm's protected
             qs = model_query(context, models.WorkloadVMs).filter(
-                models.WorkloadVMs.workload_id.in_(chargeback[tenant_id]))
-            tenant_chargeback[tenant_id]['vms_protected'] = len(qs.all())
+                models.WorkloadVMs.workload_id.in_(workload_ids))
+            tenant_chargeback[workload.project_id]['vms_protected'] = len(
+                qs.all())
+
         return tenant_chargeback
     except Exception as ex:
         LOG.exception(ex)
