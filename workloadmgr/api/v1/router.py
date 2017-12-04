@@ -24,6 +24,8 @@ from workloadmgr.api.v1 import workload_transfer as transfers
 from workloadmgr.api.v1 import global_job_scheduler
 from workloadmgr.api.v1 import config_workload
 from workloadmgr.api.v1 import config_backup
+from workloadmgr.api.v1 import workload_policy
+
 LOG = logging.getLogger(__name__)
 
 
@@ -746,3 +748,38 @@ class APIRouter(workloadmgr.api.APIRouter):
                        controller=self.resources['config_backup'],
                        action='config_backup_delete',
                        conditions={"method": ['DELETE']})
+
+        #######################################################################
+        # Workload Policy
+        self.resources['workload_policy'] = workload_policy.create_resource(
+            ext_mgr)        
+        mapper.connect("workload_policy_create",
+                       "/{project_id}/workload_policy/",
+                       controller=self.resources['workload_policy'],
+                       action='policy_create',
+                       conditions={"method": ['POST']})
+        
+        mapper.connect("workload_policy_update",
+                       "/{project_id}/workload_policy/{id}",
+                       controller=self.resources['workload_policy'],
+                       action='policy_update',
+                       conditions={"method": ['PUT']})
+        
+        mapper.connect("workload_policy_get",
+                       "/{project_id}/workload_policy/{id}",
+                       controller=self.resources['workload_policy'],
+                       action='policy_get',
+                       conditions={"method": ['GET']})
+        
+        mapper.connect("workload_policy_list",
+                       "/{project_id}/workload_policies/",
+                       controller=self.resources['workload_policy'],
+                       action='policy_get_all',
+                       conditions={"method": ['GET']})
+        
+        mapper.connect("workload_policy_delete",
+                       "/{project_id}/workload_policy/{id}",
+                       controller=self.resources['workload_policy'],
+                       action='policy_delete',
+                       conditions={"method": ['DELETE']})
+

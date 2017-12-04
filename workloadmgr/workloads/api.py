@@ -3838,3 +3838,115 @@ class API(base.Base):
                 reason=ex.message %
                 (ex.kwargs if hasattr(
                     ex, 'kwargs') else {}))
+
+
+    #Workload Policy API's
+    @wrap_check_policy
+    def policy_create(self, context, name, description, metadata, field_values):
+        """
+        Make the RPC call to create a policy.
+        """
+        try:
+            AUDITLOG.log(context, 'Policy \'' + name + '\' Create Requested', None)
+    
+            #verify field names and values validations
+            #If met then  make  DB call.
+            fields = self.db.policy_fields_get_all(context)
+            policy_fields = [f.field_name for f in fields]
+    
+            if ( len(field_values.keys()) != len(policy_fields) ) or len(set(field_values.keys()).difference(set(policy_fields))) > 0:
+                raise wlm_exceptions.InvalidRequest(reason="Please provide only %s as part of policy fields" %str(policy_fields))
+
+            options = {'user_id': context.user_id,
+                       'project_id': context.project_id,
+                       'display_name': name,
+                       'display_description': description,
+                       'status':'avaialable',
+                       'metadata': metadata,
+                       'field_values': field_values}
+            policy = self.db.policy_create(context, options)
+    
+            AUDITLOG.log(context, 'Policy \'' + policy['display_name'] + '\' Create Submitted', policy)
+            return self.db.policy_get(context, policy['id'])
+        except Exception as ex:
+            LOG.exception(ex)
+            if 'policy' in locals():
+                self.db.policy_update(context, policy['id'],
+                                        {'status': 'error',
+                                         'error_msg': ex.kwargs['reason'] if hasattr(ex,
+                                                                                     'kwargs') and 'reason' in ex.kwargs else {}})
+            raise
+    
+    
+    @wrap_check_policy
+    def policy_update(self, context, policy_id, values):
+        """
+        Make the RPC call to update a policy.
+        """
+        try:
+            policy = self.db.policy_get(context, policy_id)
+
+            AUDITLOG.log(context, 'Policy \'' + policy['display_name'] + '\' Update Requested', None)
+    
+            #verify field names and values validations
+            #If met then  make  DB calll.
+    
+            field_values = values.get('field_values', {})
+            if len(field_values) > 0:
+                fields = self.db.policy_fields_get_all(context)
+                policy_fields = [f.field_name for f in fields]
+
+                import pdb;pdb.set_trace()
+                if len(set(policy_fields).union(set(field_values.keys()))) > len(policy_fields):
+                    raise wlm_exceptions.InvalidRequest(reason="Please provide only %s as part of policy fields" %str(policy_fields))
+    
+            ##logic to validate the values using policy validations
+    
+            policy = self.db.policy_update(context, policy_id, values)
+    
+            AUDITLOG.log(context, 'Policy \'' + policy['display_name'] + '\' Update Submitted', policy)
+            return policy
+            #return self.db.policy_get(context, policy['id'])
+        except Exception as ex:
+            LOG.exception(ex)
+            raise
+    
+    
+    
+    @wrap_check_policy
+    def policy_get(self, context, policy_id):
+        """
+        Make the RPC call to get policy.
+        """
+        try:
+            policy = self.db.policy_get(context, policy_id)
+            return policy
+        except Exception as ex:
+            LOG.exception(ex)
+            raise
+    
+    @wrap_check_policy
+    def policy_list(self, context, search_opts={}):
+        """
+        Make the RPC call to list policies.
+        """
+        try:
+            policies = self.db.policy_get_all(context, **search_opts)
+            return policies
+        except Exception as ex:
+            LOG.exception(ex)
+            raise
+    
+    @wrap_check_policy
+    def policy_delete(self, context, policy_id):
+        """
+        Make the RPC call to delete policy.
+        """
+        try:
+            policy = self.db.policy_get(context, policy_id)
+            AUDITLOG.log(context, 'Policy \'' + policy['display_name'] + '\' Delete Requested', None)
+            self.db.policy_delete(context, policy_id)
+            AUDITLOG.log(context, 'Policy \'' + policy['display_name'] + '\' Delete Submitted', None)
+        except Exception as ex:
+            LOG.exception(ex)
+            raise

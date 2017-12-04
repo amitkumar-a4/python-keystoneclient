@@ -795,12 +795,11 @@ class WorkloadPolicy(BASE, WorkloadsBase):
     """Workload policy"""
     __tablename__ = 'workload_policy'
     id = Column(String(255), primary_key=True)
-
     user_id = Column(String(255), nullable=False)
     project_id = Column(String(255), nullable=False)
-
     display_name = Column(String(255))
     display_description = Column(String(255))
+    status = Column(String(255))
 
 class WorkloadPolicyMetadata(BASE, WorkloadsBase):
     """Represents  metadata for the workload policy"""

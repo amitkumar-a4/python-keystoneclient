@@ -623,6 +623,8 @@ class ConfigWorkloadNotFound(NotFound):
 class ConfigBackupNotFound(NotFound):
     message = _("Config backup %(backup_id)s could not be found.")
 
+class PolicyNotFound(NotFound):
+      message = _("Policy %(policy_id)s could not be found.")
 
 class PolicyFieldNotFound(NotFound):
     message = _("Policy field %(policy_field_id)s could not be found.")
