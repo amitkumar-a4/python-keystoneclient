@@ -871,18 +871,24 @@ class LibvirtDriver(driver.ComputeDriver):
 
             snapshot_vm_resource_metadata = {
                 'disk_info': json.dumps(disk_info)}
-            if disk_info['dev'] == 'vda' and nova_instance.image and len(
+            if disk_info['dev'] in ('vda', 'sda') and nova_instance.image and len(
                     nova_instance.image) > 0:
-                glance_image = image_service.show(
-                    cntx, nova_instance.image['id'])
-                snapshot_vm_resource_metadata['image_id'] = glance_image['id']
-                snapshot_vm_resource_metadata['image_name'] = glance_image['name']
-                snapshot_vm_resource_metadata['container_format'] = glance_image['container_format']
-                snapshot_vm_resource_metadata['disk_format'] = glance_image['disk_format']
-                snapshot_vm_resource_metadata['min_ram'] = glance_image['min_ram']
-                snapshot_vm_resource_metadata['min_disk'] = glance_image['min_disk']
-                if 'hw_qemu_guest_agent' in glance_image['properties'].keys():
-                    snapshot_vm_resource_metadata['hw_qemu_guest_agent'] = glance_image['properties']['hw_qemu_guest_agent']
+                try:
+                    glance_image = image_service.show(
+                        cntx, nova_instance.image['id'])
+                    snapshot_vm_resource_metadata['image_id'] = glance_image['id']
+                    snapshot_vm_resource_metadata['image_name'] = glance_image['name']
+                    snapshot_vm_resource_metadata['container_format'] = glance_image['container_format']
+                    snapshot_vm_resource_metadata['disk_format'] = glance_image['disk_format']
+                    snapshot_vm_resource_metadata['min_ram'] = glance_image['min_ram']
+                    snapshot_vm_resource_metadata['min_disk'] = glance_image['min_disk']
+                    if 'hw_qemu_guest_agent' in glance_image['properties'].keys():
+                        snapshot_vm_resource_metadata['hw_qemu_guest_agent'] = glance_image['properties']['hw_qemu_guest_agent']
+                except exception.ImageNotFound as ex:
+                    snapshot_vm_resource_metadata['image_id'] = uuid.uuid4()
+                    snapshot_vm_resource_metadata['image_name'] = "TrilioVault-Image-Placeholder"
+                    snapshot_vm_resource_metadata['container_format'] = "bare"
+                    snapshot_vm_resource_metadata['disk_format'] = "qcow2"
             else:
                 snapshot_vm_resource_metadata['image_id'] = None
 
