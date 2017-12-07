@@ -172,6 +172,7 @@ def enable_ha():
      node_list = []
      node_list_ip = []
      configured_host = []
+     once_node = []
      disabled_host = []
      node_address = CONF.rabbit_host
      node_host_name = ''
@@ -193,6 +194,8 @@ def enable_ha():
                  if c2.get('name') == 'configured' and c2.get('value') == 'once' and \
                     socket.gethostname() == child.get('uname'):
                     no_match = True
+                 if c2.get('name') == 'configured' and c2.get('value') == 'once':
+                    once_node.append(child.get('uname'))
                  if c2.get('name') == 'virtip':
                     virtual_ip = c2.get('value')
                  if c2.get('name') == 'ip':
@@ -298,15 +301,15 @@ def enable_ha():
         subprocess.check_call(command, shell=True)
         threading.Timer(5.0, enable_ha).start()
 
-     elif len(configured_host) >= 1 and node_list_ip[0] == configured_host[0] and node_host_name in configured_host:
+     elif len(configured_host) >= 1 and (node_list[0] == configured_host[0] or node_list[0] == once_node[0]) and node_host_name in configured_host:
 
           if node_number == 1:
              command = "mysql -h"+node_address+" -u root -p"+CONF.rabbit_password+" -e \"SHOW STATUS LIKE 'wsrep_cluster_size'\""
              result = subprocess.check_output(command, shell=True)
-             if result == "":
+             if result == "" or (result != '' and int(result.split('\n')[1].split('\t')[1]) <= 0):
                 command = 'service mysql start --wsrep-new-cluster'
                 subprocess.check_call(command, shell=True)
-             else:
+             elif result != '' and int(result.split('\n')[1].split('\t')[1]) > 1:
                   command = 'service mysql restart'
                   subprocess.check_call(command, shell=True)
           else:
@@ -327,7 +330,7 @@ def enable_ha():
                     subprocess.check_call(command, shell=True)
                 except:
                        pass
-                command = 'mysql --host='+node_address+' -u root -p'+CONF.rabbitt_password+' -e "insert into mysql.user (Host,User, ssl_cipher, x509_issuer, x509_subject) values (\''+node_address+'\',\'root\', \'\', \'\', \'\');"'
+                command = 'mysql --host='+node_address+' -u root -p'+CONF.rabbit_password+' -e "insert into mysql.user (Host,User, ssl_cipher, x509_issuer, x509_subject) values (\''+node_address+'\',\'root\', \'\', \'\', \'\');"'
                 try:
                     subprocess.check_call(command, shell=True)
                 except:
@@ -337,8 +340,11 @@ def enable_ha():
                     subprocess.check_call(command, shell=True)
                 except:
                        pass
-                command = 'service mysql restart'
-                subprocess.check_call(command, shell=True)
+                if result != '' and int(result.split('\n')[1].split('\t')[1]) > 1:
+                   command = 'service mysql stop'
+                   subprocess.check_call(command, shell=True)
+                   command = 'service mysql start --wsrep-new-cluster'
+                   subprocess.check_call(command, shell=True)
 
           if result != '' and int(result.split('\n')[1].split('\t')[1]) >= 0:
              sql_connection = 'mysql://root:'+CONF.rabbit_password+'@'+virtual_ip+':33308/workloadmgr?charset=utf8'
