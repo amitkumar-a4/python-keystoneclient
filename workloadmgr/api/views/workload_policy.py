@@ -34,6 +34,7 @@ class ViewBuilder(common.ViewBuilder):
         d['status'] = policy['status']
         d['name'] = policy['display_name']
         d['description'] = policy['display_description']
+        d['metadata'] = policy['metadata']
         d['field_values'] = policy['field_values']
         return {'policy': d}
 

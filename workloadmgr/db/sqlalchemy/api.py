@@ -4330,7 +4330,6 @@ def policy_field_delete(context, id, **kwargs):
 
 @require_context
 def _policy_update(context, values, policy_id, purge_metadata, session):
-    import pdb;pdb.set_trace()
     metadata = values.pop('metadata', {})
     field_values = values.pop('field_values',{})
     if policy_id:

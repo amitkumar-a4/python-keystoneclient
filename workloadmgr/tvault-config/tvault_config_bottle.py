@@ -4158,7 +4158,7 @@ def reinitialize():
             tables = engine.table_names()
             connection.execute("SET FOREIGN_KEY_CHECKS=0")
             for table in tables:
-                if table != 'workload_types':
+                if table not in ['workload_types','workload_policy_fields']:
                     connection.execute("TRUNCATE TABLE " + str(table))
             connection.execute("SET FOREIGN_KEY_CHECKS=1")
             trans.commit()
