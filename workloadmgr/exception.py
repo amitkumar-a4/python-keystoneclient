@@ -638,3 +638,4 @@ class PolicyValueNotFound(NotFound):
 
 class PolicyAssignmentNotFound(NotFound):
     message = _("Policy assignment %(policy_assignment_id)s could not be found.")
+

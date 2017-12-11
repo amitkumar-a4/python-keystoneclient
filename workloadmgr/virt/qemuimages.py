@@ -300,6 +300,16 @@ def get_effective_size(path, run_as_root=False):
     """rebase the backing_file_top to backing_file_base
      :param backing_file_top: top file to commit from to its base
     """
+    # Sometimes after uploading the image from contego side
+    # It takes time to reflect on Tvault storage backend.
+    # In that case waiting for 60 seconds.
+    i = 0
+    while i < 12:
+        if not os.path.exists(path):
+            time.sleep(5)
+        else:
+            break
+
     qemuinfo = qemu_img_info(path)
     if qemuinfo.file_format != 'qcow2':
         return qemuinfo.virtual_size

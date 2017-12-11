@@ -317,7 +317,7 @@ class WorkloadMgrsController(wsgi.Controller):
                 message = "Please provide policy id form available policies: %s" % (
                     str(available_policies))
                 raise exception.ErrorOccurred(message)
-
+                
             jobdefaults = {
                 'fullbackup_interval': '-1',
                 'start_time': '09:00 PM',
@@ -356,7 +356,7 @@ class WorkloadMgrsController(wsgi.Controller):
             instances = workload.get('instances', {})
             if not instances:
                 instances = {}
-
+                
             try:
                 new_workload = self.workload_api.workload_create(
                     context,
@@ -939,8 +939,8 @@ class WorkloadMgrsController(wsgi.Controller):
         try:
             context = req.environ['workloadmgr.context']
 
-            license_text = body['license']
-            license = self.workload_api.license_create(context, license_text)
+            license_data = body['license']
+            license = self.workload_api.license_create(context, license_data)
             return {'license': license}
         except exc.HTTPNotFound as error:
             raise error
@@ -957,6 +957,7 @@ class WorkloadMgrsController(wsgi.Controller):
             context = req.environ['workloadmgr.context']
             license = self.workload_api.license_list(context)
             return {'license': license}
+          
         except exc.HTTPNotFound as error:
             LOG.exception(error)
             raise error

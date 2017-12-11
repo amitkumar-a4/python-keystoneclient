@@ -812,3 +812,4 @@ class APIRouter(workloadmgr.api.APIRouter):
                        controller=self.resources['workload_policy'],
                        action='policy_field_list',
                        conditions={"method": ['GET']})
+        

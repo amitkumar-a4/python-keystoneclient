@@ -1,4 +1,5 @@
 import os
+import json
 
 from oslo.config import cfg
 
@@ -46,9 +47,27 @@ def upload_settings_db_entry(cntx):
             if 'Password' in kvpair['key'] or 'password' in kvpair['key']:
                 kvpair['value'] = '******'
 
-    settings_jason = jsonutils.dumps(settings_db)
+    settings_json = jsonutils.dumps(settings_db)
     settings_path = os.path.join(str(CONF.cloud_unique_id), "settings_db")
-    backup_target.put_object(settings_path, settings_jason)
+    db_settings = json.loads(settings_json)
+    db_settings_keys = [setting['type'] for setting in db_settings]
+
+    try:
+        backend_settings = json.loads(backup_target.get_object(settings_path))
+    except Exception as ex:
+        backend_settings = []
+    backend_settings_keys = [setting['type'] for setting in backend_settings]
+
+    # If on the backend we have more settings than DB means we havn't
+    # imported them yet, In that case appending DB settings with backend settings.
+    if len(backend_settings) > len(db_settings) or len(list(set(db_settings_keys) - set(backend_settings_keys))):
+        for setting in backend_settings:
+            if setting['type'] in db_settings_keys:
+                backend_settings.remove(setting)
+
+        db_settings.extend(backend_settings)
+    db_settings = json.dumps(db_settings)
+    backup_target.put_object(settings_path, db_settings)
 
 
 def upload_workload_db_entry(cntx, workload_id):
@@ -776,10 +795,13 @@ def get_compute_host(context):
 
 
 @autolog.log_method(logger=Logger)
-def validate_database_creds(context, databases):
+def validate_database_creds(context, databases, trust_creds):
     try:
+        host = get_compute_host(context)
         compute_service = nova.API(production=True)
-        params = {'databases': databases}
+        params = {'databases': databases,
+                  'host': host, 'trust_creds': trust_creds}
+
         status = compute_service.validate_database_creds(context, params)
         if status['result'] != "success":
             message = "Please verify given database credentials."

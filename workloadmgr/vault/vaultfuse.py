@@ -942,7 +942,7 @@ class SwiftRepository(ObjectRepository):
                 except BaseException:
                     pass
             if component is not None and component != '' and \
-                    '-segments' in component and not '_segments' not in component:
+                    '-segments' not in component and '_segments' not in component:
                 if component not in dirents:
                     dirents.append(component)
         for r in list(dirents):

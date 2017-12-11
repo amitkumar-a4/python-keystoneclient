@@ -3288,9 +3288,9 @@ class API(base.Base):
     @autolog.log_method(logger=Logger)
     @upload_settings
     @wrap_check_policy
-    def license_create(self, context, license_text):
+    def license_create(self, context, license_data):
 
-        license_json = json.dumps(parse_license_text(license_text))
+        license_json = json.dumps(parse_license_text(license_data['lic_txt']))
         setting = {u'category': "license",
                    u'name': "license-%s" % str(uuid.uuid4()),
                    u'description': u'TrilioVault License Key',
@@ -3298,7 +3298,7 @@ class API(base.Base):
                    u'user_id': context.user_id,
                    u'is_public': False,
                    u'is_hidden': True,
-                   u'metadata': {},
+                   u'metadata': {'filename':license_data['file_name']},
                    u'type': "license_key", }
         created_license = []
         try:
@@ -3327,7 +3327,9 @@ class API(base.Base):
         if len(license) == 0:
             raise Exception("No licenses added to TrilioVault")
 
-        return json.loads(license[0].value)
+        lic = json.loads(license[0].value)
+        lic['metadata'] = license[0]['metadata']
+        return lic
 
     @autolog.log_method(logger=Logger)
     @wrap_check_policy
@@ -3658,12 +3660,17 @@ class API(base.Base):
                         config_data.pop('trusted_user'))
                 if 'authorized_key' in config_data:
                     os.remove(authorized_key)
-                    metadata['authorized_key'] = vault.get_key_file(
+                    trust_creds['authorized_key'] = metadata['authorized_key'] = vault.get_key_file(
                         config_data['authorized_key'])
 
             if 'databases' in config_data:
+                if 'trust_creds' not in locals():
+                    trust_creds['trusted_user'] = _get_matadata(
+                        existing_config_workload.metadata, 'trusted_user')
+                    trust_creds['authorized_key'] = _get_matadata(
+                        existing_config_workload.metadata, 'authorized_key')
                 workload_utils.validate_database_creds(
-                    context, config_data['databases'])
+                    context, config_data['databases'], trust_creds)
                 metadata['databases'] = pickle.dumps(
                     config_data.pop('databases'))
 

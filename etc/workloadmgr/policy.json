@@ -80,4 +80,5 @@
         "workload:policy_apply": "rule:admin_api",
         "workload:policy_remove": "rule:admin_api",
         "workload:policy_field_create": "rule:admin_api",
+
 }

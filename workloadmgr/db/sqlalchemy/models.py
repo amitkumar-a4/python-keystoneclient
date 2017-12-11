@@ -791,7 +791,6 @@ class ConfigBackupMetadata(BASE, WorkloadsBase):
     key = Column(String(255), index=True, nullable=False)
     value = Column(Text)
 
-
 class WorkloadPolicy(BASE, WorkloadsBase):
     """Workload policy"""
     __tablename__ = 'workload_policy'
@@ -891,7 +890,6 @@ def register_models():
               ConfigWorkloads,
               ConfigWorkloadMetadata,
               ConfigBackups,
-              ConfigBackupMetadata,
               WorkloadPolicy,
               WorkloadPolicyMetadata,
               WorkloadPolicyFields,

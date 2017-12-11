@@ -683,8 +683,6 @@ def config_backup_delete(context, backup_id, **kwargs):
     return IMPL.config_backup_delete(context, backup_id, **kwargs)
 
 # Workload Policy API's
-
-
 def policy_create(context, values, **kwargs):
     """create workload policy"""
     return IMPL.policy_create(context, values, **kwargs)
