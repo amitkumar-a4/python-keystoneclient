@@ -1356,6 +1356,18 @@ def _register_workloadtypes():
                 description='A workload that consists of other workloads',
                 id='54947065-2a59-494a-ab64-b6501c139a82')
 
+        # Register Policy fields
+        if config_data['configuration_type'] == 'openstack':
+            fields = wlm.workload_policy.policy_field_list()
+            existing_policy_fields = [field.field_name for field in fields]
+            policy_fields = ['fullbackup_interval', 'interval',
+                             'retention_policy_type', 'retention_policy_value']
+
+            for field_name in policy_fields:
+                if field_name not in existing_policy_fields:
+                    wlm.workload_policy.policy_field_create(
+                        name=field_name, type='text')
+
     if config_data['configuration_type'] == 'openstack':
         config_data['config_status'] = 'success'
         persist_config()
@@ -4158,7 +4170,7 @@ def reinitialize():
             tables = engine.table_names()
             connection.execute("SET FOREIGN_KEY_CHECKS=0")
             for table in tables:
-                if table not in ['workload_types','workload_policy_fields']:
+                if table not in ['workload_types', 'workload_policy_fields']:
                     connection.execute("TRUNCATE TABLE " + str(table))
             connection.execute("SET FOREIGN_KEY_CHECKS=1")
             trans.commit()

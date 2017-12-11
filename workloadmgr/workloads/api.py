@@ -442,17 +442,21 @@ class API(base.Base):
     def _apply_workload_policy(self, context, policy_id, jobschedule):
         try:
             policy = self.policy_get(context, policy_id)
-            available_policies = self.get_assigned_policies(context, context.project_id)
-        
+            available_policies = self.get_assigned_policies(
+                context, context.project_id)
+
             if len(available_policies) == 0:
-                message = "No policy is assigned to project: %s" % (context.project_id)
+                message = "No policy is assigned to project: %s" % (
+                    context.project_id)
                 raise wlm_exceptions.ErrorOccurred(message)
             if policy_id not in available_policies:
-                message = "Given policy: %s not availabe for project: %s" % (policy_id, context.project_id)
+                message = "Given policy: %s not availabe for project: %s" % (
+                    policy_id, context.project_id)
                 raise wlm_exceptions.ErrorOccurred(message)
-        
+
             for field_value in policy.field_values:
-                jobschedule[field_value['policy_field_name']] = field_value['value']
+                jobschedule[field_value['policy_field_name']
+                            ] = field_value['value']
         except Exception as ex:
             LOG.exception(ex)
             raise ex
@@ -840,7 +844,7 @@ class API(base.Base):
                 '\' Create Requested',
                 None)
 
-            policy_id  = metadata.get('policy_id', None)
+            policy_id = metadata.get('policy_id', None)
             if policy_id is not None:
                 self._apply_workload_policy(context, policy_id, jobschedule)
 
@@ -925,8 +929,10 @@ class API(base.Base):
 
             if policy_id is not None:
                 values = {'policy_id': policy_id, 'workload_id': workload.id}
-                policy_assignment = self.db.policy_assignment_create(context, values)
-                self.db.workload_update(context, workload.id, {'metadata' : {'policy_assignment_id': policy_assignment.id}})
+                policy_assignment = self.db.policy_assignment_create(
+                    context, values)
+                self.db.workload_update(context, workload.id, {'metadata': {
+                                        'policy_assignment_id': policy_assignment.id}})
 
             for instance in instances:
                 values = {'workload_id': workload.id,
@@ -1054,15 +1060,16 @@ class API(base.Base):
             purge_metadata = True
             options['metadata'] = workload['metadata']
             if 'policy_id' in workload['metadata'] and workload['metadata']['policy_id'] is not None:
-                policy_id =  workload['metadata']['policy_id']
+                policy_id = workload['metadata']['policy_id']
                 if 'jobschedule' not in workload:
                     workload['jobschedule'] = {}
-                self._apply_workload_policy(context, policy_id,  workload['jobschedule'])
-                for k,v in workloadobj['metadata'].iteritems():
+                self._apply_workload_policy(
+                    context, policy_id, workload['jobschedule'])
+                for k, v in workloadobj['metadata'].iteritems():
                     if k == "policy_assignment_id":
-                        import pdb;pdb.set_trace()
-                        values = {'policy_id': policy_id, 'workload_id': workload_id}
-                        self.db.policy_assignment_update(context, v, values)                         
+                        values = {'policy_id': policy_id,
+                                  'workload_id': workload_id}
+                        self.db.policy_assignment_update(context, v, values)
 
         if 'jobschedule' in workload and workload['jobschedule'] and self._scheduler.running:
 
@@ -3879,44 +3886,45 @@ class API(base.Base):
                 (ex.kwargs if hasattr(
                     ex, 'kwargs') else {}))
 
-
-    #Workload Policy API's
+    # Workload Policy API's
     @wrap_check_policy
     def policy_create(self, context, name, description, metadata, field_values):
         """
         Create a policy.
         """
         try:
-            AUDITLOG.log(context, 'Policy \'' + name + '\' Create Requested', None)
-    
-            #verify field names provided with available policy fields
+            AUDITLOG.log(context, 'Policy \'' + name +
+                         '\' Create Requested', None)
+
+            # verify field names provided with available policy fields
             fields = self.db.policy_fields_get_all(context)
             policy_fields = [f.field_name for f in fields]
-    
-            if ( len(field_values.keys()) != len(policy_fields) ) or len(set(field_values.keys()).difference(set(policy_fields))) > 0:
-                raise wlm_exceptions.InvalidRequest(reason="Please provide only %s as part of policy fields" %str(policy_fields))
+
+            if (len(field_values.keys()) != len(policy_fields)) or len(set(field_values.keys()).difference(set(policy_fields))) > 0:
+                raise wlm_exceptions.InvalidRequest(
+                    reason="Please provide only %s as part of policy fields" % str(policy_fields))
 
             options = {'user_id': context.user_id,
                        'project_id': context.project_id,
                        'display_name': name,
                        'display_description': description,
-                       'status':'avaialable',
+                       'status': 'avaialable',
                        'metadata': metadata,
                        'field_values': field_values}
             policy = self.db.policy_create(context, options)
-    
-            AUDITLOG.log(context, 'Policy \'' + policy['display_name'] + '\' Create Submitted', policy)
+
+            AUDITLOG.log(context, 'Policy \'' +
+                         policy['display_name'] + '\' Create Submitted', policy)
             return self.db.policy_get(context, policy['id'])
         except Exception as ex:
             LOG.exception(ex)
             if 'policy' in locals():
                 self.db.policy_update(context, policy['id'],
-                                        {'status': 'error',
-                                         'error_msg': ex.kwargs['reason'] if hasattr(ex,
-                                                                                     'kwargs') and 'reason' in ex.kwargs else {}})
+                                      {'status': 'error',
+                                       'error_msg': ex.kwargs['reason'] if hasattr(ex,
+                                                                                   'kwargs') and 'reason' in ex.kwargs else {}})
             raise
-    
-    
+
     @wrap_check_policy
     def policy_update(self, context, policy_id, values):
         """
@@ -3925,29 +3933,33 @@ class API(base.Base):
         try:
             policy = self.db.policy_get(context, policy_id)
 
-            AUDITLOG.log(context, 'Policy \'' + policy['display_name'] + '\' Update Requested', None)
+            AUDITLOG.log(context, 'Policy \'' +
+                         policy['display_name'] + '\' Update Requested', None)
 
-            policy_assignments = self.db.policy_assignments_get_all(context, policy_id=policy_id)
+            policy_assignments = self.db.policy_assignments_get_all(
+                context, policy_id=policy_id)
             if len(policy_assignments) > 0:
-               raise wlm_exceptions.ErrorOccurred(reason="Can not update policy: %s. It's assigned to workloads." %(policy_id))
+                raise wlm_exceptions.ErrorOccurred(
+                    reason="Can not update policy: %s. It's assigned to workloads." % (policy_id))
 
-            #verify field names provided with available policy fields
+            # verify field names provided with available policy fields
             field_values = values.get('field_values', {})
             if len(field_values) > 0:
                 fields = self.db.policy_fields_get_all(context)
                 policy_fields = [f.field_name for f in fields]
 
                 if len(set(policy_fields).union(set(field_values.keys()))) > len(policy_fields):
-                    raise wlm_exceptions.InvalidRequest(reason="Please provide only %s as part of policy fields" %str(policy_fields))
-    
+                    raise wlm_exceptions.InvalidRequest(
+                        reason="Please provide only %s as part of policy fields" % str(policy_fields))
+
             policy = self.db.policy_update(context, policy_id, values)
-    
-            AUDITLOG.log(context, 'Policy \'' + policy['display_name'] + '\' Update Submitted', policy)
+
+            AUDITLOG.log(context, 'Policy \'' +
+                         policy['display_name'] + '\' Update Submitted', policy)
             return policy
         except Exception as ex:
             LOG.exception(ex)
             raise
-
 
     @wrap_check_policy
     def policy_get(self, context, policy_id):
@@ -3960,7 +3972,7 @@ class API(base.Base):
         except Exception as ex:
             LOG.exception(ex)
             raise
-    
+
     @wrap_check_policy
     def policy_list(self, context, search_opts={}):
         """
@@ -3972,17 +3984,26 @@ class API(base.Base):
         except Exception as ex:
             LOG.exception(ex)
             raise
-    
+
     @wrap_check_policy
     def policy_delete(self, context, policy_id):
         """
         Delete the given policy.
         """
         try:
+            AUDITLOG.log(context, 'Policy \'' +
+                         policy['display_name'] + '\' Delete Requested', None)
+
             policy = self.db.policy_get(context, policy_id)
-            AUDITLOG.log(context, 'Policy \'' + policy['display_name'] + '\' Delete Requested', None)
+            policy_assignments = self.db.policy_assignments_get_all(
+                context, policy_id=policy_id)
+            if len(policy_assignments) > 0:
+                raise wlm_exceptions.ErrorOccurred(
+                    reason="Can not delete policy: %s. It's assigned to workloads." % (policy_id))
+
             self.db.policy_delete(context, policy_id)
-            AUDITLOG.log(context, 'Policy \'' + policy['display_name'] + '\' Delete Submitted', None)
+            AUDITLOG.log(context, 'Policy \'' +
+                         policy['display_name'] + '\' Delete Submitted', None)
         except Exception as ex:
             LOG.exception(ex)
             raise
@@ -4004,20 +4025,20 @@ class API(base.Base):
             assigned_projects = []
             for meta in policy.metadata:
                 if meta.key == "assigned_projects":
-                    assigned_projects = pickle.loads( str(meta.value))
+                    assigned_projects = pickle.loads(str(meta.value))
 
             if project_id not in assigned_projects:
                 assigned_projects.append(project_id)
             else:
-                message = "Policy: %s is already applied on given project id: %s " %(policy_id, project_id)
+                message = "Policy: %s is already applied on given project id: %s " % (
+                    policy_id, project_id)
                 raise wlm_exceptions.ErrorOccurred(reason=message)
 
             metadata = {'assigned_projects': pickle.dumps(assigned_projects)}
-            return self.db.policy_update(context, policy_id, {'metadata':metadata})
+            return self.db.policy_update(context, policy_id, {'metadata': metadata})
         except Exception as ex:
             LOG.exception(ex)
             raise
-
 
     @wrap_check_policy
     def policy_remove(self, context, policy_id, project_id):
@@ -4035,7 +4056,8 @@ class API(base.Base):
             if project_id in assigned_projects:
                 assigned_projects.remove(project_id)
             else:
-                message = "Policy: %s is not applied on given project id: %s " %(policy_id, project_id)
+                message = "Policy: %s is not applied on given project id: %s " % (
+                    policy_id, project_id)
                 raise wlm_exceptions.ErrorOccurred(reason=message)
 
             metadata = {'assigned_projects': pickle.dumps(assigned_projects)}
@@ -4065,15 +4087,25 @@ class API(base.Base):
 
     @autolog.log_method(logger=Logger)
     @wrap_check_policy
-    def policy_field_create(self, context, name, type):
+    def policy_field_create(self, context, id, name, type):
         """
         Create a policy_field. No RPC call is made
         """
-        AUDITLOG.log(context, 'Policy Field \'' + name + '\' Create Requested', None)
+        AUDITLOG.log(context, 'Policy Field \'' +
+                     name + '\' Create Requested', None)
         options = {'field_name': name,
                    'type': type,
-                    }
+                   }
         policy_field = self.db.policy_field_create(context, options)
-        AUDITLOG.log(context, 'Policy Field \'' + name + '\' Create Submitted', policy_field)
+        AUDITLOG.log(context, 'Policy Field \'' + name +
+                     '\' Create Submitted', policy_field)
         return policy_field
 
+    @autolog.log_method(logger=Logger)
+    @wrap_check_policy
+    def policy_field_list(self, context):
+        """
+        List all policy fields.
+        """
+        policy_fields = self.db.policy_fields_get_all(context)
+        return policy_fields

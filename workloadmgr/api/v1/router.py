@@ -752,31 +752,31 @@ class APIRouter(workloadmgr.api.APIRouter):
         #######################################################################
         # Workload Policy
         self.resources['workload_policy'] = workload_policy.create_resource(
-            ext_mgr)        
+            ext_mgr)
         mapper.connect("workload_policy_create",
                        "/{project_id}/workload_policy/",
                        controller=self.resources['workload_policy'],
                        action='policy_create',
                        conditions={"method": ['POST']})
-        
+
         mapper.connect("workload_policy_update",
                        "/{project_id}/workload_policy/{id}",
                        controller=self.resources['workload_policy'],
                        action='policy_update',
                        conditions={"method": ['PUT']})
-        
+
         mapper.connect("workload_policy_get",
                        "/{project_id}/workload_policy/{id}",
                        controller=self.resources['workload_policy'],
                        action='policy_get',
                        conditions={"method": ['GET']})
-        
+
         mapper.connect("workload_policy_list",
                        "/{project_id}/workload_policies/",
                        controller=self.resources['workload_policy'],
                        action='policy_get_all',
                        conditions={"method": ['GET']})
-        
+
         mapper.connect("workload_policy_delete",
                        "/{project_id}/workload_policy/{id}",
                        controller=self.resources['workload_policy'],
@@ -807,3 +807,8 @@ class APIRouter(workloadmgr.api.APIRouter):
                        action='policy_field_create',
                        conditions={"method": ['POST']})
 
+        mapper.connect("list_policy_fields",
+                       "/{project_id}/policy_field/",
+                       controller=self.resources['workload_policy'],
+                       action='policy_field_list',
+                       conditions={"method": ['GET']})

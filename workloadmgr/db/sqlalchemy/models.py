@@ -791,6 +791,7 @@ class ConfigBackupMetadata(BASE, WorkloadsBase):
     key = Column(String(255), index=True, nullable=False)
     value = Column(Text)
 
+
 class WorkloadPolicy(BASE, WorkloadsBase):
     """Workload policy"""
     __tablename__ = 'workload_policy'
@@ -801,12 +802,14 @@ class WorkloadPolicy(BASE, WorkloadsBase):
     display_description = Column(String(255))
     status = Column(String(255))
 
+
 class WorkloadPolicyMetadata(BASE, WorkloadsBase):
     """Represents  metadata for the workload policy"""
     __tablename__ = 'workload_policy_metadata'
 
     id = Column(String(255), primary_key=True)
-    policy_id = Column(String(255), ForeignKey('workload_policy.id'), nullable=False)
+    policy_id = Column(String(255), ForeignKey(
+        'workload_policy.id'), nullable=False)
     key = Column(String(255), index=True, nullable=False)
     value = Column(Text)
     workload_policy = relationship(WorkloadPolicy, backref=backref('metadata'))
@@ -826,10 +829,13 @@ class WorkloadPolicyValues(BASE, WorkloadsBase):
     __tablename__ = 'workload_policy_values'
 
     id = Column(String(255), primary_key=True)
-    policy_id = Column(String(255), ForeignKey('workload_policy.id'), nullable=False)
-    policy_field_name = Column(String(255), ForeignKey('workload_policy_fields.field_name'), nullable=False)
+    policy_id = Column(String(255), ForeignKey(
+        'workload_policy.id'), nullable=False)
+    policy_field_name = Column(String(255), ForeignKey(
+        'workload_policy_fields.field_name'), nullable=False)
     value = Column(String(255), nullable=False)
-    workload_policy_value = relationship(WorkloadPolicy, backref=backref('field_values'))
+    workload_policy_value = relationship(
+        WorkloadPolicy, backref=backref('field_values'))
 
 
 class WorkloadPolicyAssignmnets(BASE, WorkloadsBase):
@@ -837,8 +843,10 @@ class WorkloadPolicyAssignmnets(BASE, WorkloadsBase):
     __tablename__ = 'workload_policy_assignments'
 
     id = Column(String(255), primary_key=True)
-    policy_id = Column(String(255), ForeignKey('workload_policy.id'), nullable=False)
-    workload_id = Column(String(255), ForeignKey('workloads.id'), nullable=False)
+    policy_id = Column(String(255), ForeignKey(
+        'workload_policy.id'), nullable=False)
+    workload_id = Column(String(255), ForeignKey(
+        'workloads.id'), nullable=False)
 
 
 def register_models():

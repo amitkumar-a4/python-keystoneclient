@@ -55,11 +55,12 @@ class ViewBuilder(common.ViewBuilder):
 
     def _list_view(self, func, request, policy_list):
         """Provide a view for a list of policy."""
-        policy_list = [func(request, policy)['policy'] for policy in policy_list]
-        
-        if func.__name__== 'detail':
+        policy_list = [func(request, policy)['policy']
+                       for policy in policy_list]
+
+        if func.__name__ == 'detail':
             policy_list = sorted(policy_list,
-                              key=lambda policy: policy['created_at'])
+                                 key=lambda policy: policy['created_at'])
         policy_list = dict(policy_list=policy_list)
 
         return policy_list

@@ -38,8 +38,10 @@ class WorkloadPolicyController(wsgi.Controller):
                     raise Exception(message)
 
             if 'retention_policy_type' in values:
-                retention_types = ['Number of Snapshots to Keep', 'Number of days to retain Snapshots']
-                message = "Invalid value for retention_policy_type. Please choose among: %s" %(str(retention_types))
+                retention_types = ['Number of Snapshots to Keep',
+                                   'Number of days to retain Snapshots']
+                message = "Invalid value for retention_policy_type. Please choose among: %s" % (
+                    str(retention_types))
                 if values['retention_policy_type'] not in retention_types:
                     raise Exception(message)
 
@@ -51,9 +53,9 @@ class WorkloadPolicyController(wsgi.Controller):
             if 'retention_policy_value' in values:
                 message = "Invalid value for fullbackup_interval. Enter Number of incremental snapshots to take Full Backup between 1 to 999, '-1' for 'NEVER' and '0' for 'ALWAYS'"
                 policy_value = values['retention_policy_value']
-                if (type(int(policy_value)) is not int) or (int(policy_value)  < -1) or  (int(policy_value) > 999):
+                if (type(int(policy_value)) is not int) or (int(policy_value) < -1) or (int(policy_value) > 999):
                     raise Exception(message)
-    
+
         except Exception as ex:
             raise exception.ErrorOccurred(reason=message)
 
@@ -133,11 +135,11 @@ class WorkloadPolicyController(wsgi.Controller):
                 msg = _("Please provide policy name.")
                 raise exc.HTTPBadRequest(explanation=msg)
             policy = self.workload_api.policy_create(context,
-                                                       name,
-                                                       description,
-                                                       metadata,
-                                                       field_values
-                                                       )
+                                                     name,
+                                                     description,
+                                                     metadata,
+                                                     field_values
+                                                     )
             return self._view_builder.summary(req, policy)
         except exc.HTTPNotFound as error:
             raise error
@@ -185,7 +187,8 @@ class WorkloadPolicyController(wsgi.Controller):
         try:
             context = req.environ['workloadmgr.context']
             try:
-                policy = self.workload_api.policy_apply(context, policy_id, tenant_id)
+                policy = self.workload_api.policy_apply(
+                    context, policy_id, tenant_id)
                 return self._view_builder.summary(req, policy)
             except exception.WorkloadNotFound as error:
                 raise exc.HTTPNotFound(explanation=unicode(error))
@@ -207,7 +210,8 @@ class WorkloadPolicyController(wsgi.Controller):
         try:
             context = req.environ['workloadmgr.context']
             try:
-                policy = self.workload_api.policy_remove(context, policy_id, tenant_id)
+                policy = self.workload_api.policy_remove(
+                    context, policy_id, tenant_id)
                 return self._view_builder.summary(req, policy)
             except exception.WorkloadNotFound as error:
                 raise exc.HTTPNotFound(explanation=unicode(error))
@@ -229,7 +233,8 @@ class WorkloadPolicyController(wsgi.Controller):
         try:
             context = req.environ['workloadmgr.context']
             try:
-                policies = self.workload_api.get_assigned_policies(context, tenant_id)
+                policies = self.workload_api.get_assigned_policies(
+                    context, tenant_id)
                 return {'policies': policies}
             except exception.WorkloadNotFound as error:
                 raise exc.HTTPNotFound(explanation=unicode(error))
@@ -245,7 +250,6 @@ class WorkloadPolicyController(wsgi.Controller):
         except Exception as error:
             LOG.exception(error)
             raise exc.HTTPServerError(explanation=unicode(error))
-
 
     def policy_field_create(self, req, body):
         """Create a new policy_field."""
@@ -264,10 +268,11 @@ class WorkloadPolicyController(wsgi.Controller):
             type = policy_field.get('type', None)
 
             try:
-                self.workload_api.policy_field_create(context,
-                                                           name,
-                                                           type
-                                                           )
+                policy_field = self.workload_api.policy_field_create(context,
+                                                                     name,
+                                                                     type
+                                                                     )
+                return {'policy_field': policy_field}
             except exception:
                 raise
         except exc.HTTPNotFound as error:
@@ -278,6 +283,25 @@ class WorkloadPolicyController(wsgi.Controller):
             raise error
         except Exception as error:
             raise exc.HTTPServerError(explanation=unicode(error))
+
+    def policy_field_list(self, req):
+        """list all available WorkloadPolicyFields."""
+        try:
+            context = req.environ['workloadmgr.context']
+            try:
+                field_list = self.workload_api.policy_field_list(context)
+            except exception.NotFound:
+                raise exc.HTTPNotFound()
+            return {'policy_field_list': field_list}
+        except exc.HTTPNotFound as error:
+            raise error
+        except exc.HTTPBadRequest as error:
+            raise error
+        except exc.HTTPServerError as error:
+            raise error
+        except Exception as error:
+            raise exc.HTTPServerError(explanation=unicode(error))
+
 
 def create_resource(ext_mgr):
     return wsgi.Resource(WorkloadPolicyController(ext_mgr))
