@@ -4561,7 +4561,7 @@ def policy_value_delete(context, id, **kwargs):
 @require_context
 def _policy_assignment_update(context, values, policy_assignment_id, session):
     if policy_assignment_id:
-        policy_assignment_ref = policy_assignment_get(context, policy_assignment_id, session)
+        policy_assignment_ref = _policy_assignment_get(context, policy_assignment_id, session)
     else:
         policy_assignment_ref = models.WorkloadPolicyAssignmnets()
         if not values.get('id'):
@@ -4589,12 +4589,14 @@ def policy_assignments_get_all(context, **kwargs):
     query = model_query(context, models.WorkloadPolicyAssignmnets, session=session,
                         read_deleted="no")
 
+    if 'policy_id' in kwargs and kwargs['policy_id'] is not None:
+        query = query.filter_by(policy_id =kwargs['policy_id'])
+
     policy_assignments = query.all()
     return policy_assignments
 
 @require_context
-def policy_assignment_get(context, id, **kwargs):
-    session = get_session()
+def _policy_assignment_get(context, id, session, **kwargs):
     try:
         policy_assignments = model_query(
             context, models.WorkloadPolicyAssignmnets, session=session, read_deleted="no"). \
@@ -4608,6 +4610,10 @@ def policy_assignment_get(context, id, **kwargs):
 
     return policy_assignments
 
+@require_context
+def policy_assignment_get(context, id, **kwargs):
+    session = get_session()
+    return _policy_assignment_get(context, id, session)
 
 @require_context
 def policy_assignment_delete(context, id, **kwargs):

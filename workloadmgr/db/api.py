@@ -747,9 +747,9 @@ def policy_assignment_create(context, values, **kwargs):
     """create policy assignment"""
     return IMPL.policy_assignment_create(context, values, **kwargs)
 
-def policy_assignment_update(context, assignment_id, **kwargs):
+def policy_assignment_update(context, assignment_id, values, **kwargs):
     """update policy assignment"""
-    return IMPL.policy_assignment_update(context, assignment_id, **kwargs)
+    return IMPL.policy_assignment_update(context, assignment_id, values, **kwargs)
 
 def policy_assignments_get_all(context, **kwargs):
     """get all policy assignment"""

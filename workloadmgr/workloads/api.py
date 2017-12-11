@@ -1060,7 +1060,8 @@ class API(base.Base):
                 self._apply_workload_policy(context, policy_id,  workload['jobschedule'])
                 for k,v in workloadobj['metadata'].iteritems():
                     if k == "policy_assignment_id":
-                        values = {'policy_id': policy_id, 'workload_id': workload.id}
+                        import pdb;pdb.set_trace()
+                        values = {'policy_id': policy_id, 'workload_id': workload_id}
                         self.db.policy_assignment_update(context, v, values)                         
 
         if 'jobschedule' in workload and workload['jobschedule'] and self._scheduler.running:
@@ -3925,6 +3926,10 @@ class API(base.Base):
             policy = self.db.policy_get(context, policy_id)
 
             AUDITLOG.log(context, 'Policy \'' + policy['display_name'] + '\' Update Requested', None)
+
+            policy_assignments = self.db.policy_assignments_get_all(context, policy_id=policy_id)
+            if len(policy_assignments) > 0:
+               raise wlm_exceptions.ErrorOccurred(reason="Can not update policy: %s. It's assigned to workloads." %(policy_id))
 
             #verify field names provided with available policy fields
             field_values = values.get('field_values', {})
