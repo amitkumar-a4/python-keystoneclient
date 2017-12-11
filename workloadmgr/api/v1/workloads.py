@@ -314,7 +314,7 @@ class WorkloadMgrsController(wsgi.Controller):
          
             if policy_id is None and len(available_policies) > 0:
                 message = "Please provide policy id form available policies: %s" %(str(available_policies))
-                #raise exception.ErrorOccurred(message)
+                raise exception.ErrorOccurred(message)
 
             jobdefaults = {
                 'fullbackup_interval': '-1',
@@ -354,9 +354,6 @@ class WorkloadMgrsController(wsgi.Controller):
             instances = workload.get('instances', {})
             if not instances:
                 instances = {}
-            metadata = workload.get('metadata', {})
-            if not metadata:
-                metadata = {}
 
             try:
                 new_workload = self.workload_api.workload_create(

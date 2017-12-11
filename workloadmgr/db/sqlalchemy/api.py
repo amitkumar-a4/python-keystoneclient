@@ -4256,6 +4256,7 @@ def _config_backup_metadata_delete(context, metadata_ref, session):
     """
     metadata_ref.delete(session=session)
 
+#Workload Policy API's
 @require_context
 def _policy_field_update(context, policy_field_id, values, session):
     if policy_field_id:
@@ -4325,8 +4326,6 @@ def policy_field_delete(context, id, **kwargs):
             update({'deleted': True,
                     'deleted_at': timeutils.utcnow(),
                     'updated_at': literal_column('updated_at')})
-
-####POLICY APIs
 
 @require_context
 def _policy_update(context, values, policy_id, purge_metadata, session):
@@ -4466,8 +4465,6 @@ def _policy_metadata_delete(context, metadata_ref, session):
     metadata_ref.delete(session=session)
     return metadata_ref
 
-##WorkloadPolicyValues
-
 @require_context
 def _set_field_values_for_policy(context, policy_ref, policy_field_values,
                                      session):
@@ -4561,8 +4558,6 @@ def policy_value_delete(context, id, **kwargs):
                     'deleted_at': timeutils.utcnow(),
                     'updated_at': literal_column('updated_at')})
 
-
-##WorkloadPolicyAssignmnets API's
 @require_context
 def _policy_assignment_update(context, values, policy_assignment_id, session):
     if policy_assignment_id:

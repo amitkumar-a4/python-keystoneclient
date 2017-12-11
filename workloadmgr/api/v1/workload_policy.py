@@ -55,7 +55,7 @@ class WorkloadPolicyController(wsgi.Controller):
                     raise Exception(message)
     
         except Exception as ex:
-            raise Exception(message)
+            raise exception.ErrorOccurred(reason=message)
 
     def policy_get(self, req, id):
         """Return data about the given WorkloadPolicy."""
@@ -76,7 +76,7 @@ class WorkloadPolicyController(wsgi.Controller):
             raise exc.HTTPServerError(explanation=unicode(error))
 
     def policy_get_all(self, req):
-        """Return data about the given WorkloadPolicy."""
+        """list all available WorkloadPolicies."""
         try:
             context = req.environ['workloadmgr.context']
             try:
@@ -183,9 +183,6 @@ class WorkloadPolicyController(wsgi.Controller):
     def policy_apply(self, req, policy_id, tenant_id):
         """Apply policy on a given tenant."""
         try:
-            #if not self.is_valid_body(body, 'policy'):
-            #    raise exc.HTTPBadRequest()
-
             context = req.environ['workloadmgr.context']
             try:
                 policy = self.workload_api.policy_apply(context, policy_id, tenant_id)
@@ -208,9 +205,6 @@ class WorkloadPolicyController(wsgi.Controller):
     def policy_remove(self, req, policy_id, tenant_id):
         """Remove policy from a given tenant."""
         try:
-            #if not self.is_valid_body(body, 'policy'):
-            #    raise exc.HTTPBadRequest()
-
             context = req.environ['workloadmgr.context']
             try:
                 policy = self.workload_api.policy_remove(context, policy_id, tenant_id)
@@ -254,7 +248,7 @@ class WorkloadPolicyController(wsgi.Controller):
 
 
     def policy_field_create(self, req, body):
-        """Create a new workload_type."""
+        """Create a new policy_field."""
         try:
             if not self.is_valid_body(body, 'policy_field'):
                 raise exc.HTTPBadRequest()

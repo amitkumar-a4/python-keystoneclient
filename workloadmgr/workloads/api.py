@@ -1032,17 +1032,6 @@ class API(base.Base):
         """
         workloadobj = self.workload_get(context, workload_id)
 
-        '''
-        if policy_id is not None:
-            values = {'policy_id': policy_id, 'workload_id': workload.id}
-            policy_assignment = self.db.policy_assignment_create(context, values)
-            self.db.workload_update(context, workload.id, {metadata : {'policy_assignment_id': policy_assignment.id}})
-
-            policy_id  = metadata.get('policy_id', None)
-            if policy_id is not None:
-                self._apply_workload_policy(context, policy_id, jobschedule)
-        '''
-
         AUDITLOG.log(
             context,
             'Workload \'' +
@@ -1119,9 +1108,7 @@ class API(base.Base):
 
             workload['jobschedule'] = self.convert_date_time_zone(
                 workload['jobschedule'])
-
             options['jobschedule'] = pickle.dumps(workload['jobschedule'], 0)
-
         if 'instances' in workload and workload['instances']:
             compute_service = nova.API(production=True)
             instances = workload['instances']
@@ -3896,13 +3883,12 @@ class API(base.Base):
     @wrap_check_policy
     def policy_create(self, context, name, description, metadata, field_values):
         """
-        Make the RPC call to create a policy.
+        Create a policy.
         """
         try:
             AUDITLOG.log(context, 'Policy \'' + name + '\' Create Requested', None)
     
-            #verify field names and values validations
-            #If met then  make  DB call.
+            #verify field names provided with available policy fields
             fields = self.db.policy_fields_get_all(context)
             policy_fields = [f.field_name for f in fields]
     
@@ -3933,16 +3919,14 @@ class API(base.Base):
     @wrap_check_policy
     def policy_update(self, context, policy_id, values):
         """
-        Make the RPC call to update a policy.
+        Update given policy.
         """
         try:
             policy = self.db.policy_get(context, policy_id)
 
             AUDITLOG.log(context, 'Policy \'' + policy['display_name'] + '\' Update Requested', None)
-    
-            #verify field names and values validations
-            #If met then  make  DB calll.
-    
+
+            #verify field names provided with available policy fields
             field_values = values.get('field_values', {})
             if len(field_values) > 0:
                 fields = self.db.policy_fields_get_all(context)
@@ -3951,23 +3935,19 @@ class API(base.Base):
                 if len(set(policy_fields).union(set(field_values.keys()))) > len(policy_fields):
                     raise wlm_exceptions.InvalidRequest(reason="Please provide only %s as part of policy fields" %str(policy_fields))
     
-            ##logic to validate the values using policy validations
-    
             policy = self.db.policy_update(context, policy_id, values)
     
             AUDITLOG.log(context, 'Policy \'' + policy['display_name'] + '\' Update Submitted', policy)
             return policy
-            #return self.db.policy_get(context, policy['id'])
         except Exception as ex:
             LOG.exception(ex)
             raise
-    
-    
-    
+
+
     @wrap_check_policy
     def policy_get(self, context, policy_id):
         """
-        Make the RPC call to get policy.
+        Get policy object.
         """
         try:
             policy = self.db.policy_get(context, policy_id)
@@ -3979,7 +3959,7 @@ class API(base.Base):
     @wrap_check_policy
     def policy_list(self, context, search_opts={}):
         """
-        Make the RPC call to list policies.
+        List all available policies.
         """
         try:
             policies = self.db.policy_get_all(context, **search_opts)
@@ -3991,7 +3971,7 @@ class API(base.Base):
     @wrap_check_policy
     def policy_delete(self, context, policy_id):
         """
-        Make the RPC call to delete policy.
+        Delete the given policy.
         """
         try:
             policy = self.db.policy_get(context, policy_id)
@@ -4047,7 +4027,6 @@ class API(base.Base):
                 if meta.key == "assigned_projects":
                     assigned_projects = pickle.loads(str(meta.value))
 
-            #assigned_projects.append(project_id)
             if project_id in assigned_projects:
                 assigned_projects.remove(project_id)
             else:
