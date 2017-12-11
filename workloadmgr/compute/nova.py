@@ -27,6 +27,7 @@ from novaclient import exceptions as nova_exception
 from novaclient import service_catalog
 from novaclient import client
 from novaclient import extension as nova_extension
+
 from novaclient.v1_1 import client as nova_client
 
 from neutronclient.common import exceptions as nc_exc

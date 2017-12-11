@@ -16,11 +16,12 @@ import time
 import eventlet
 import eventlet.wsgi
 import greenlet
-from oslo.config import cfg
 from paste import deploy
 import routes.middleware
 import webob.dec
 import webob.exc
+
+from oslo.config import cfg
 
 from workloadmgr import exception
 from workloadmgr import flags
