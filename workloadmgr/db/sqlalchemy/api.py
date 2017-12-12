@@ -4348,10 +4348,12 @@ def _policy_update(context, values, policy_id, purge_metadata, session):
     policy_ref.update(values)
     policy_ref.save(session)
 
-    _set_metadata_for_policy(
-        context, policy_ref, metadata, purge_metadata, session)
-    field_values = _set_field_values_for_policy(
-        context, policy_ref, field_values, session)
+    if metadata:
+        _set_metadata_for_policy(
+            context, policy_ref, metadata, purge_metadata, session)
+    if field_values:
+        field_values = _set_field_values_for_policy(
+            context, policy_ref, field_values, session)
     return policy_ref
 
 

@@ -3915,7 +3915,7 @@ class API(base.Base):
                        'project_id': context.project_id,
                        'display_name': name,
                        'display_description': description,
-                       'status': 'avaialable',
+                       'status': 'available',
                        'metadata': metadata,
                        'field_values': field_values}
             policy = self.db.policy_create(context, options)
