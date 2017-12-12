@@ -204,7 +204,6 @@ def update_service_account_password():
     else:
         return {'error': ''}
 
-
 @bottle.post('/update_service_account_password')
 @authorize()
 def change_service_password():
@@ -1498,6 +1497,7 @@ def configure_mysql():
             "echo manual > /etc/init/mysql.override"]
         subprocess.call(command, shell=False)
 
+
 def configure_rabbitmq():
     if config_data['nodetype'] == 'controller':
         # configure rabittmq
@@ -1998,25 +1998,6 @@ def configure_nova():
             '-c',
             "echo manual > /etc/init/nova-xvpvncproxy.override"]
         subprocess.call(command, shell=False)
-        command = [
-            'sudo',
-            'sh',
-            '-c',
-            "echo manual > /etc/init/nova-scheduler.override"]
-        subprocess.call(command, shell=False)
-        command = [
-            'sudo',
-            'sh',
-            '-c',
-            "echo manual > /etc/init/nova-novncproxy.override"]
-        subprocess.call(command, shell=False)
-        command = [
-            'sudo',
-            'sh',
-            '-c',
-            "echo manual > /etc/init/nova-xvpvncproxy.override"]
-        subprocess.call(command, shell=False)
-
 
 
 def configure_neutron():
@@ -2208,6 +2189,7 @@ def configure_neutron():
             '-c',
             "echo manual > /etc/init/neutron-server.override"]
         subprocess.call(command, shell=False)
+
 
 def configure_glance():
     if config_data['nodetype'] == 'controller' and config_data['configuration_type'] == 'vmware':
@@ -2430,6 +2412,7 @@ def configure_horizon():
                 '-c',
                 "echo manual > /etc/init/apache2.override"]
             subprocess.call(command, shell=False)
+
 
 @bottle.route('/services/<service_display_name>/<action>')
 @authorize()
@@ -4599,7 +4582,7 @@ def main():
             new_file.close()
             close(fh)
             # Move new file
-            command = ['sudo', 'mv', abs_path, "/etc/hostname"]     
+            command = ['sudo', 'mv', abs_path, "/etc/hostname"]
             subprocess.call(command, shell=False)
             os.chmod('/etc/hostname', 0o644)
             command = ['sudo', 'chown', 'root:root', "/etc/hostname"]
@@ -4655,7 +4638,6 @@ def main():
                     'mv',
                     "/opt/stack/workloadmgr/etc/gen-cer",
                     "/etc/tvault/ssl/"]
-
                 subprocess.call(command, shell=False, cwd="/etc/tvault/ssl")
                 os.chmod('/etc/tvault/ssl/gen-cer', 0o554)
                 command = ['sudo', 'sh', 'gen-cer', socket.gethostname()]
