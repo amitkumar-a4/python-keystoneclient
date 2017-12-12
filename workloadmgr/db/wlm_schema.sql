@@ -1144,9 +1144,134 @@ CREATE TABLE `workloads` (
   CONSTRAINT `workloads_ibfk_1` FOREIGN KEY (`workload_type_id`) REFERENCES `workload_types` (`id`),
   CONSTRAINT `workloads_ibfk_2` FOREIGN KEY (`vault_storage_id`) REFERENCES `vault_storages` (`id`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8;
-/*!40101 SET character_set_client = @saved_cs_client */;
-/*!40103 SET TIME_ZONE=@OLD_TIME_ZONE */;
 
+
+--
+-- Table structure for table `workload_policy`
+--
+
+DROP TABLE IF EXISTS `workload_policy`;
+/*!40101 SET @saved_cs_client     = @@character_set_client */;
+/*!40101 SET character_set_client = utf8 */;
+CREATE TABLE `workload_policy` (
+  `created_at` datetime DEFAULT NULL,
+  `finished_at` datetime DEFAULT NULL,
+  `updated_at` datetime DEFAULT NULL,
+  `deleted_at` datetime DEFAULT NULL,
+  `deleted` tinyint(1) DEFAULT NULL,
+  `version` varchar(255) DEFAULT NULL,
+  `id` varchar(255) NOT NULL,
+  `user_id` varchar(255) NOT NULL,
+  `project_id` varchar(255) NOT NULL,
+  `display_name` varchar(255) NOT NULL,
+  `display_description` varchar(255) NOT NULL,
+  `status` varchar(255) DEFAULT NULL,
+  PRIMARY KEY (`id`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8;
+/*!40101 SET character_set_client = @saved_cs_client */;
+
+
+--
+-- Table structure for table `workload_policy_assignments`
+--
+
+DROP TABLE IF EXISTS `workload_policy_assignments`;
+/*!40101 SET @saved_cs_client     = @@character_set_client */;
+/*!40101 SET character_set_client = utf8 */;
+CREATE TABLE `workload_policy_assignments` (
+  `created_at` datetime DEFAULT NULL,
+  `finished_at` datetime DEFAULT NULL,
+  `updated_at` datetime DEFAULT NULL,
+  `deleted_at` datetime DEFAULT NULL,
+  `deleted` tinyint(1) DEFAULT NULL,
+  `version` varchar(255) DEFAULT NULL,
+  `id` varchar(255) NOT NULL,
+  `policy_id` varchar(255) NOT NULL,
+  `workload_id` varchar(255) NOT NULL,
+  PRIMARY KEY (`id`),
+  KEY `workload_policy_assignments_workloads` (`workload_id`),
+  KEY `workload_policy_assignments_workload_policy` (`policy_id`),
+  CONSTRAINT `workload_policy_assignments_workloads` FOREIGN KEY (`workload_id`) REFERENCES `workloads` (`id`),
+  CONSTRAINT `workload_policy_assignmnents_workload_policy` FOREIGN KEY (`policy_id`) REFERENCES `workload_policy` (`id`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8;
+/*!40101 SET character_set_client = @saved_cs_client */;
+
+
+--
+-- Table structure for table `workload_policy_fields`
+--
+
+DROP TABLE IF EXISTS `workload_policy_fields`;
+/*!40101 SET @saved_cs_client     = @@character_set_client */;
+/*!40101 SET character_set_client = utf8 */;
+CREATE TABLE `workload_policy_fields` (
+  `created_at` datetime DEFAULT NULL,
+  `finished_at` datetime DEFAULT NULL,
+  `updated_at` datetime DEFAULT NULL,
+  `deleted_at` datetime DEFAULT NULL,
+  `deleted` tinyint(1) DEFAULT NULL,
+  `version` varchar(255) DEFAULT NULL,
+  `id` varchar(255) NOT NULL,
+  `field_name` varchar(255) NOT NULL,
+  `type` varchar(255) NOT NULL,
+  PRIMARY KEY (`field_name`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8;
+/*!40101 SET character_set_client = @saved_cs_client */;
+
+
+--
+-- Table structure for table `workload_policy_metadata`
+--
+
+DROP TABLE IF EXISTS `workload_policy_metadata`;
+/*!40101 SET @saved_cs_client     = @@character_set_client */;
+/*!40101 SET character_set_client = utf8 */;
+CREATE TABLE `workload_policy_metadata` (
+  `created_at` datetime DEFAULT NULL,
+  `finished_at` datetime DEFAULT NULL,
+  `updated_at` datetime DEFAULT NULL,
+  `deleted_at` datetime DEFAULT NULL,
+  `deleted` tinyint(1) DEFAULT NULL,
+  `version` varchar(255) DEFAULT NULL,
+  `id` varchar(255) NOT NULL,
+  `policy_id` varchar(255) NOT NULL,
+  `key` varchar(255) NOT NULL,
+  `value` text,
+  PRIMARY KEY (`id`),
+  KEY `workload_policy_metadata_workload_policy` (`policy_id`),
+  CONSTRAINT `workload_policy_metadata_workload_policy` FOREIGN KEY (`policy_id`) REFERENCES `workload_policy` (`id`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8;
+/*!40101 SET character_set_client = @saved_cs_client */;
+
+
+--
+-- Table structure for table `workload_policy_values`
+--
+
+DROP TABLE IF EXISTS `workload_policy_values`;
+/*!40101 SET @saved_cs_client     = @@character_set_client */;
+/*!40101 SET character_set_client = utf8 */;
+CREATE TABLE `workload_policy_values` (
+  `created_at` datetime DEFAULT NULL,
+  `finished_at` datetime DEFAULT NULL,
+  `updated_at` datetime DEFAULT NULL,
+  `deleted_at` datetime DEFAULT NULL,
+  `deleted` tinyint(1) DEFAULT NULL,
+  `version` varchar(255) DEFAULT NULL,
+  `id` varchar(255) NOT NULL,
+  `policy_id` varchar(255) NOT NULL,
+  `policy_field_name` varchar(255) NOT NULL,
+  `value` varchar(255) NOT NULL,
+  PRIMARY KEY (`id`),
+  KEY `workload_policy_values_workload_policy_fields` (`policy_field_name`),
+  KEY `workload_policy_values_workload_policy` (`policy_id`),
+  CONSTRAINT `workload_policy_values_workload_policy` FOREIGN KEY (`policy_id`) REFERENCES `workload_policy` (`id`),
+  CONSTRAINT `workload_policy_values_workload_policy_fields` FOREIGN KEY (`policy_field_name`) REFERENCES `workload_policy_fields` (`field_name`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8;
+/*!40101 SET character_set_client = @saved_cs_client */;
+
+
+/*!40103 SET TIME_ZONE=@OLD_TIME_ZONE */;
 /*!40101 SET SQL_MODE=@OLD_SQL_MODE */;
 /*!40014 SET FOREIGN_KEY_CHECKS=@OLD_FOREIGN_KEY_CHECKS */;
 /*!40014 SET UNIQUE_CHECKS=@OLD_UNIQUE_CHECKS */;
