@@ -890,6 +890,7 @@ def register_models():
               ConfigWorkloads,
               ConfigWorkloadMetadata,
               ConfigBackups,
+              ConfigBackupMetadata,
               WorkloadPolicy,
               WorkloadPolicyMetadata,
               WorkloadPolicyFields,
