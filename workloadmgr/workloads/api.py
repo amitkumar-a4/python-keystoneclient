@@ -4094,7 +4094,7 @@ class API(base.Base):
 
     @autolog.log_method(logger=Logger)
     @wrap_check_policy
-    def policy_field_create(self, context, id, name, type):
+    def policy_field_create(self, context, name, type):
         """
         Create a policy_field. No RPC call is made
         """
