@@ -16,11 +16,12 @@ import time
 import eventlet
 import eventlet.wsgi
 import greenlet
-from oslo.config import cfg
 from paste import deploy
 import routes.middleware
 import webob.dec
 import webob.exc
+
+from oslo.config import cfg
 
 from workloadmgr import exception
 from workloadmgr import flags
@@ -142,13 +143,13 @@ class Server(object):
                 if use_ssl:
                     sock = wrap_ssl(sock)
 
-            except socket.error, err:
+            except socket.error as err:
                 if err.args[0] != errno.EADDRINUSE:
                     raise
                 eventlet.sleep(0.1)
         if not sock:
             raise RuntimeError(_("Could not bind to %(host)s:%(port)s "
-                               "after trying for 30 seconds") %
+                                 "after trying for 30 seconds") %
                                {'host': host, 'port': port})
         sock.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
         # sockets can hang around forever without keepalive

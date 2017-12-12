@@ -37,6 +37,7 @@ from eventlet import semaphore
 # TODO(pekowsk): Remove import cfg and below comment in Havana.
 # This import should no longer be needed when the amqp_rpc_single_reply_queue
 # option is removed.
+
 from oslo.config import cfg
 
 from workloadmgr.openstack.common import excutils
@@ -62,6 +63,7 @@ LOG = logging.getLogger(__name__)
 
 class Pool(pools.Pool):
     """Class that implements a Pool of Connections."""
+
     def __init__(self, conf, connection_cls, *args, **kwargs):
         self.connection_cls = connection_cls
         self.conf = conf
@@ -184,6 +186,7 @@ class ConnectionContext(rpc_common.Connection):
 
 class ReplyProxy(ConnectionContext):
     """ Connection class for RPC replies / callbacks """
+
     def __init__(self, conf, connection_pool):
         self._call_waiters = {}
         self._num_call_waiters = 0
@@ -235,7 +238,7 @@ def msg_reply(conf, msg_id, reply_q, connection_pool, reply=None,
             msg = {'result': reply, 'failure': failure}
         except TypeError:
             msg = {'result': dict((k, repr(v))
-                   for k, v in reply.__dict__.iteritems()),
+                                  for k, v in reply.__dict__.iteritems()),
                    'failure': failure}
         if ending:
             msg['ending'] = True
@@ -252,6 +255,7 @@ def msg_reply(conf, msg_id, reply_q, connection_pool, reply=None,
 
 class RpcContext(rpc_common.CommonRpcContext):
     """Context that supports replying to a rpc.call"""
+
     def __init__(self, **kwargs):
         self.msg_id = kwargs.pop('msg_id', None)
         self.reply_q = kwargs.pop('reply_q', None)
@@ -512,7 +516,7 @@ class MulticallProxyWaiter(object):
             yield result
 
 
-#TODO(pekowski): Remove MulticallWaiter() in Havana.
+# TODO(pekowski): Remove MulticallWaiter() in Havana.
 class MulticallWaiter(object):
     def __init__(self, conf, connection, timeout):
         self._connection = connection

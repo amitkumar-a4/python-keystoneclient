@@ -64,4 +64,3 @@ class BaseWorkloadTypeVMTasksTestCase(test.TestCase):
         snapshots = self.db.snapshot_get_all_by_project(self.context, "9ad87da6ea0e4eacb2aaa85cbac31a21")
         self.assertEqual(len(snapshots), 4)
 '''
-

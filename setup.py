@@ -33,7 +33,7 @@ weights = [
 
 setuptools.setup(
     name=project,
-    version= common_setup.get_version(project, '2013.1.3'),
+    version=common_setup.get_version(project, '2013.1.3'),
     description='Data Protection As a Service',
     author='OpenStack',
     author_email='workloadmgr@lists.launchpad.net',

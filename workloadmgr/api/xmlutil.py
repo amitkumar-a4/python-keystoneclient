@@ -87,6 +87,7 @@ def get_items(obj):
 
 class EmptyStringSelector(Selector):
     """Returns the empty string if Selector would return None."""
+
     def __call__(self, obj, do_raise=False):
         """Returns empty string if the selected value does not exist."""
 

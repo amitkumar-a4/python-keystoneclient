@@ -9,6 +9,7 @@ Common Auth Middleware.
 import os
 
 from oslo.config import cfg
+
 import webob.dec
 import webob.exc
 
@@ -76,9 +77,9 @@ class WorkloadMgrKeystoneContext(base_wsgi.Middleware):
         # This is the new header since Keystone went to ID/Name
         project_id = req.headers.get('X_TENANT_ID', None)
         project_id = req.headers.get('X_PROJECT_ID', project_id)
-	if project_id is None:
-	    LOG.debug("Neither X_TENANT_ID nor X_USER found in request")
-	    return webob.exc.HTTPUnauthorized()
+        if project_id is None:
+            LOG.debug("Neither X_TENANT_ID nor X_USER found in request")
+            return webob.exc.HTTPUnauthorized()
 
         project_domain_id = req.headers.get('X-Project-Domain-Id', None)
         project_domain_name = req.headers.get('X-Project-Domain-Name', None)

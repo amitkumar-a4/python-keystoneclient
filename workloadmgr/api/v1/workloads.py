@@ -36,6 +36,7 @@ import socket
 FLAGS = flags.FLAGS
 LOG = logging.getLogger(__name__)
 
+
 def make_workload(elem):
     elem.set('id')
     elem.set('status')
@@ -47,6 +48,7 @@ def make_workload(elem):
     elem.set('name')
     elem.set('description')
     elem.set('fail_reason')
+
 
 class WorkloadTemplate(xmlutil.TemplateBuilder):
     def construct(self):
@@ -60,17 +62,20 @@ class WorkloadTemplate(xmlutil.TemplateBuilder):
 class WorkloadsTemplate(xmlutil.TemplateBuilder):
     def construct(self):
         root = xmlutil.TemplateElement('workloads')
-        elem = xmlutil.SubTemplateElement(root, 'workload', selector='workloads')
+        elem = xmlutil.SubTemplateElement(
+            root, 'workload', selector='workloads')
         make_workload(elem)
         alias = WorkloadMgrs.alias
         namespace = WorkloadMgrs.namespace
         return xmlutil.MasterTemplate(root, 1, nsmap={alias: namespace})
+
 
 class CreateDeserializer(wsgi.MetadataXMLDeserializer):
     def default(self, string):
         dom = minidom.parseString(string)
         workload = self._extract_workload(dom)
         return {'body': {'workload': workload}}
+
 
 class UpdateDeserializer(wsgi.MetadataXMLDeserializer):
     def default(self, string):
@@ -88,6 +93,7 @@ class UpdateDeserializer(wsgi.MetadataXMLDeserializer):
             if workload_node.getAttribute(attr):
                 workload[attr] = workload_node.getAttribute(attr)
         return workload
+
 
 class WorkloadMgrsController(wsgi.Controller):
     """The API controller """
@@ -118,9 +124,9 @@ class WorkloadMgrsController(wsgi.Controller):
         try:
             context = req.environ['workloadmgr.context']
             database_only = False
-            if ('QUERY_STRING' in req.environ) :
+            if ('QUERY_STRING' in req.environ):
                 qs = parse_qs(req.environ['QUERY_STRING'])
-                database_only = qs.get('database_only',[''])[0]
+                database_only = qs.get('database_only', [''])[0]
                 database_only = escape(database_only)
                 if database_only.lower() == 'true':
                     database_only = True
@@ -136,7 +142,7 @@ class WorkloadMgrsController(wsgi.Controller):
         except Exception as error:
             LOG.exception(error)
             raise exc.HTTPServerError(explanation=unicode(error))
-    
+
     def unlock(self, req, id):
         try:
             context = req.environ['workloadmgr.context']
@@ -166,16 +172,16 @@ class WorkloadMgrsController(wsgi.Controller):
         except Exception as error:
             LOG.exception(error)
             raise exc.HTTPServerError(explanation=unicode(error))
-    
+
     def snapshot(self, req, id, body=None):
         """snapshot a workload."""
         try:
             context = req.environ['workloadmgr.context']
             full = None
-            if ('QUERY_STRING' in req.environ) :
-                qs=parse_qs(req.environ['QUERY_STRING'])
+            if ('QUERY_STRING' in req.environ):
+                qs = parse_qs(req.environ['QUERY_STRING'])
                 var = parse_qs(req.environ['QUERY_STRING'])
-                full = var.get('full',[''])[0]
+                full = var.get('full', [''])[0]
                 full = escape(full)
 
             snapshot_type = 'incremental'
@@ -185,12 +191,16 @@ class WorkloadMgrsController(wsgi.Controller):
 
                 name = body['snapshot'].get('name', "") or 'Snapshot'
                 name = name.strip() or 'Snapshot'
-                description = body['snapshot'].get('description', "") or 'no-description'
+                description = body['snapshot'].get(
+                    'description', "") or 'no-description'
                 description = description.strip() or 'no-description'
 
-                snapshot_type = body['snapshot'].get('snapshot_type', snapshot_type)
-            new_snapshot = self.workload_api.workload_snapshot(context, id, snapshot_type, name, description)
-            return self.snapshot_view_builder.summary(req,dict(new_snapshot.iteritems()))
+                snapshot_type = body['snapshot'].get(
+                    'snapshot_type', snapshot_type)
+            new_snapshot = self.workload_api.workload_snapshot(
+                context, id, snapshot_type, name, description)
+            return self.snapshot_view_builder.summary(
+                req, dict(new_snapshot.iteritems()))
         except exception.WorkloadNotFound as error:
             LOG.exception(error)
             raise exc.HTTPNotFound(explanation=unicode(error))
@@ -230,26 +240,31 @@ class WorkloadMgrsController(wsgi.Controller):
         except Exception as error:
             LOG.exception(error)
             raise exc.HTTPServerError(explanation=unicode(error))
-        
+
     def _get_workloads(self, req, is_detail):
         """Returns a list of workloadmgr, transformed through view builder."""
         try:
             context = req.environ['workloadmgr.context']
             all_workloads = None
-            #Get value of query parameter 'all_workloads'
+            # Get value of query parameter 'all_workloads'
             page_number = None
             nfs_share = None
-            if ('QUERY_STRING' in req.environ):                
+            if ('QUERY_STRING' in req.environ):
                 var = parse_qs(req.environ['QUERY_STRING'])
-                all_workloads = var.get('all_workloads',[''])[0]
+                all_workloads = var.get('all_workloads', [''])[0]
                 all_workloads = bool(escape(all_workloads))
-                page_number = var.get('page_number',[''])[0]
-                nfs_share = var.get('nfs_share',[''])[0]
-            workloads_all = self.workload_api.workload_get_all(context,search_opts={'page_number':page_number,\
-                            'nfs_share':nfs_share, 'all_workloads':all_workloads})
+                page_number = var.get('page_number', [''])[0]
+                nfs_share = var.get('nfs_share', [''])[0]
+            workloads_all = self.workload_api.workload_get_all(
+                context,
+                search_opts={
+                    'page_number': page_number,
+                    'nfs_share': nfs_share,
+                    'all_workloads': all_workloads})
             limited_list = common.limited(workloads_all, req)
             if is_detail:
-                workloads = self._view_builder.detail_list(req, workloads_all, self.workload_api)
+                workloads = self._view_builder.detail_list(
+                    req, workloads_all, self.workload_api)
             else:
                 workloads = self._view_builder.summary_list(req, workloads_all)
             return workloads
@@ -262,7 +277,7 @@ class WorkloadMgrsController(wsgi.Controller):
         except Exception as error:
             LOG.exception(error)
             raise exc.HTTPServerError(explanation=unicode(error))
-        
+
     @wsgi.response(202)
     @wsgi.serializers(xml=WorkloadTemplate)
     @wsgi.deserializers(xml=CreateDeserializer)
@@ -271,9 +286,9 @@ class WorkloadMgrsController(wsgi.Controller):
         try:
             if not self.is_valid_body(body, 'workload'):
                 raise exc.HTTPBadRequest()
-    
+
             context = req.environ['workloadmgr.context']
-    
+
             try:
                 workload = body['workload']
             except KeyError:
@@ -286,63 +301,66 @@ class WorkloadMgrsController(wsgi.Controller):
             description = description.strip() or "no-description"
 
             workload_type_id = workload.get('workload_type_id', None)
-            source_platform = workload.get('source_platform', "") or 'openstack'
+            source_platform = workload.get(
+                'source_platform', "") or 'openstack'
             source_platform = source_platform.strip() or "openstack"
-            jobdefaults = {'fullbackup_interval': '-1',
-                           'start_time': '09:00 PM',
-                           'interval': u'24hr',
-                           'enabled': u'true',
-                           'start_date': time.strftime("%m/%d/%Y"),
-                           'end_date': "No End",
-                           'retention_policy_type': 'Number of Snapshots to Keep',
-                           'retention_policy_value': '30'}
-
+            jobdefaults = {
+                'fullbackup_interval': '-1',
+                'start_time': '09:00 PM',
+                'interval': u'24hr',
+                'enabled': u'true',
+                'start_date': time.strftime("%m/%d/%Y"),
+                'end_date': "No End",
+                'retention_policy_type': 'Number of Snapshots to Keep',
+                'retention_policy_value': '30'}
 
             jobschedule = workload.get('jobschedule', jobdefaults)
             if not jobschedule:
                 jobschedule = {}
 
-            if not 'fullbackup_interval' in jobschedule:
+            if 'fullbackup_interval' not in jobschedule:
                 jobschedule['fullbackup_interval'] = jobdefaults['fullbackup_interval']
 
-            if not 'start_time' in jobschedule:
+            if 'start_time' not in jobschedule:
                 jobschedule['start_time'] = jobdefaults['start_time']
 
-            if not 'interval' in jobschedule:
+            if 'interval' not in jobschedule:
                 jobschedule['interval'] = jobdefaults['interval']
 
-            if not 'enabled' in jobschedule:
+            if 'enabled' not in jobschedule:
                 jobschedule['enabled'] = jobdefaults['enabled']
 
-            if not 'start_date' in jobschedule:
+            if 'start_date' not in jobschedule:
                 jobschedule['start_date'] = jobdefaults['start_date']
-                
-            if not 'retention_policy_type' in jobschedule:
-                jobschedule['retention_policy_type'] = jobdefaults['retention_policy_type']                  
-                
-            if not 'retention_policy_value' in jobschedule:
+
+            if 'retention_policy_type' not in jobschedule:
+                jobschedule['retention_policy_type'] = jobdefaults['retention_policy_type']
+
+            if 'retention_policy_value' not in jobschedule:
                 jobschedule['retention_policy_value'] = jobdefaults['retention_policy_value']
 
             instances = workload.get('instances', {})
             if not instances:
-                instances = {}        
-            metadata = workload.get('metadata', {}) 
+                instances = {}
+            metadata = workload.get('metadata', {})
             if not metadata:
-                metadata = {}    
-    
+                metadata = {}
+
             try:
-                new_workload = self.workload_api.workload_create(context, 
-                                                                 name, 
-                                                                 description,
-                                                                 workload_type_id, 
-                                                                 source_platform,
-                                                                 instances,
-                                                                 jobschedule,
-                                                                 metadata)
-                new_workload_dict = self.workload_api.workload_show(context, new_workload.id)
+                new_workload = self.workload_api.workload_create(
+                    context,
+                    name,
+                    description,
+                    workload_type_id,
+                    source_platform,
+                    instances,
+                    jobschedule,
+                    metadata)
+                new_workload_dict = self.workload_api.workload_show(
+                    context, new_workload.id)
             except Exception as error:
                 raise exc.HTTPServerError(explanation=unicode(error))
-     
+
             retval = self._view_builder.summary(req, new_workload_dict)
             return retval
         except exc.HTTPNotFound as error:
@@ -356,7 +374,7 @@ class WorkloadMgrsController(wsgi.Controller):
             raise error
         except Exception as error:
             LOG.exception(error)
-            raise exc.HTTPServerError(explanation=unicode(error))  
+            raise exc.HTTPServerError(explanation=unicode(error))
 
     @wsgi.response(202)
     @wsgi.serializers(xml=WorkloadTemplate)
@@ -366,7 +384,7 @@ class WorkloadMgrsController(wsgi.Controller):
         try:
             if not self.is_valid_body(body, 'workload'):
                 raise exc.HTTPBadRequest()
-    
+
             context = req.environ['workloadmgr.context']
             try:
                 try:
@@ -375,17 +393,19 @@ class WorkloadMgrsController(wsgi.Controller):
                     msg = _("Incorrect request body format")
                     raise exc.HTTPBadRequest(explanation=msg)
 
-                jobdefaults = {'fullbackup_interval': '-1',
-                               'start_time': '09:00 PM',
-                               'interval': u'24hr',
-                               'enabled': u'true',
-                               'start_date': time.strftime("%x"),
-                               'end_date': "No End",
-                               'retention_policy_type': 'Number of Snapshots to Keep',
-                               'retention_policy_value': '30'}
+                jobdefaults = {
+                    'fullbackup_interval': '-1',
+                    'start_time': '09:00 PM',
+                    'interval': u'24hr',
+                    'enabled': u'true',
+                    'start_date': time.strftime("%x"),
+                    'end_date': "No End",
+                    'retention_policy_type': 'Number of Snapshots to Keep',
+                    'retention_policy_value': '30'}
 
                 jobschedule = workload.get('jobschedule', jobdefaults)
-                self.workload_api.workload_modify(context, id, body['workload'])
+                self.workload_api.workload_modify(
+                    context, id, body['workload'])
             except exception.WorkloadNotFound as error:
                 raise exc.HTTPNotFound(explanation=unicode(error))
         except exc.HTTPNotFound as error:
@@ -399,15 +419,15 @@ class WorkloadMgrsController(wsgi.Controller):
             raise error
         except Exception as error:
             LOG.exception(error)
-            raise exc.HTTPServerError(explanation=unicode(error))  
-            
+            raise exc.HTTPServerError(explanation=unicode(error))
 
     def get_workflow(self, req, id):
         """Return workflow details of a given workload."""
         try:
             context = req.environ['workloadmgr.context']
             try:
-                workload_workflow = self.workload_api.workload_get_workflow(context, workload_id=id)
+                workload_workflow = self.workload_api.workload_get_workflow(
+                    context, workload_id=id)
                 return workload_workflow
             except exception.WorkloadNotFound as error:
                 raise exc.HTTPNotFound(explanation=unicode(error))
@@ -422,8 +442,8 @@ class WorkloadMgrsController(wsgi.Controller):
             raise error
         except Exception as error:
             LOG.exception(error)
-            raise exc.HTTPServerError(explanation=unicode(error))        
-    
+            raise exc.HTTPServerError(explanation=unicode(error))
+
     def pause(self, req, id):
         """pause a given workload."""
         try:
@@ -443,8 +463,7 @@ class WorkloadMgrsController(wsgi.Controller):
             raise error
         except Exception as error:
             LOG.exception(error)
-            raise exc.HTTPServerError(explanation=unicode(error))         
-        
+            raise exc.HTTPServerError(explanation=unicode(error))
 
     def resume(self, req, id):
         """resume a given workload."""
@@ -465,14 +484,15 @@ class WorkloadMgrsController(wsgi.Controller):
             raise error
         except Exception as error:
             LOG.exception(error)
-            raise exc.HTTPServerError(explanation=unicode(error))          
-    
+            raise exc.HTTPServerError(explanation=unicode(error))
+
     def get_topology(self, req, id):
         """Return topology of a given workload."""
         try:
             context = req.environ['workloadmgr.context']
             try:
-                workload_topology = self.workload_api.workload_get_topology(context, workload_id=id)
+                workload_topology = self.workload_api.workload_get_topology(
+                    context, workload_id=id)
                 return workload_topology
             except exception.NotFound as error:
                 raise exc.HTTPNotFound(explanation=unicode(error))
@@ -487,13 +507,14 @@ class WorkloadMgrsController(wsgi.Controller):
             raise error
         except Exception as error:
             LOG.exception(error)
-            raise exc.HTTPServerError(explanation=unicode(error))          
+            raise exc.HTTPServerError(explanation=unicode(error))
 
     def discover_instances(self, req, id):
         """discover_instances of a workload_type using the metadata"""
         try:
             context = req.environ['workloadmgr.context']
-            instances = self.workload_api.workload_discover_instances(context, id)
+            instances = self.workload_api.workload_discover_instances(
+                context, id)
             return instances
         except exc.HTTPNotFound as error:
             LOG.exception(error)
@@ -506,14 +527,15 @@ class WorkloadMgrsController(wsgi.Controller):
             raise error
         except Exception as error:
             LOG.exception(error)
-            raise exc.HTTPServerError(explanation=unicode(error))                       
+            raise exc.HTTPServerError(explanation=unicode(error))
 
     def get_import_workloads_list(self, req):
         try:
             context = req.environ['workloadmgr.context']
             try:
-                workloads = self.workload_api.get_import_workloads_list(context)
-                return self._view_builder.detail_list(req, workloads) 
+                workloads = self.workload_api.get_import_workloads_list(
+                    context)
+                return self._view_builder.detail_list(req, workloads)
             except exception.WorkloadNotFound as error:
                 LOG.exception(error)
                 raise exc.HTTPNotFound(explanation=unicode(error))
@@ -540,18 +562,20 @@ class WorkloadMgrsController(wsgi.Controller):
             try:
                 workload_ids = body['workload_ids']
             except KeyError:
-                   pass
+                pass
 
             upgrade = True
             try:
                 upgrade = body.get('upgrade')
             except KeyError:
-                   pass
+                pass
 
             try:
-                workloads = self.workload_api.import_workloads(context, workload_ids, upgrade)
-                    
-                imported_workloads = self._view_builder.detail_list(req,  workloads['workloads']['imported_workloads'])
+                workloads = self.workload_api.import_workloads(
+                    context, workload_ids, upgrade)
+
+                imported_workloads = self._view_builder.detail_list(
+                    req, workloads['workloads']['imported_workloads'])
                 workloads['workloads']['imported_workloads'] = imported_workloads['workloads']
                 return workloads
             except exception.WorkloadNotFound as error:
@@ -571,12 +595,12 @@ class WorkloadMgrsController(wsgi.Controller):
             raise error
         except Exception as error:
             LOG.exception(error)
-            raise exc.HTTPServerError(explanation=unicode(error))           
-    
+            raise exc.HTTPServerError(explanation=unicode(error))
+
     def get_nodes(self, req):
         try:
             context = req.environ['workloadmgr.context']
-            nodes = {'nodes':[]}
+            nodes = {'nodes': []}
             try:
                 nodes = self.workload_api.get_nodes(context)
             except Exception as ex:
@@ -594,7 +618,7 @@ class WorkloadMgrsController(wsgi.Controller):
             raise error
         except Exception as error:
             LOG.exception(error)
-            raise exc.HTTPServerError(explanation=unicode(error))       
+            raise exc.HTTPServerError(explanation=unicode(error))
 
     def remove_node(self, req, ip):
         try:
@@ -621,7 +645,7 @@ class WorkloadMgrsController(wsgi.Controller):
         try:
             context = req.environ['workloadmgr.context']
             if body:
-               ip = body.get('ip')
+                ip = body.get('ip')
             try:
                 self.workload_api.add_node(context, ip)
             except Exception as ex:
@@ -639,11 +663,12 @@ class WorkloadMgrsController(wsgi.Controller):
         except Exception as error:
             LOG.exception(error)
             raise exc.HTTPServerError(explanation=unicode(error))
-    
+
     def get_storage_usage(self, req):
         try:
             context = req.environ['workloadmgr.context']
-            storages_usage = {'storage_usage': [{'total': 0, 'full': 0, 'incremental': 0}]}
+            storages_usage = {'storage_usage': [
+                {'total': 0, 'full': 0, 'incremental': 0}]}
             try:
                 storages_usage = self.workload_api.get_storage_usage(context)
             except Exception as ex:
@@ -661,27 +686,27 @@ class WorkloadMgrsController(wsgi.Controller):
             raise error
         except Exception as error:
             LOG.exception(error)
-            raise exc.HTTPServerError(explanation=unicode(error))        
+            raise exc.HTTPServerError(explanation=unicode(error))
 
-                
     def get_contego_status(self, req):
         try:
             context = req.environ['workloadmgr.context']
             host, ip = None, None
-                
-            if ('QUERY_STRING' in req.environ) :
-                qs=parse_qs(req.environ['QUERY_STRING'])                
-                host = qs.get('host',[''])[0]
+
+            if ('QUERY_STRING' in req.environ):
+                qs = parse_qs(req.environ['QUERY_STRING'])
+                host = qs.get('host', [''])[0]
                 host = str(escape(host))
-                              
-            if ('QUERY_STRING' in req.environ) :
-                qs=parse_qs(req.environ['QUERY_STRING'])                
-                ip = qs.get('ip',[''])[0]
+
+            if ('QUERY_STRING' in req.environ):
+                qs = parse_qs(req.environ['QUERY_STRING'])
+                ip = qs.get('ip', [''])[0]
                 ip = str(escape(ip))
-            
+
             compute_contego_records = {}
-            try:                
-                compute_contego_records = self.workload_api.get_contego_status(context, host, ip)
+            try:
+                compute_contego_records = self.workload_api.get_contego_status(
+                    context, host, ip)
             except Exception as ex:
                 LOG.exception(ex)
                 raise ex
@@ -697,21 +722,22 @@ class WorkloadMgrsController(wsgi.Controller):
             raise error
         except Exception as error:
             LOG.exception(error)
-            raise exc.HTTPServerError(explanation=unicode(error))       
-            
+            raise exc.HTTPServerError(explanation=unicode(error))
+
     def get_recentactivities(self, req):
         try:
             context = req.environ['workloadmgr.context']
             time_in_minutes = 600
-            if ('QUERY_STRING' in req.environ) :
-                qs=parse_qs(req.environ['QUERY_STRING'])
+            if ('QUERY_STRING' in req.environ):
+                qs = parse_qs(req.environ['QUERY_STRING'])
                 var = parse_qs(req.environ['QUERY_STRING'])
-                time_in_minutes = var.get('time_in_minutes',[''])[0]
+                time_in_minutes = var.get('time_in_minutes', [''])[0]
                 time_in_minutes = int(escape(time_in_minutes))
-            
-            recentactivities = {'recentactivities':[]}
+
+            recentactivities = {'recentactivities': []}
             try:
-                recentactivities = self.workload_api.get_recentactivities(context, time_in_minutes)
+                recentactivities = self.workload_api.get_recentactivities(
+                    context, time_in_minutes)
             except Exception as ex:
                 LOG.exception(ex)
                 raise ex
@@ -727,32 +753,35 @@ class WorkloadMgrsController(wsgi.Controller):
             raise error
         except Exception as error:
             LOG.exception(error)
-            raise exc.HTTPServerError(explanation=unicode(error))          
-    
+            raise exc.HTTPServerError(explanation=unicode(error))
+
     def get_auditlog(self, req):
         try:
             context = req.environ['workloadmgr.context']
             time_in_minutes = 1440
             time_from = None
             time_to = None
-            if ('QUERY_STRING' in req.environ) :
-                qs=parse_qs(req.environ['QUERY_STRING'])
+            if ('QUERY_STRING' in req.environ):
+                qs = parse_qs(req.environ['QUERY_STRING'])
                 var = parse_qs(req.environ['QUERY_STRING'])
                 time_in_minutes = var.get('time_in_minutes', None)
                 if time_in_minutes:
                     time_in_minutes = time_in_minutes[0]
                     time_in_minutes = int(escape(time_in_minutes))
-                
-                start_range = var.get('start_range',None)
-                end_range = var.get('end_range',None)
+
+                start_range = var.get('start_range', None)
+                end_range = var.get('end_range', None)
                 if start_range:
-                    start_range = datetime.strptime(start_range[0] + " 00:00:00", "%m-%d-%Y  %H:%M:%S")
+                    start_range = datetime.strptime(
+                        start_range[0] + " 00:00:00", "%m-%d-%Y  %H:%M:%S")
                 if end_range:
-                    end_range = datetime.strptime(end_range[0] + " 23:59:59", "%m-%d-%Y  %H:%M:%S")
-                    
-            auditlog = {'auditlog':[]}
+                    end_range = datetime.strptime(
+                        end_range[0] + " 23:59:59", "%m-%d-%Y  %H:%M:%S")
+
+            auditlog = {'auditlog': []}
             try:
-                auditlog = self.workload_api.get_auditlog(context, time_in_minutes, start_range, end_range)
+                auditlog = self.workload_api.get_auditlog(
+                    context, time_in_minutes, start_range, end_range)
             except Exception as ex:
                 LOG.exception(ex)
                 raise ex
@@ -768,34 +797,36 @@ class WorkloadMgrsController(wsgi.Controller):
             raise error
         except Exception as error:
             LOG.exception(error)
-            raise exc.HTTPServerError(explanation=unicode(error))   
-        
-    def settings(self, req, body=None):                           
+            raise exc.HTTPServerError(explanation=unicode(error))
+
+    def settings(self, req, body=None):
         """settings"""
         try:
             context = req.environ['workloadmgr.context']
             get_hidden = False
             get_smtp_settings = False
-            if ('QUERY_STRING' in req.environ) :
-               qs=parse_qs(req.environ['QUERY_STRING'])
-               var = parse_qs(req.environ['QUERY_STRING'])
-               get_hidden = var.get('get_hidden',[''])[0]
-               get_hidden = escape(get_hidden)                
-               if get_hidden.lower() == 'true':
-                  get_hidden = True
-               get_smtp_settings = var.get('get_smtp_settings',[''])[0]
-               get_smtp_settings = escape(get_smtp_settings)
-               if get_smtp_settings.lower() == 'true':
-                  get_smtp_settings = True
+            if ('QUERY_STRING' in req.environ):
+                qs = parse_qs(req.environ['QUERY_STRING'])
+                var = parse_qs(req.environ['QUERY_STRING'])
+                get_hidden = var.get('get_hidden', [''])[0]
+                get_hidden = escape(get_hidden)
+                if get_hidden.lower() == 'true':
+                    get_hidden = True
+                get_smtp_settings = var.get('get_smtp_settings', [''])[0]
+                get_smtp_settings = escape(get_smtp_settings)
+                if get_smtp_settings.lower() == 'true':
+                    get_smtp_settings = True
             Config = ConfigParser.RawConfigParser()
             Config.read('/var/triliovault/settings/workloadmgr-settings.conf')
-            settings = None            
+            settings = None
             if (body and 'settings' in body):
-                settings = settings_module.set_settings(context, body['settings'])
+                settings = settings_module.set_settings(
+                    context, body['settings'])
             if (body and 'page_size' in body['settings']):
-                settings = self.workload_api.setting_get(context,'page_size')                
+                settings = self.workload_api.setting_get(context, 'page_size')
             if not settings:
-                settings = settings_module.get_settings(context, get_hidden, get_smtp_settings)
+                settings = settings_module.get_settings(
+                    context, get_hidden, get_smtp_settings)
             return {'settings': settings}
         except exception.WorkloadNotFound as error:
             LOG.exception(error)
@@ -806,69 +837,85 @@ class WorkloadMgrsController(wsgi.Controller):
         except Exception as error:
             LOG.exception(error)
             raise exc.HTTPServerError(explanation=unicode(error))
-   
+
     def test_email(self, req):
         """Test email configuration"""
         try:
-            context = req.environ['workloadmgr.context']        
+            context = req.environ['workloadmgr.context']
             html = '<html><head></head><body>'
             html += 'Test email</body></html>'
             try:
-                 settings = settings_module.get_settings(context) 
-                 import re
-                 for setting in settings:
-                     if setting.strip().find('smtp_') >= 0:
-                        value = settings_module.get_settings(context).get(setting)
-                        if (value == "" or len(value) <= 1) and setting != 'smtp_email_enable':
-                           if settings_module.get_settings(context).get('smtp_server_name') == 'localhost' and (setting == 'smtp_server_password' or setting == 'smtp_server_username'):
-                              continue
-                           else:
-                                 raise exception.ErrorOccurred("Mandatory field "+setting+" cannot be empty") 
+                settings = settings_module.get_settings(context)
+                import re
+                for setting in settings:
+                    if setting.strip().find('smtp_') >= 0:
+                        value = settings_module.get_settings(
+                            context).get(setting)
+                        if (value == "" or len(value) <=
+                                1) and setting != 'smtp_email_enable':
+                            if settings_module.get_settings(context).get('smtp_server_name') == 'localhost' and (
+                                    setting == 'smtp_server_password' or setting == 'smtp_server_username'):
+                                continue
+                            else:
+                                raise exception.ErrorOccurred(
+                                    "Mandatory field " + setting + " cannot be empty")
                         elif (setting == 'smtp_default_sender' or setting == 'smtp_default_recipient') and not re.search(r'[\w.-]+@[\w.-]+.\w+', value):
-                             raise exception.ErrorOccurred("Please enter valid email address for "+setting)                                  
+                            raise exception.ErrorOccurred(
+                                "Please enter valid email address for " + setting)
                         elif setting == 'smtp_timeout' and int(value) > 10:
-                             raise exception.ErrorOccurred(setting+" cannot be greater than 10") 
+                            raise exception.ErrorOccurred(
+                                setting + " cannot be greater than 10")
 
-                 msg = MIMEMultipart('alternative')
-                 msg['From'] = settings_module.get_settings(context).get('smtp_default_sender')
-                 if settings_module.get_settings(context).get('smtp_default_recipient') is None: 
+                msg = MIMEMultipart('alternative')
+                msg['From'] = settings_module.get_settings(
+                    context).get('smtp_default_sender')
+                if settings_module.get_settings(context).get(
+                        'smtp_default_recipient') is None:
                     msg['To'] = msg['From']
-                 else:
-                      msg['To'] =  settings_module.get_settings(context).get('smtp_default_recipient')
- 
-                 msg['Subject'] = 'Testing email configuration'
-                 part2 = MIMEText(html, 'html')
-                 msg.attach(part2)
-                 try:
-                     socket.setdefaulttimeout(int(settings_module.get_settings(context).get('smtp_timeout')))
-                     s = smtplib.SMTP(settings_module.get_settings(context).get('smtp_server_name'),int(settings_module.get_settings(context).get('smtp_port')))
-                     if settings_module.get_settings(context).get('smtp_server_name') != 'localhost':
+                else:
+                    msg['To'] = settings_module.get_settings(
+                        context).get('smtp_default_recipient')
+
+                msg['Subject'] = 'Testing email configuration'
+                part2 = MIMEText(html, 'html')
+                msg.attach(part2)
+                try:
+                    socket.setdefaulttimeout(
+                        int(settings_module.get_settings(context).get('smtp_timeout')))
+                    s = smtplib.SMTP(
+                        settings_module.get_settings(context).get('smtp_server_name'), int(
+                            settings_module.get_settings(context).get('smtp_port')))
+                    if settings_module.get_settings(context).get(
+                            'smtp_server_name') != 'localhost':
                         s.ehlo()
                         s.starttls()
                         s.ehlo
-                        s.login(settings_module.get_settings(context).get('smtp_server_username'),settings_module.get_settings(context).get('smtp_server_password'))
-                     s.sendmail(msg['From'], msg['To'], msg.as_string())
-                     s.quit()
-                 except smtplib.SMTPException as ex:
-                        if ex.smtp_code == 535:
-                           msg = ex.smtp_error
-                        else:
-                             msg = "Error authenticating with specified username and password"
-                        raise exception.ErrorOccurred(msg)
+                        s.login(
+                            settings_module.get_settings(
+                                context).get('smtp_server_username'),
+                            settings_module.get_settings(context).get('smtp_server_password'))
+                    s.sendmail(msg['From'], msg['To'], msg.as_string())
+                    s.quit()
+                except smtplib.SMTPException as ex:
+                    if ex.smtp_code == 535:
+                        msg = ex.smtp_error
+                    else:
+                        msg = "Error authenticating with specified username and password"
+                    raise exception.ErrorOccurred(msg)
             except Exception as error:
-                   msg = error
-                   try:
-                       if error.message != '' and error.message[0] == -5:
-                          msg = 'smtp_server_name is not valid'
-                       if error.message != '' and error.message.__class__.__name__ == 'timeout':
-                          msg = 'smtp server unreachable with this smtp_server_name and smtp_port values'
-                       if hasattr(error, 'strerror') and error.strerror != '':
-                          msg = error.strerror
-                       if '%(reason)' in error.message:
-                          msg = error.args[0]
-                   except Exception as ex:
-                          msg = "Error validation email settings"
-                   raise exception.ErrorOccurred(msg)
+                msg = error
+                try:
+                    if error.message != '' and error.message[0] == -5:
+                        msg = 'smtp_server_name is not valid'
+                    if error.message != '' and error.message.__class__.__name__ == 'timeout':
+                        msg = 'smtp server unreachable with this smtp_server_name and smtp_port values'
+                    if hasattr(error, 'strerror') and error.strerror != '':
+                        msg = error.strerror
+                    if '%(reason)' in error.message:
+                        msg = error.args[0]
+                except Exception as ex:
+                    msg = "Error validation email settings"
+                raise exception.ErrorOccurred(msg)
         except exception.InvalidState as error:
             LOG.exception(error)
             raise exc.HTTPBadRequest(explanation=unicode(error))
@@ -881,9 +928,9 @@ class WorkloadMgrsController(wsgi.Controller):
         try:
             context = req.environ['workloadmgr.context']
 
-            license_text = body['license']
-            license = self.workload_api.license_create(context, license_text)
-            return {'license' : license}
+            license_data = body['license']
+            license = self.workload_api.license_create(context, license_data)
+            return {'license': license}
         except exc.HTTPNotFound as error:
             raise error
         except exc.HTTPBadRequest as error:
@@ -898,7 +945,7 @@ class WorkloadMgrsController(wsgi.Controller):
         try:
             context = req.environ['workloadmgr.context']
             license = self.workload_api.license_list(context)
-            return {'license' : license}
+            return {'license': license}
         except exc.HTTPNotFound as error:
             LOG.exception(error)
             raise error
@@ -910,14 +957,14 @@ class WorkloadMgrsController(wsgi.Controller):
             raise error
         except Exception as error:
             LOG.exception(error)
-            raise exc.HTTPServerError(explanation=unicode(error))  
+            raise exc.HTTPServerError(explanation=unicode(error))
 
     def license_check(self, req):
         """Verify license check."""
         try:
             context = req.environ['workloadmgr.context']
             message = self.workload_api.license_check(context)
-            return {'message' : message}
+            return {'message': message}
         except exc.HTTPNotFound as error:
             LOG.exception(error)
             raise error
@@ -929,9 +976,9 @@ class WorkloadMgrsController(wsgi.Controller):
             raise error
         except Exception as error:
             LOG.exception(error)
-            raise exc.HTTPServerError(explanation=unicode(error))  
+            raise exc.HTTPServerError(explanation=unicode(error))
 
-    def get_orphaned_workloads_list(self, req, path_info=None ):
+    def get_orphaned_workloads_list(self, req, path_info=None):
         try:
             context = req.environ['workloadmgr.context']
             qs = parse_qs(req.environ['QUERY_STRING'])
@@ -941,7 +988,8 @@ class WorkloadMgrsController(wsgi.Controller):
             else:
                 migrate_cloud = False
             try:
-                workloads = self.workload_api.get_orphaned_workloads_list(context, migrate_cloud)
+                workloads = self.workload_api.get_orphaned_workloads_list(
+                    context, migrate_cloud)
                 return self._view_builder.detail_list(req, workloads)
             except exception.WorkloadNotFound as error:
                 LOG.exception(error)
@@ -972,17 +1020,25 @@ class WorkloadMgrsController(wsgi.Controller):
                 new_tenant_id = tenant_map['new_tenant_id']
                 user_id = tenant_map['user_id']
                 if workload_ids and old_tenant_ids:
-                    raise exc.HTTPBadRequest(explanation=unicode("Please provide "\
-                          "only one parameter among workload_ids and old_tenant_ids."))
-                if new_tenant_id == None:
-                    raise exc.HTTPBadRequest(explanation=unicode("Please provide "\
-                          "required parameters: new_tenant_id."))
-                if user_id == None:
-                    raise exc.HTTPBadRequest(explanation=unicode("Please provide "\
-                          "required parameters: user_id."))
+                    raise exc.HTTPBadRequest(
+                        explanation=unicode(
+                            "Please provide "
+                            "only one parameter among workload_ids and old_tenant_ids."))
+                if new_tenant_id is None:
+                    raise exc.HTTPBadRequest(
+                        explanation=unicode(
+                            "Please provide "
+                            "required parameters: new_tenant_id."))
+                if user_id is None:
+                    raise exc.HTTPBadRequest(
+                        explanation=unicode(
+                            "Please provide "
+                            "required parameters: user_id."))
             try:
-                workloads = self.workload_api.workloads_reassign(context, tenant_maps)
-                reassigned_workloads = self._view_builder.detail_list(req,  workloads['workloads']['reassigned_workloads'])
+                workloads = self.workload_api.workloads_reassign(
+                    context, tenant_maps)
+                reassigned_workloads = self._view_builder.detail_list(
+                    req, workloads['workloads']['reassigned_workloads'])
                 workloads['workloads']['reassigned_workloads'] = reassigned_workloads['workloads']
                 return workloads
             except exception.WorkloadNotFound as error:
@@ -1004,6 +1060,6 @@ class WorkloadMgrsController(wsgi.Controller):
             LOG.exception(error)
             raise exc.HTTPServerError(explanation=unicode(error))
 
+
 def create_resource():
     return wsgi.Resource(WorkloadMgrsController())
-

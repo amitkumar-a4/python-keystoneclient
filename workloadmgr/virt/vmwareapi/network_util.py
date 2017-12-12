@@ -43,23 +43,28 @@ def get_network_with_the_name(session, network_name="vmnet0", cluster=None):
     for network in vm_networks:
         # Get network properties
         if network._type == 'DistributedVirtualPortgroup':
-            props = session._call_method(vim_util,
-                        "get_dynamic_property", network,
-                        "DistributedVirtualPortgroup", "config")
+            props = session._call_method(
+                vim_util,
+                "get_dynamic_property",
+                network,
+                "DistributedVirtualPortgroup",
+                "config")
             # NOTE(asomya): This only works on ESXi if the port binding is
             # set to ephemeral
             if props.name == network_name:
                 network_obj['type'] = 'DistributedVirtualPortgroup'
                 network_obj['dvpg'] = props.key
-                dvs_props = session._call_method(vim_util,
-                                "get_dynamic_property",
-                                props.distributedVirtualSwitch,
-                                "VmwareDistributedVirtualSwitch", "uuid")
+                dvs_props = session._call_method(
+                    vim_util,
+                    "get_dynamic_property",
+                    props.distributedVirtualSwitch,
+                    "VmwareDistributedVirtualSwitch",
+                    "uuid")
                 network_obj['dvsw'] = dvs_props
         else:
             props = session._call_method(vim_util,
-                        "get_dynamic_property", network,
-                        "Network", "summary.name")
+                                         "get_dynamic_property", network,
+                                         "Network", "summary.name")
             if props == network_name:
                 network_obj['type'] = 'Network'
                 network_obj['name'] = network_name
@@ -74,9 +79,12 @@ def get_vswitch_for_vlan_interface(session, vlan_interface, cluster=None):
     """
     # Get the list of vSwicthes on the Host System
     host_mor = vm_util.get_host_ref(session, cluster)
-    vswitches_ret = session._call_method(vim_util,
-                "get_dynamic_property", host_mor,
-                "HostSystem", "config.network.vswitch")
+    vswitches_ret = session._call_method(
+        vim_util,
+        "get_dynamic_property",
+        host_mor,
+        "HostSystem",
+        "config.network.vswitch")
     # Meaning there are no vSwitches on the host. Shouldn't be the case,
     # but just doing code check
     if not vswitches_ret:
@@ -97,9 +105,12 @@ def get_vswitch_for_vlan_interface(session, vlan_interface, cluster=None):
 def check_if_vlan_interface_exists(session, vlan_interface, cluster=None):
     """Checks if the vlan_interface exists on the esx host."""
     host_mor = vm_util.get_host_ref(session, cluster)
-    physical_nics_ret = session._call_method(vim_util,
-                "get_dynamic_property", host_mor,
-                "HostSystem", "config.network.pnic")
+    physical_nics_ret = session._call_method(
+        vim_util,
+        "get_dynamic_property",
+        host_mor,
+        "HostSystem",
+        "config.network.pnic")
     # Meaning there are no physical nics on the host
     if not physical_nics_ret:
         return False
@@ -113,9 +124,12 @@ def check_if_vlan_interface_exists(session, vlan_interface, cluster=None):
 def get_vlanid_and_vswitch_for_portgroup(session, pg_name, cluster=None):
     """Get the vlan id and vswicth associated with the port group."""
     host_mor = vm_util.get_host_ref(session, cluster)
-    port_grps_on_host_ret = session._call_method(vim_util,
-                "get_dynamic_property", host_mor,
-                "HostSystem", "config.network.portgroup")
+    port_grps_on_host_ret = session._call_method(
+        vim_util,
+        "get_dynamic_property",
+        host_mor,
+        "HostSystem",
+        "config.network.portgroup")
     if not port_grps_on_host_ret:
         msg = _("ESX SOAP server returned an empty port group "
                 "for the host system in its response")
@@ -135,20 +149,23 @@ def create_port_group(session, pg_name, vswitch_name, vlan_id=0, cluster=None):
     """
     client_factory = session._get_vim().client.factory
     add_prt_grp_spec = vm_util.get_add_vswitch_port_group_spec(
-                    client_factory,
-                    vswitch_name,
-                    pg_name,
-                    vlan_id)
+        client_factory,
+        vswitch_name,
+        pg_name,
+        vlan_id)
     host_mor = vm_util.get_host_ref(session, cluster)
-    network_system_mor = session._call_method(vim_util,
-        "get_dynamic_property", host_mor,
-        "HostSystem", "configManager.networkSystem")
+    network_system_mor = session._call_method(
+        vim_util,
+        "get_dynamic_property",
+        host_mor,
+        "HostSystem",
+        "configManager.networkSystem")
     LOG.debug(_("Creating Port Group with name %s on "
                 "the ESX host") % pg_name)
     try:
         session._call_method(session._get_vim(),
-                "AddPortGroup", network_system_mor,
-                portgrp=add_prt_grp_spec)
+                             "AddPortGroup", network_system_mor,
+                             portgrp=add_prt_grp_spec)
     except error_util.VimFaultException as exc:
         # There can be a race condition when two instances try
         # adding port groups at the same time. One succeeds, then
