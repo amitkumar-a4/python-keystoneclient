@@ -162,8 +162,9 @@ class PrepareBackupImage(task.Task):
         except:
                pass"""
         image_info = qemuimages.qemu_img_info(resource_snap_path)
-        if  snapshot_vm_resource.resource_name in ('vda','sda') and \
-            db.get_metadata_value(snapshot_vm_resource.metadata, 'image_id') is not None:
+
+        if snapshot_vm_resource.resource_name == 'vda' and db.get_metadata_value(
+                snapshot_vm_resource.metadata, 'image_id') is not None:
             # upload the bottom of the chain to glance
             while image_info.backing_file:
                 image_info = qemuimages.qemu_img_info(image_info.backing_file)
@@ -796,11 +797,11 @@ class RestoreInstanceFromVolume(task.Task):
     def execute(self, context, vmname, restore_id,
                 volume_id, restore_type, instance_options,
                 restored_security_groups, restored_nics,
-                restored_compute_flavor_id, keyname, disk_name):
+                restored_compute_flavor_id, keyname):
         return self.execute_with_log(context, vmname, restore_id,
-                                    volume_id, restore_type, instance_options,
-                                    restored_security_groups, restored_nics,
-                                    restored_compute_flavor_id, keyname, disk_name)
+                                     volume_id, restore_type, instance_options,
+                                     restored_security_groups, restored_nics,
+                                     restored_compute_flavor_id, keyname)
 
     def revert(self, *args, **kwargs):
         return self.revert_with_log(*args, **kwargs)
@@ -809,7 +810,7 @@ class RestoreInstanceFromVolume(task.Task):
     def execute_with_log(self, context, vmname, restore_id,
                          volume_id, restore_type, instance_options,
                          restored_security_groups, restored_nics,
-                         restored_compute_flavor_id, keyname, disk_name):
+                         restored_compute_flavor_id, keyname):
 
         self.db = db = WorkloadMgrDB().db
         self.cntx = amqp.RpcContext.from_dict(context)
@@ -839,7 +840,8 @@ class RestoreInstanceFromVolume(task.Task):
             volume_service.set_bootable(self.cntx, restored_volume)
         except Exception as ex:
             LOG.exception(ex)
-        block_device_mapping = {disk_name: volume_id+":vol"}
+
+        block_device_mapping = {u'vda': volume_id + ":vol"}
 
         self.restored_instance = restored_instance = \
             compute_service.create_server(self.cntx, restored_instance_name,
@@ -906,6 +908,7 @@ class RestoreInstanceFromImage(task.Task):
                          image_id, restore_type, instance_options,
                          restored_security_groups, restored_nics,
                          restored_compute_flavor_id, keyname):
+
         self.db = db = WorkloadMgrDB().db
         self.cntx = amqp.RpcContext.from_dict(context)
         self.compute_service = compute_service = nova.API(
@@ -1436,17 +1439,22 @@ def RestoreVolumes(context, instance, instance_options,
     for snapshot_vm_resource in snapshot_vm_resources:
         if snapshot_vm_resource.resource_type != 'disk':
             continue
+
         if db.get_metadata_value(snapshot_vm_resource.metadata, 'volume_id'):
             volume_type = db.get_metadata_value(
                 snapshot_vm_resource.metadata, 'volume_type')
             if volume_type:
                 volume_type = volume_type.lower()
             else:
-                volume_type='default'
-            volume_id = db.get_metadata_value(snapshot_vm_resource.metadata, 'volume_id').lower()
-  
-            new_volume_type = get_new_volume_type(instance_options, volume_id, volume_type)
-            #if [vtype for vtype in CONF.nfs_volume_type_substr.split(',') if vtype in new_volume_type]:
+                volume_type = 'default'
+            volume_id = db.get_metadata_value(
+                snapshot_vm_resource.metadata, 'volume_id').lower()
+
+            new_volume_type = get_new_volume_type(
+                instance_options, volume_id, volume_type)
+
+            # if [vtype for vtype in CONF.nfs_volume_type_substr.split(',') if
+            # vtype in new_volume_type]:
             if False:
                 flow.add(RestoreNFSVolume("RestoreNFSVolume" + snapshot_vm_resource.id,
                                           rebind=dict(vm_resource_id=snapshot_vm_resource.id,
@@ -1482,16 +1490,16 @@ def RestoreInstance(context, instance, snapshotobj, restore_id):
     for snapshot_vm_resource in snapshot_vm_resources:
         if snapshot_vm_resource.resource_type != 'disk':
             continue
-        if  snapshot_vm_resource.resource_name not in ('vda','sda'):
-            continue        
+        if snapshot_vm_resource.resource_name != 'vda':
+            continue
         if db.get_metadata_value(snapshot_vm_resource.metadata, 'image_id'):
-            flow.add(RestoreInstanceFromImage("RestoreInstanceFromImage" + instance['vm_id'],
-                                rebind=dict(image_id='image_id_' + str(snapshot_vm_resource.id), disk_name=snapshot_vm_resource.resource_name),
-                                provides='restored_instance_id'))            
+            flow.add(RestoreInstanceFromImage("RestoreInstanceFromImage" +
+                                              instance['vm_id'], rebind=dict(image_id='image_id_' +
+                                                                             str(snapshot_vm_resource.id)), provides='restored_instance_id'))
         else:
-            flow.add(RestoreInstanceFromVolume("RestoreInstanceFromVolume" + instance['vm_id'],
-                                rebind=dict(volume_id='volume_id_' + str(snapshot_vm_resource.id), disk_name=snapshot_vm_resource.resource_name),
-                                provides='restored_instance_id'))
+            flow.add(RestoreInstanceFromVolume("RestoreInstanceFromVolume" +
+                                               instance['vm_id'], rebind=dict(volume_id='volume_id_' +
+                                                                              str(snapshot_vm_resource.id)), provides='restored_instance_id'))
     return flow
 
 
@@ -1511,9 +1519,9 @@ def AttachVolumes(context, instance, snapshotobj, restore_id):
         context, instance['vm_id'], snapshotobj.id)
     for snapshot_vm_resource in snapshot_vm_resources:
         if snapshot_vm_resource.resource_type != 'disk':
-           continue
-        if snapshot_vm_resource.resource_name in ('vda','sda'):
-           continue
+            continue
+        if snapshot_vm_resource.resource_name == 'vda':
+            continue
         if db.get_metadata_value(snapshot_vm_resource.metadata, 'volume_id'):
             flow.add(AttachVolume("AttachVolume" +
                                   snapshot_vm_resource.id, rebind=dict(volume_id='volume_id_' +
@@ -1709,6 +1717,7 @@ def restore_vm(cntx, db, instance, restore, restored_net_resources,
                                            snapshot_obj, restore['id'], store)
     if childflow:
         _restorevmflow.add(childflow)
+
     # create nova/cinder objects from image ids
     childflow = RestoreVolumes(cntx, instance, instance_options,
                                snapshot_obj, restore['id'])
