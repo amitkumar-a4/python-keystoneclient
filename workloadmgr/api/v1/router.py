@@ -783,16 +783,10 @@ class APIRouter(workloadmgr.api.APIRouter):
                        action='policy_delete',
                        conditions={"method": ['DELETE']})
 
-        mapper.connect("workload_policy_apply",
-                       "/{project_id}/workload_policy/{policy_id}/apply/{tenant_id}",
+        mapper.connect("workload_policy_assign",
+                       "/{project_id}/workload_policy/{policy_id}/assign",
                        controller=self.resources['workload_policy'],
-                       action='policy_apply',
-                       conditions={"method": ['PUT']})
-
-        mapper.connect("workload_policy_remove",
-                       "/{project_id}/workload_policy/{policy_id}/remove/{tenant_id}",
-                       controller=self.resources['workload_policy'],
-                       action='policy_remove',
+                       action='policy_assign',
                        conditions={"method": ['PUT']})
 
         mapper.connect("list_assigned_policies",

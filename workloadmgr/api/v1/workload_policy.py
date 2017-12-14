@@ -182,39 +182,31 @@ class WorkloadPolicyController(wsgi.Controller):
             LOG.exception(error)
             raise exc.HTTPServerError(explanation=unicode(error))
 
-    def policy_apply(self, req, policy_id, tenant_id):
+    def policy_assign(self, req, policy_id, body ):
         """Apply policy on a given tenant."""
         try:
             context = req.environ['workloadmgr.context']
+            if not self.is_valid_body(body, 'policy'):
+                raise exc.HTTPBadRequest()
             try:
-                policy = self.workload_api.policy_apply(
-                    context, policy_id, tenant_id)
-                return self._view_builder.summary(req, policy)
-            except exception.WorkloadNotFound as error:
-                raise exc.HTTPNotFound(explanation=unicode(error))
-        except exc.HTTPNotFound as error:
-            LOG.exception(error)
-            raise error
-        except exc.HTTPBadRequest as error:
-            LOG.exception(error)
-            raise error
-        except exc.HTTPServerError as error:
-            LOG.exception(error)
-            raise error
-        except Exception as error:
-            LOG.exception(error)
-            raise exc.HTTPServerError(explanation=unicode(error))
+                policy = body['policy']
+            except KeyError:
+                msg = _("Incorrect request body format")
+                raise exc.HTTPBadRequest(explanation=msg)
 
-    def policy_remove(self, req, policy_id, tenant_id):
-        """Remove policy from a given tenant."""
-        try:
-            context = req.environ['workloadmgr.context']
-            try:
-                policy = self.workload_api.policy_remove(
-                    context, policy_id, tenant_id)
-                return self._view_builder.summary(req, policy)
-            except exception.WorkloadNotFound as error:
-                raise exc.HTTPNotFound(explanation=unicode(error))
+            add_projects = policy.get('add_projects', [])
+            remove_projects = policy.get('remove_projects', [])
+            if (len(add_projects) == 0) and (len(remove_projects) == 0) :
+               msg = _("Please provide tenant_id's to assign/remove policy.")
+               raise exc.HTTPBadRequest(explanation=msg)
+
+            if (len(set(add_projects).intersection(set(remove_projects)))) > 0:
+                msg = _("Cannot have same project id for assigning and removing policy.")
+                raise exc.HTTPBadRequest(explanation=msg)
+            policy, failed_ids = self.workload_api.policy_assign(
+                context, policy_id, add_projects, remove_projects)
+            policy = self._view_builder.summary(req, policy)
+            return {'policy' : policy['policy'], 'failed_ids' : failed_ids}
         except exc.HTTPNotFound as error:
             LOG.exception(error)
             raise error

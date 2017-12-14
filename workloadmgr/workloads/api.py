@@ -4015,16 +4015,24 @@ class API(base.Base):
             LOG.exception(ex)
             raise
 
+
     @wrap_check_policy
-    def policy_apply(self, context, policy_id, project_id):
+    def policy_assign(self, context, policy_id, add_projects, remove_projects):
         """
-        Apply the policy to a tenant
+        Assign/remove the policy to a tenant.
         """
         try:
-            # Validate tenant_id existance
-            clients.initialise()
-            keystoneclient = clients.Clients(context).client("keystone")
-            project = keystoneclient.client.projects.get(project_id)
+            failed_project_ids = []
+            #Remove those project id's which are wrong.
+            try:
+                for project_id in add_projects[:]:
+                    # Validate tenant_id existance
+                    clients.initialise()
+                    keystoneclient = clients.Clients(context).client("keystone")
+                    project = keystoneclient.client.projects.get(project_id)
+            except Exception as ex:
+                failed_project_ids.append(project_id)
+                add_projects.remove(project_id)
 
             # Validate policy_id
             policy = self.db.policy_get(context, policy_id)
@@ -4034,41 +4042,19 @@ class API(base.Base):
                 if meta.key == "assigned_projects":
                     assigned_projects = pickle.loads(str(meta.value))
 
-            if project_id not in assigned_projects:
-                assigned_projects.append(project_id)
-            else:
-                message = "Policy: %s is already applied on given project id: %s " % (
-                    policy_id, project_id)
-                raise wlm_exceptions.ErrorOccurred(reason=message)
+            if len(remove_projects)>0:
+                #Taking wrong id's for tenants from remove projects.
+                failed_project_ids.extend(list(set(remove_projects).difference(set(assigned_projects))))
 
-            metadata = {'assigned_projects': pickle.dumps(assigned_projects)}
-            return self.db.policy_update(context, policy_id, {'metadata': metadata})
-        except Exception as ex:
-            LOG.exception(ex)
-            raise
+                #Remove projects
+                assigned_projects = list(set(assigned_projects).difference(set(remove_projects)))
 
-    @wrap_check_policy
-    def policy_remove(self, context, policy_id, project_id):
-        """
-        Remove the policy for a tennat
-        """
-        try:
-            policy = self.db.policy_get(context, policy_id)
+            #Add new projects
+            assigned_projects.extend(add_projects)
+            metadata = {'assigned_projects': pickle.dumps(list(set(assigned_projects)))}
+            policy = self.db.policy_update(context, policy_id, {'metadata': metadata})
 
-            assigned_projects = []
-            for meta in policy.metadata:
-                if meta.key == "assigned_projects":
-                    assigned_projects = pickle.loads(str(meta.value))
-
-            if project_id in assigned_projects:
-                assigned_projects.remove(project_id)
-            else:
-                message = "Policy: %s is not applied on given project id: %s " % (
-                    policy_id, project_id)
-                raise wlm_exceptions.ErrorOccurred(reason=message)
-
-            metadata = {'assigned_projects': pickle.dumps(assigned_projects)}
-            return self.db.policy_update(context, policy_id, {'metadata': metadata})
+            return (policy, failed_project_ids)
         except Exception as ex:
             LOG.exception(ex)
             raise
