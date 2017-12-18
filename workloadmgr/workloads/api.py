@@ -1363,8 +1363,6 @@ class API(base.Base):
         except Exception as ex:
             LOG.exception(ex)
             raise ex
-        finally:
-            workload_utils.update_storage_stats(context)
 
         AUDITLOG.log(context, 'Import Workloads Completed', None)
         return workloads
@@ -3853,21 +3851,27 @@ class API(base.Base):
             total_vms_protected = 0
             tenants_usage = self.db.get_tenants_usage(
                 context)
-            for tenant, usage in tenants_usage.iteritems():
-                total_vms_protected += usage['vms_protected']
             nova_client = workloadmgr_keystoneclient.KeystoneClientBase(
                 context).nova_client
             search_opts = {'all_tenants': 1}
             servers = nova_client.servers.list(search_opts=search_opts)
-            for server in servers:
-                if server.tenant_id in tenants_usage:
-                    if 'total_vms' not in tenants_usage[server.tenant_id]:
-                        tenants_usage[server.tenant_id]['total_vms'] = 1
-                    else:
-                        tenants_usage[server.tenant_id]['total_vms'] += 1
+            tenant_wise_servers = {}
+            for server in  servers:
+                if server.tenant_id not in tenant_wise_servers:
+                    tenant_wise_servers[server.tenant_id] = [server.id]
                 else:
-                    tenants_usage[server.tenant_id] = {
-                        'total_vms': 1, 'vms_protected': 0, 'used_capacity': 0}
+                    tenant_wise_servers[server.tenant_id].append(server.id)
+            for tenant_id in tenant_wise_servers:
+                if tenant_id in tenants_usage:
+                    protected = len(set(tenants_usage[tenant_id]['vms_protected']).intersection(set(tenant_wise_servers[tenant_id])))
+                    passively_protected = len(set(tenants_usage[tenant_id]['vms_protected']).difference(set(tenant_wise_servers[tenant_id])))
+                    tenants_usage[tenant_id]['vms_protected'] = protected
+                    tenants_usage[tenant_id]['total_vms'] = len(tenant_wise_servers[tenant_id])
+                    tenants_usage[tenant_id]['passively_protected'] = passively_protected
+                else:
+                    tenants_usage[tenant_id]['vms_protected'] = 0
+                    tenants_usage[tenant_id]['total_vms'] = len(tenant_wise_servers[tenant_id])
+                    tenants_usage[tenant_id]['passively_protected'] = 0
 
             # Update tenants_usage for those tenants which doesn't have any workloads
             clients.initialise()
@@ -3877,7 +3881,7 @@ class API(base.Base):
             for tenant in tenants:
                 if tenant.id not in tenants_usage:
                     tenants_usage[tenant.id] = {
-                        'vms_protected': 0, 'total_vms': 0, 'used_capacity': 0}
+                        'vms_protected': 0, 'total_vms': 0, 'used_capacity': 0, 'passively_protected': 0}
 
             backends_storage_stats = self.get_storage_usage(context)
 

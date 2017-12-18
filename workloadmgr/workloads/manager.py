@@ -816,7 +816,6 @@ class WorkloadMgrManager(manager.SchedulerDependentManager):
                 LOG.exception(ex)
 
         finally:
-            workload_utils.update_storage_stats(context, workload.id)
             try:
                 backup_target.purge_snapshot_from_staging_area(
                     context, {'workload_id': workload.id, 'snapshot_id': snapshot.id})
@@ -1464,7 +1463,6 @@ class WorkloadMgrManager(manager.SchedulerDependentManager):
                                 {'status': 'done',
                                  'finished_at': timeutils.utcnow(),
                                  'status_messages': status_messages})
-            workload_utils.update_storage_stats(context, snapshot.workload_id)
 
         self.pool.submit(execute, context, snapshot_id, task_id)
 
