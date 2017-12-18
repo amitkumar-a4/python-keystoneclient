@@ -4267,15 +4267,16 @@ def get_tenants_usage(context, **kwargs):
     try:
         tenant_chargeback = {}
         session = get_session()
-        qry = session.query(models.Workloads.project_id, func.sum(cast(models.WorkloadMetadata.value, Integer))).join(models.WorkloadMetadata).filter(models.WorkloadMetadata.key.in_(['workload_size'])).group_by(models.Workloads.project_id)
+        qry = session.query(models.Workloads.project_id, func.sum(cast(models.WorkloadMetadata.value, Integer))).join(
+            models.WorkloadMetadata).filter(models.WorkloadMetadata.key.in_(['workload_size'])).group_by(models.Workloads.project_id)
         result = qry.all()
-        for proj_id,storage_used in result:
+        for proj_id, storage_used in result:
             if proj_id not in tenant_chargeback:
                 tenant_chargeback[proj_id] = {}
             tenant_chargeback[proj_id]['used_capacity'] = int(storage_used)
 
-
-        qry = session.query(models.Workloads.project_id, func.count(models.WorkloadVMs)).join(models.WorkloadVMs).group_by(models.Workloads.project_id).filter_by(deleted=False)
+        qry = session.query(models.Workloads.project_id, func.count(models.WorkloadVMs)).join(
+            models.WorkloadVMs).group_by(models.Workloads.project_id).filter_by(deleted=False)
         result = qry.all()
         for proj_id, vm_protected in result:
             if proj_id not in tenant_chargeback:
