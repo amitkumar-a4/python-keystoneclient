@@ -31,6 +31,8 @@ class ViewBuilder(common.ViewBuilder):
         """Generic, non-detailed view of a policy."""
         d = {}
         d['id'] = policy['id']
+        d['created_at'] = policy['created_at']
+        d['updated_at'] = policy['created_at']
         d['status'] = policy['status']
         d['name'] = policy['display_name']
         d['description'] = policy['display_description']
