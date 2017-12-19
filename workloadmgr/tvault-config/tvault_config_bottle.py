@@ -3644,7 +3644,7 @@ def configure_service():
         if config_data['nodetype'] == 'controller' and config_data['enable_ha'] == 'on':
            replace_line(
             '/etc/corosync/corosync.conf',
-            '                bindnetaddr: ',
+            'bindnetaddr: ',
             '                bindnetaddr: '+config_data['bindaddr'])
            try:
                command = ['sudo', 'service', 'corosync', 'restart']
