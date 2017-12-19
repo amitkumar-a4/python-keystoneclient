@@ -4262,6 +4262,7 @@ def _config_backup_metadata_delete(context, metadata_ref, session):
     metadata_ref.delete(session=session)
 
 
+@require_admin_context
 def get_tenants_usage(context, **kwargs):
     """Give storage used by tenant workloads"""
     try:
