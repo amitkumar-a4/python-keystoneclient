@@ -3856,22 +3856,24 @@ class API(base.Base):
             search_opts = {'all_tenants': 1}
             servers = nova_client.servers.list(search_opts=search_opts)
             tenant_wise_servers = {}
-            for server in  servers:
+            for server in servers:
                 if server.tenant_id not in tenant_wise_servers:
                     tenant_wise_servers[server.tenant_id] = [server.id]
                 else:
                     tenant_wise_servers[server.tenant_id].append(server.id)
             for tenant_id in tenant_wise_servers:
                 if tenant_id in tenants_usage:
-                    protected = len(set(tenants_usage[tenant_id]['vms_protected']).intersection(set(tenant_wise_servers[tenant_id])))
-                    passively_protected = len(set(tenants_usage[tenant_id]['vms_protected']).difference(set(tenant_wise_servers[tenant_id])))
+                    protected = len(set(tenants_usage[tenant_id]['vms_protected']).intersection(
+                        set(tenant_wise_servers[tenant_id])))
+                    passively_protected = len(set(tenants_usage[tenant_id]['vms_protected']).difference(
+                        set(tenant_wise_servers[tenant_id])))
                     tenants_usage[tenant_id]['vms_protected'] = protected
-                    tenants_usage[tenant_id]['total_vms'] = len(tenant_wise_servers[tenant_id])
+                    tenants_usage[tenant_id]['total_vms'] = len(
+                        tenant_wise_servers[tenant_id])
                     tenants_usage[tenant_id]['passively_protected'] = passively_protected
                 else:
-                    tenants_usage[tenant_id]['vms_protected'] = 0
-                    tenants_usage[tenant_id]['total_vms'] = len(tenant_wise_servers[tenant_id])
-                    tenants_usage[tenant_id]['passively_protected'] = 0
+                    tenants_usage[tenant_id] = {'vms_protected': 0, 'total_vms': len(
+                        tenant_wise_servers[tenant_id]), 'used_capacity': 0, 'passively_protected': 0}
 
             # Update tenants_usage for those tenants which doesn't have any workloads
             clients.initialise()
@@ -3881,7 +3883,9 @@ class API(base.Base):
             for tenant in tenants:
                 if tenant.id not in tenants_usage:
                     tenants_usage[tenant.id] = {
-                        'vms_protected': 0, 'total_vms': 0, 'used_capacity': 0, 'passively_protected': 0}
+                        'vms_protected': 0, 'total_vms': 0, 'used_capacity': 0, 'passively_protected': 0, 'tenant_name': tenant.name}
+                else:
+                    tenants_usage[tenant.id]['tenant_name'] = tenant.name
 
             backends_storage_stats = self.get_storage_usage(context)
 
