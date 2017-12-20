@@ -184,6 +184,8 @@ def enable_ha():
      node_number = 0
      no_match = False
      for child in root:
+         if len(child.getchildren()) == 0:
+            continue 
          node_list.append(child.get('uname'))
          for c1 in child.getchildren():
              for c2 in c1.getchildren():
@@ -222,7 +224,7 @@ def enable_ha():
         fl.write(data)
         fl.close()
 
-        data1 = "global\nchroot  /var/lib/haproxy\ndaemon\ngroup  haproxy\nmaxconn  4000\npidfile  /var/run/haproxy.pid\nuser  haproxy\n\ndefaults\nlog  global\nmaxconn  4000\noption  redispatch\nretries  3\ntimeout  http-request 10s\ntimeout  queue 1m\ntimeout  connect 10s\ntimeout  client 1m\ntimeout  server 1m\ntimeout  check 10s\n\nlisten galera_cluster\nbind "+virtual_ip+":33308\nbalance roundrobin\noption tcpka\noption mysql-check user haproxy\n"+mysql_ha_string+"\nlisten wlm_api_cluster\nbind "+virtual_ip+":8781\nbalance roundrobin\noption  tcpka\noption  httpchk\n"+api_ha_string
+        data1 = "global\nchroot  /var/lib/haproxy\ndaemon\ngroup  haproxy\nmaxconn  4000\npidfile  /var/run/haproxy.pid\nuser  haproxy\n\ndefaults\nlog  global\nmaxconn  4000\noption  redispatch\nretries  3\ntimeout  http-request 10s\ntimeout  queue 1m\ntimeout  connect 10s\ntimeout  client 1m\ntimeout  server 1m\ntimeout  check 10s\n\nlisten galera_cluster\nbind "+virtual_ip+":33308\nbalance roundrobin\noption tcpka\n#option mysql-check user haproxy\n"+mysql_ha_string+"\nlisten wlm_api_cluster\nbind "+virtual_ip+":8781\nbalance roundrobin\noption  tcpka\noption  httpchk\n"+api_ha_string
         fl = open("/etc/haproxy/haproxy.cfg", "w+")
         fl.write(data1)
         fl.close()
@@ -262,57 +264,55 @@ def enable_ha():
                   subprocess.check_call(command, shell=True) """
 
 
-        command = 'service rabbitmq-server stop'
-        subprocess.check_call(command, shell=True)
-
-        command = 'sshpass -p "'+CONF.rabbit_password+'" scp -o StrictHostKeyChecking=no  root@'+node_list_ip[0]+':/var/lib/rabbitmq/.erlang.cookie /var/lib/rabbitmq/.erlang.cookie'
-        subprocess.check_call(command, shell=True)
-
-        command = 'chown rabbitmq:rabbitmq /var/lib/rabbitmq/.erlang.cookie'
-        subprocess.check_call(command, shell=True)
-        command = 'chmod 400 /var/lib/rabbitmq/.erlang.cookie'
-        subprocess.check_call(command, shell=True)
-        command = 'service rabbitmq-server start'
-        subprocess.check_call(command, shell=True)
-
-        command = 'rabbitmqctl stop_app'
-        subprocess.check_call(command, shell=True)
-        command = 'rabbitmqctl force_reset'
-        subprocess.check_call(command, shell=True)
-        if node_number != 1:
-           try:
-               command = 'rabbitmqctl join_cluster --ram rabbit@'+node_list[0]
-               subprocess.check_call(command, shell=True)
-           except:
-                  pass
-        command = 'rabbitmqctl start_app'
-        subprocess.check_call(command, shell=True)
-        command = 'rabbitmqctl change_password guest '+CONF.rabbit_password
-        subprocess.check_call(command, shell=True)
-
-        command = 'service rabbitmq-server restart'
-        subprocess.check_call(command, shell=True)
-
-        if node_number == 1:
-           command = "rabbitmqctl set_policy ha-all '^(?!amq\.).*' '{\"ha-mode\": \"all\"}'"
-           subprocess.check_call(command, shell=True)
-
         command = 'crm node attribute '+node_host_name+' set configured yes'
         subprocess.check_call(command, shell=True)
         threading.Timer(5.0, enable_ha).start()
 
      elif len(configured_host) >= 1 and (node_list[0] == configured_host[0] or node_list[0] == once_node[0]) and node_host_name in configured_host:
 
+          command = 'service rabbitmq-server stop'
+          subprocess.check_call(command, shell=True)
+
+          command = 'sshpass -p "'+CONF.rabbit_password+'" scp -o StrictHostKeyChecking=no  root@'+node_list_ip[0]+':/var/lib/rabbitmq/.erlang.cookie /var/lib/rabbitmq/.erlang.cookie'
+          subprocess.check_call(command, shell=True)
+
+          command = 'chown rabbitmq:rabbitmq /var/lib/rabbitmq/.erlang.cookie'
+          subprocess.check_call(command, shell=True)
+          command = 'chmod 400 /var/lib/rabbitmq/.erlang.cookie'
+          subprocess.check_call(command, shell=True)
+          command = 'service rabbitmq-server start'
+          subprocess.check_call(command, shell=True)
+
+          command = 'rabbitmqctl stop_app'
+          subprocess.check_call(command, shell=True)
+          command = 'rabbitmqctl force_reset'
+          subprocess.check_call(command, shell=True)
+          if node_number != 1:
+             try:
+                 command = 'rabbitmqctl join_cluster --ram rabbit@'+node_list[0]
+                 subprocess.check_call(command, shell=True)
+             except:
+                  pass
+          command = 'rabbitmqctl start_app'
+          subprocess.check_call(command, shell=True)
+          command = 'rabbitmqctl change_password guest '+CONF.rabbit_password
+          subprocess.check_call(command, shell=True)
+
+          command = 'service rabbitmq-server restart'
+          subprocess.check_call(command, shell=True)
+
           if node_number == 1:
-             command = "mysql -h"+node_address+" -u root -p"+CONF.rabbit_password+" -e \"SHOW STATUS LIKE 'wsrep_cluster_size'\""
-             result = subprocess.check_output(command, shell=True)
-             if result == "" or (result != '' and int(result.split('\n')[1].split('\t')[1]) <= 0):
-                command = 'service mysql start --wsrep-new-cluster'
-                subprocess.check_call(command, shell=True)
-             elif result != '' and int(result.split('\n')[1].split('\t')[1]) > 1:
-                  command = 'service mysql restart'
-                  subprocess.check_call(command, shell=True)
-          else:
+             command = "rabbitmqctl set_policy ha-all '^(?!amq\.).*' '{\"ha-mode\": \"all\"}'"
+             subprocess.check_call(command, shell=True)
+
+
+          command = "mysql -h"+node_address+" -u root -p"+CONF.rabbit_password+" -e \"SHOW STATUS LIKE 'wsrep_cluster_size'\""
+          result = subprocess.check_output(command, shell=True)
+
+          if result == "" or (result != '' and int(result.split('\n')[1].split('\t')[1]) <= 0):
+               command = 'service mysql start --wsrep-new-cluster'
+               subprocess.check_call(command, shell=True)
+          elif result != '' and int(result.split('\n')[1].split('\t')[1]) > 1:
                command = 'service mysql restart'
                subprocess.check_call(command, shell=True)
 
