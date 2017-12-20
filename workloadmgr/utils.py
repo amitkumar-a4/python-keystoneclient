@@ -49,7 +49,6 @@ from workloadmgr.openstack.common import timeutils
 
 from tzlocal import get_localzone
 
-
 LOG = logging.getLogger(__name__)
 ISO_TIME_FORMAT = "%Y-%m-%dT%H:%M:%S"
 PERFECT_TIME_FORMAT = "%Y-%m-%dT%H:%M:%S.%f"
@@ -1609,3 +1608,4 @@ def get_local_time(record_time, input_format, output_format, tz):
     except Exception as ex:
         LOG.exception(ex)
         return record_time
+
