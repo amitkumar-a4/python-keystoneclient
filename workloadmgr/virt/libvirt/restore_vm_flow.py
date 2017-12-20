@@ -163,7 +163,7 @@ class PrepareBackupImage(task.Task):
                pass"""
         image_info = qemuimages.qemu_img_info(resource_snap_path)
 
-        if snapshot_vm_resource.resource_name == 'vda' and db.get_metadata_value(
+        if snapshot_vm_resource.resource_name in ('vda', 'sda') and db.get_metadata_value(
                 snapshot_vm_resource.metadata, 'image_id') is not None:
             # upload the bottom of the chain to glance
             while image_info.backing_file:
@@ -1490,7 +1490,7 @@ def RestoreInstance(context, instance, snapshotobj, restore_id):
     for snapshot_vm_resource in snapshot_vm_resources:
         if snapshot_vm_resource.resource_type != 'disk':
             continue
-        if snapshot_vm_resource.resource_name != 'vda':
+        if not snapshot_vm_resource.resource_name in ('vda', 'sda'):
             continue
         if db.get_metadata_value(snapshot_vm_resource.metadata, 'image_id'):
             flow.add(RestoreInstanceFromImage("RestoreInstanceFromImage" +
@@ -1520,7 +1520,7 @@ def AttachVolumes(context, instance, snapshotobj, restore_id):
     for snapshot_vm_resource in snapshot_vm_resources:
         if snapshot_vm_resource.resource_type != 'disk':
             continue
-        if snapshot_vm_resource.resource_name == 'vda':
+        if snapshot_vm_resource.resource_name in ('vda', 'sda'):
             continue
         if db.get_metadata_value(snapshot_vm_resource.metadata, 'volume_id'):
             flow.add(AttachVolume("AttachVolume" +
