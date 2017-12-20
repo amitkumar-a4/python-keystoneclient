@@ -873,6 +873,7 @@ class LibvirtDriver(driver.ComputeDriver):
                 'disk_info': json.dumps(disk_info)}
             if disk_info['dev'] in ('vda', 'sda') and nova_instance.image and len(
                     nova_instance.image) > 0:
+
                 try:
                     glance_image = image_service.show(
                         cntx, nova_instance.image['id'])
@@ -882,6 +883,14 @@ class LibvirtDriver(driver.ComputeDriver):
                     snapshot_vm_resource_metadata['disk_format'] = glance_image['disk_format']
                     snapshot_vm_resource_metadata['min_ram'] = glance_image['min_ram']
                     snapshot_vm_resource_metadata['min_disk'] = glance_image['min_disk']
+
+                    d = {}
+                    for prop in  glance_image['properties'].keys():
+                        if prop != 'hw_qemu_guest_agent':
+                            d[prop] = glance_image['properties'][prop]
+                    if len(d) > 0:
+                        snapshot_vm_resource_metadata['iprops'] = json.dumps(d)
+
                     if 'hw_qemu_guest_agent' in glance_image['properties'].keys():
                         snapshot_vm_resource_metadata['hw_qemu_guest_agent'] = glance_image['properties']['hw_qemu_guest_agent']
                 except exception.ImageNotFound as ex:

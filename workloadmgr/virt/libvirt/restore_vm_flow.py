@@ -133,8 +133,8 @@ class PrepareBackupImage(task.Task):
         return self.revert_with_log(*args, **kwargs)
 
     @autolog.log_method(Logger, 'PrepareBackupImage.execute')
-    def execute_with_log(self, context, restore_id,
-                         vm_resource_id, volume_type):
+    def execute_with_log(self, context, restore_id, vm_resource_id, volume_type):
+        disk_name = 'vda'
         db = WorkloadMgrDB().db
         self.cntx = amqp.RpcContext.from_dict(context)
 
@@ -177,7 +177,7 @@ class PrepareBackupImage(task.Task):
             image_overlay_file_path = 'not-applicable'
             image_virtual_size = image_info.virtual_size
 
-        return restore_file_path, image_overlay_file_path, image_virtual_size
+        return restore_file_path, disk_name, image_overlay_file_path, image_virtual_size
 
         """
         if db.get_metadata_value(snapshot_vm_resource.metadata, 'image_id') == None and \
@@ -342,8 +342,13 @@ class UploadImageToGlance(task.Task):
         self.cntx = nova._get_tenant_context(self.cntx)
 
         # Add hw_qemu_guest_agent information to image metadata if available
-        status_hw_qemu_guest_agent = db.get_metadata_value(
-            snapshot_vm_resource.metadata, 'hw_qemu_guest_agent')
+        image_properties = db.get_metadata_value(snapshot_vm_resource.metadata, 'iprops')
+        if image_properties is not None and len(image_properties) > 1:
+           props = json.loads(image_properties)
+           for prop in props:
+               image_metadata['properties'][prop] = props[prop]
+ 
+        status_hw_qemu_guest_agent = db.get_metadata_value(snapshot_vm_resource.metadata, 'hw_qemu_guest_agent')
         if str(status_hw_qemu_guest_agent).lower() in ['yes', 'no']:
             image_metadata['properties']['hw_qemu_guest_agent'] = status_hw_qemu_guest_agent
 
@@ -1391,8 +1396,8 @@ def LinearPrepareBackupImages(
                                     rebind=dict(vm_resource_id=snapshot_vm_resource.id,
                                                 volume_type='volume_type_' + snapshot_vm_resource.id),
                                     provides=('restore_file_path_' + str(snapshot_vm_resource.id),
-                                              'image_overlay_file_path_' +
-                                              str(snapshot_vm_resource.id),
+                                              'disk_name_' + snapshot_vm_resource.resource_name,
+                                              'image_overlay_file_path_' + str(snapshot_vm_resource.id),
                                               'image_virtual_size_' + str(snapshot_vm_resource.id))))
     return flow
 
@@ -1493,13 +1498,13 @@ def RestoreInstance(context, instance, snapshotobj, restore_id):
         if not snapshot_vm_resource.resource_name in ('vda', 'sda'):
             continue
         if db.get_metadata_value(snapshot_vm_resource.metadata, 'image_id'):
-            flow.add(RestoreInstanceFromImage("RestoreInstanceFromImage" +
-                                              instance['vm_id'], rebind=dict(image_id='image_id_' +
-                                                                             str(snapshot_vm_resource.id)), provides='restored_instance_id'))
+            flow.add(RestoreInstanceFromImage("RestoreInstanceFromImage" + instance['vm_id'],
+                                rebind=dict(image_id='image_id_' + str(snapshot_vm_resource.id)),
+                                provides='restored_instance_id'))            
         else:
-            flow.add(RestoreInstanceFromVolume("RestoreInstanceFromVolume" +
-                                               instance['vm_id'], rebind=dict(volume_id='volume_id_' +
-                                                                              str(snapshot_vm_resource.id)), provides='restored_instance_id'))
+            flow.add(RestoreInstanceFromVolume("RestoreInstanceFromVolume" + instance['vm_id'],
+                                rebind=dict(volume_id='volume_id_' + str(snapshot_vm_resource.id), disk_name='disk_name_'+snapshot_vm_resource.resource_name),
+                                provides='restored_instance_id'))
     return flow
 
 
@@ -1592,7 +1597,6 @@ def AssignFloatingIPFlow(context):
 
 
 def FreezeNThawFlow(context):
-
     flow = lf.Flow("freezenthawlf")
     flow.add(
         FreezeVM(

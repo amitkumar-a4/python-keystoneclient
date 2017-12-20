@@ -27,7 +27,6 @@ BASE = declarative_base()
 
 DB_VERSION = '2.6.14'
 
-
 class WorkloadsBase(object):
     """Base class for Workloads Models."""
     __table_args__ = {'mysql_engine': 'InnoDB'}
