@@ -3868,6 +3868,7 @@ class API(base.Base):
                     passively_protected = len(set(tenants_usage[tenant_id]['vms_protected']).difference(
                         set(tenant_wise_servers[tenant_id])))
                     tenants_usage[tenant_id]['vms_protected'] = protected
+                    total_vms_protected += protected
                     tenants_usage[tenant_id]['total_vms'] = len(
                         tenant_wise_servers[tenant_id])
                     tenants_usage[tenant_id]['passively_protected'] = passively_protected
