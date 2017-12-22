@@ -787,7 +787,7 @@ class APIRouter(workloadmgr.api.APIRouter):
                        "/{project_id}/workload_policy/{policy_id}/assign",
                        controller=self.resources['workload_policy'],
                        action='policy_assign',
-                       conditions={"method": ['PUT']})
+                       conditions={"method": ['POST']})
 
         mapper.connect("list_assigned_policies",
                        "/{project_id}/workload_policy/assigned/{tenant_id}",
