@@ -4105,3 +4105,67 @@ class API(base.Base):
         """
         policy_fields = self.db.policy_fields_get_all(context)
         return policy_fields
+
+    @autolog.log_method(logger=Logger)
+    @wrap_check_policy
+    def get_tenants_usage(self, context):
+        """
+        Get storage used and vm's protected by different tenants.
+        """
+        try:
+            total_usage = 0
+            total_capacity = 0
+            total_vms_protected = 0
+            tenants_usage = self.db.get_tenants_usage(
+                context)
+            nova_client = workloadmgr_keystoneclient.KeystoneClientBase(
+                context).nova_client
+            search_opts = {'all_tenants': 1}
+            servers = nova_client.servers.list(search_opts=search_opts)
+            tenant_wise_servers = {}
+            for server in servers:
+                if server.tenant_id not in tenant_wise_servers:
+                    tenant_wise_servers[server.tenant_id] = [server.id]
+                else:
+                    tenant_wise_servers[server.tenant_id].append(server.id)
+            for tenant_id in tenant_wise_servers:
+                if tenant_id in tenants_usage:
+                    protected = len(set(tenants_usage[tenant_id]['vms_protected']).intersection(
+                        set(tenant_wise_servers[tenant_id])))
+                    passively_protected = len(set(tenants_usage[tenant_id]['vms_protected']).difference(
+                        set(tenant_wise_servers[tenant_id])))
+                    tenants_usage[tenant_id]['vms_protected'] = protected
+                    tenants_usage[tenant_id]['total_vms'] = len(
+                        tenant_wise_servers[tenant_id])
+                    tenants_usage[tenant_id]['passively_protected'] = passively_protected
+                else:
+                    tenants_usage[tenant_id] = {'vms_protected': 0, 'total_vms': len(
+                        tenant_wise_servers[tenant_id]), 'used_capacity': 0, 'passively_protected': 0}
+
+            # Update tenants_usage for those tenants which doesn't have any workloads
+            clients.initialise()
+            keystoneclient = clients.Clients(context).client("keystone")
+            tenants = keystoneclient.client.projects.list()
+
+            for tenant in tenants:
+                if tenant.id not in tenants_usage:
+                    tenants_usage[tenant.id] = {
+                        'vms_protected': 0, 'total_vms': 0, 'used_capacity': 0, 'passively_protected': 0, 'tenant_name': tenant.name}
+                else:
+                    tenants_usage[tenant.id]['tenant_name'] = tenant.name
+
+            backends_storage_stats = self.get_storage_usage(context)
+
+            for backend in backends_storage_stats['storage_usage']:
+                total_capacity += int(backend['total_capacity'])
+                total_usage += int(backend['total_utilization'])
+            global_usage = {'total_capacity': total_capacity, 'total_usage': total_usage, 'total_vms': len(
+                servers), 'vms_protected': total_vms_protected}
+            return {'tenants_usage': tenants_usage,
+                    'global_usage': global_usage}
+        except Exception as ex:
+            LOG.exception(ex)
+            raise wlm_exceptions.ErrorOccurred(
+                reason=ex.message %
+                (ex.kwargs if hasattr(
+                    ex, 'kwargs') else {}))
