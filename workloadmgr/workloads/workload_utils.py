@@ -881,3 +881,4 @@ def get_compute_nodes(context, host=None, up_only=False):
         return contego_nodes
     except Exception as ex:
         raise ex
+

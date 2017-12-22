@@ -781,3 +781,7 @@ def policy_assignment_get(context, assignment_id, **kwargs):
 def policy_assignment_delete(context, assignment_id, **kwargs):
     """delete policy assignment"""
     return IMPL.policy_assignment_delete(context, assignment_id, **kwargs)
+
+def get_tenants_usage(context, **kwargs):
+    """Get storage usage of a tenant."""
+    return IMPL.get_tenants_usage(context, **kwargs)

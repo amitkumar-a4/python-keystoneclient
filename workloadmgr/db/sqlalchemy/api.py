@@ -20,9 +20,10 @@ import sqlalchemy.sql as sa_sql
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy import or_
 from sqlalchemy.orm import joinedload
-from sqlalchemy.sql.expression import literal_column
+from sqlalchemy.sql.expression import literal_column, cast
 from sqlalchemy.sql import func
 from sqlalchemy import and_
+from sqlalchemy import Integer
 
 from workloadmgr.common import sqlalchemyutils
 from workloadmgr import db
@@ -725,8 +726,12 @@ def workload_get_all(context, **kwargs):
                             models.Workloads.deleted_at > func.adddate(
                                 func.now(),
                                 time_delta)))
-        if 'all_workloads' in kwargs and kwargs['all_workloads'] is not True:
+
+        if 'project_id' in kwargs and kwargs['project_id'] is not None and kwargs['project_id'] != '':
+            qs = qs.filter_by(project_id=kwargs['project_id'])
+        elif 'all_workloads' in kwargs and kwargs['all_workloads'] is not True:
             qs = qs.filter_by(project_id=context.project_id)
+
     else:
         qs = qs.filter_by(project_id=context.project_id)
     if 'project_list' and 'user_list' in kwargs:
@@ -4649,3 +4654,29 @@ def policy_assignment_delete(context, id, **kwargs):
     with session.begin():
         session.query(models.WorkloadPolicyAssignmnets). \
             filter_by(id=id).delete()
+
+@require_admin_context
+def get_tenants_usage(context, **kwargs):
+    """Give storage used by tenant workloads"""
+    try:
+        tenant_chargeback = {}
+        session = get_session()
+        qry = session.query(models.Snapshots.project_id, func.sum(cast(models.Snapshots.size, Integer))).\
+              group_by(models.Snapshots.project_id)
+        result = qry.all()
+        for proj_id, storage_used in result:
+            if proj_id not in tenant_chargeback:
+                tenant_chargeback[proj_id] = {}
+                tenant_chargeback[proj_id]['vms_protected'] = []
+            tenant_chargeback[proj_id]['used_capacity'] = int(storage_used)
+
+        qry = session.query(models.Workloads.project_id, models.WorkloadVMs.vm_id).join(
+            models.WorkloadVMs).filter_by(deleted=False)
+        result = qry.all()
+        for proj_id, vm_protected in result:
+            tenant_chargeback[proj_id]['vms_protected'].append(vm_protected)
+
+        return tenant_chargeback
+    except Exception as ex:
+        LOG.exception(ex)
+        
