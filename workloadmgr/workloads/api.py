@@ -927,13 +927,6 @@ class API(base.Base):
                        'host': socket.gethostname(), }
             workload = self.db.workload_create(context, options)
 
-            if policy_id is not None:
-                values = {'policy_id': policy_id, 'workload_id': workload.id}
-                policy_assignment = self.db.policy_assignment_create(
-                    context, values)
-                self.db.workload_update(context, workload.id, {'metadata': {
-                                        'policy_assignment_id': policy_assignment.id}})
-
             for instance in instances:
                 values = {'workload_id': workload.id,
                           'vm_id': instance['instance-id'],
@@ -1061,15 +1054,18 @@ class API(base.Base):
             options['metadata'] = workload['metadata']
             if 'policy_id' in workload['metadata'] and workload['metadata']['policy_id'] is not None:
                 policy_id = workload['metadata']['policy_id']
+                available_policies = self.get_assigned_policies(
+                    context, context.project_id)
+
+                if policy_id not in available_policies:
+                    message = "Policy %s is not assigned to project %s" % (
+                        policy_id, context.project_id)
+                    raise wlm_exceptions.ErrorOccurred(message)
+
                 if 'jobschedule' not in workload:
                     workload['jobschedule'] = {}
                 self._apply_workload_policy(
                     context, policy_id, workload['jobschedule'])
-                for k, v in workloadobj['metadata'].iteritems():
-                    if k == "policy_assignment_id":
-                        values = {'policy_id': policy_id,
-                                  'workload_id': workload_id}
-                        self.db.policy_assignment_update(context, v, values)
 
         if 'jobschedule' in workload and workload['jobschedule'] and self._scheduler.running:
 
@@ -1393,6 +1389,13 @@ class API(base.Base):
             import_settings_method = getattr(import_workload_module,
                                              'import_settings')
             import_settings_method(context, models.DB_VERSION)
+
+            # Import Workload policies
+            import_policy_module = importlib.import_module(
+                "workloadmgr.db.imports.import_workload_1_0_177")
+            import_policy_method = getattr(import_policy_module,
+                                           'import_policy')
+            import_policy_method(context, models.DB_VERSION)
 
             self.workload_ensure_global_job_scheduler(context)
 
@@ -3298,7 +3301,7 @@ class API(base.Base):
                    u'user_id': context.user_id,
                    u'is_public': False,
                    u'is_hidden': True,
-                   u'metadata': {'filename':license_data['file_name']},
+                   u'metadata': {'filename': license_data['file_name']},
                    u'type': "license_key", }
         created_license = []
         try:
@@ -3920,6 +3923,7 @@ class API(base.Base):
                        'field_values': field_values}
             policy = self.db.policy_create(context, options)
 
+            workload_utils.upload_policy_db_entry(context, policy.id)
             AUDITLOG.log(context, 'Policy \'' +
                          policy['display_name'] + '\' Create Submitted', policy)
             return self.db.policy_get(context, policy['id'])
@@ -3944,7 +3948,7 @@ class API(base.Base):
                          policy['display_name'] + '\' Update Requested', None)
 
             policy_assignments = self.db.policy_assignments_get_all(
-                context, policy_id=policy_id)
+                context, policy_id=policy_id, workloads=True)
             if len(policy_assignments) > 0:
                 raise wlm_exceptions.ErrorOccurred(
                     reason="Can not update policy: %s. It's assigned to workloads." % (policy_id))
@@ -3961,6 +3965,7 @@ class API(base.Base):
 
             policy = self.db.policy_update(context, policy_id, values)
 
+            workload_utils.upload_policy_db_entry(context, policy_id)
             AUDITLOG.log(context, 'Policy \'' +
                          policy['display_name'] + '\' Update Submitted', policy)
             return policy
@@ -3998,23 +4003,23 @@ class API(base.Base):
         Delete the given policy.
         """
         try:
+            policy = self.db.policy_get(context, policy_id)
             AUDITLOG.log(context, 'Policy \'' +
                          policy['display_name'] + '\' Delete Requested', None)
 
-            policy = self.db.policy_get(context, policy_id)
             policy_assignments = self.db.policy_assignments_get_all(
-                context, policy_id=policy_id)
+                context, policy_id=policy_id, workloads=True)
             if len(policy_assignments) > 0:
                 raise wlm_exceptions.ErrorOccurred(
                     reason="Can not delete policy: %s. It's assigned to workloads." % (policy_id))
 
             self.db.policy_delete(context, policy_id)
+            workload_utils.policy_delete(context, policy_id)
             AUDITLOG.log(context, 'Policy \'' +
                          policy['display_name'] + '\' Delete Submitted', None)
         except Exception as ex:
             LOG.exception(ex)
             raise
-
 
     @wrap_check_policy
     def policy_assign(self, context, policy_id, add_projects, remove_projects):
@@ -4023,12 +4028,13 @@ class API(base.Base):
         """
         try:
             failed_project_ids = []
-            #Remove those project id's which are wrong.
+            # Remove those project id's which are wrong.
             try:
                 for project_id in add_projects[:]:
                     # Validate tenant_id existance
                     clients.initialise()
-                    keystoneclient = clients.Clients(context).client("keystone")
+                    keystoneclient = clients.Clients(
+                        context).client("keystone")
                     project = keystoneclient.client.projects.get(project_id)
             except Exception as ex:
                 failed_project_ids.append(project_id)
@@ -4037,23 +4043,24 @@ class API(base.Base):
             # Validate policy_id
             policy = self.db.policy_get(context, policy_id)
 
-            assigned_projects = []
-            for meta in policy.metadata:
-                if meta.key == "assigned_projects":
-                    assigned_projects = pickle.loads(str(meta.value))
+            policy_assignments = self.db.policy_assignments_get_all(
+                context, policy_id=policy_id)
 
-            if len(remove_projects)>0:
-                #Taking wrong id's for tenants from remove projects.
-                failed_project_ids.extend(list(set(remove_projects).difference(set(assigned_projects))))
+            for pa in policy_assignments:
+                if pa.project_id in remove_projects:
+                    self.db.policy_assignment_delete(context, pa.id)
+                    remove_projects.remove(pa.project_id)
+                elif pa.project_id in add_projects:
+                    add_projects.remove(pa.project_id)
 
-                #Remove projects
-                assigned_projects = list(set(assigned_projects).difference(set(remove_projects)))
+            if len(remove_projects) > 0:
+                failed_project_ids.extend(remove_projects)
 
-            #Add new projects
-            assigned_projects.extend(add_projects)
-            metadata = {'assigned_projects': pickle.dumps(list(set(assigned_projects)))}
-            policy = self.db.policy_update(context, policy_id, {'metadata': metadata})
+            for proj_id in add_projects:
+                values = {'policy_id': policy_id, 'project_id': proj_id}
+                self.db.policy_assignment_create(context, values)
 
+            policy = self.db.policy_get(context, policy_id)
             return (policy, failed_project_ids)
         except Exception as ex:
             LOG.exception(ex)
@@ -4065,14 +4072,10 @@ class API(base.Base):
         list the policies which are assigned to given project
         """
         try:
-            assigned_policies = []
-            policies = self.db.policy_get_all(context)
-            for policy in policies:
-                for meta in policy.metadata:
-                    if meta.key == "assigned_projects":
-                        assigned_projects = pickle.loads(str(meta.value))
-                        if project_id in assigned_projects:
-                            assigned_policies.append(policy.id)
+            assignments = self.db.policy_assignments_get_all(
+                context, project_id=project_id)
+            assigned_policies = [
+                assignment.policy_id for assignment in assignments]
             return assigned_policies
         except Exception as ex:
             LOG.exception(ex)

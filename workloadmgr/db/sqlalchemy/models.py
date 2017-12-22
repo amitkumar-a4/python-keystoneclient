@@ -25,9 +25,7 @@ FLAGS = flags.FLAGS
 BASE = declarative_base()
 
 
-
 DB_VERSION = '2.6.14'
-
 
 
 class WorkloadsBase(object):
@@ -793,6 +791,7 @@ class ConfigBackupMetadata(BASE, WorkloadsBase):
     key = Column(String(255), index=True, nullable=False)
     value = Column(Text)
 
+
 class WorkloadPolicy(BASE, WorkloadsBase):
     """Workload policy"""
     __tablename__ = 'workload_policy'
@@ -846,8 +845,9 @@ class WorkloadPolicyAssignmnets(BASE, WorkloadsBase):
     id = Column(String(255), primary_key=True)
     policy_id = Column(String(255), ForeignKey(
         'workload_policy.id'), nullable=False)
-    workload_id = Column(String(255), ForeignKey(
-        'workloads.id'), nullable=False)
+    project_id = Column(String(255), nullable=False)
+    policy_assignments = relationship(
+        WorkloadPolicy, backref=backref('policy_assignments'))
 
 
 def register_models():

@@ -772,7 +772,7 @@ class APIRouter(workloadmgr.api.APIRouter):
                        conditions={"method": ['GET']})
 
         mapper.connect("workload_policy_list",
-                       "/{project_id}/workload_policies/",
+                       "/{project_id}/workload_policy/",
                        controller=self.resources['workload_policy'],
                        action='policy_get_all',
                        conditions={"method": ['GET']})
@@ -790,7 +790,7 @@ class APIRouter(workloadmgr.api.APIRouter):
                        conditions={"method": ['PUT']})
 
         mapper.connect("list_assigned_policies",
-                       "/{project_id}/assigned_policy/{tenant_id}",
+                       "/{project_id}/workload_policy/assigned/{tenant_id}",
                        controller=self.resources['workload_policy'],
                        action='get_assigned_policies',
                        conditions={"method": ['GET']})
@@ -806,4 +806,3 @@ class APIRouter(workloadmgr.api.APIRouter):
                        controller=self.resources['workload_policy'],
                        action='policy_field_list',
                        conditions={"method": ['GET']})
-        

@@ -1187,11 +1187,9 @@ CREATE TABLE `workload_policy_assignments` (
   `version` varchar(255) DEFAULT NULL,
   `id` varchar(255) NOT NULL,
   `policy_id` varchar(255) NOT NULL,
-  `workload_id` varchar(255) NOT NULL,
+  `project_id` varchar(255) NOT NULL,
   PRIMARY KEY (`id`),
-  KEY `workload_policy_assignments_workloads` (`workload_id`),
   KEY `workload_policy_assignments_workload_policy` (`policy_id`),
-  CONSTRAINT `workload_policy_assignments_workloads` FOREIGN KEY (`workload_id`) REFERENCES `workloads` (`id`),
   CONSTRAINT `workload_policy_assignmnents_workload_policy` FOREIGN KEY (`policy_id`) REFERENCES `workload_policy` (`id`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8;
 /*!40101 SET character_set_client = @saved_cs_client */;
@@ -1218,6 +1216,14 @@ CREATE TABLE `workload_policy_fields` (
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8;
 /*!40101 SET character_set_client = @saved_cs_client */;
 
+--
+-- Dumping data for table `workload_policy_fields`
+--
+LOCK TABLES `workload_policy_fields` WRITE;
+/*!40000 ALTER TABLE `workload_policy_fields` DISABLE KEYS */;
+INSERT INTO `workload_policy_fields` VALUES  (current_timestamp(),NULL,NULL,NULL,0,NULL,'5b2314a2-df38-495a-a2e0-9f16be1d7c3c','fullbackup_interval','text'),(current_timestamp(),NULL,NULL,NULL,0,NULL,'4b61711f-1110-4e5d-9976-5216a8c7eb85','interval','text'),(current_timestamp(),NULL,NULL,NULL,0,NULL,'22beaf15-d593-4774-a41f-af2ac5070238','retention_policy_type','text'),(current_timestamp(),NULL,NULL,NULL,0,NULL,'a3d67e8a-33b5-4f6e-8ac7-9583be4147b8','retention_policy_value','text');
+/*!40000 ALTER TABLE `workload_policy_fields` ENABLE KEYS */;
+UNLOCK TABLES;
 
 --
 -- Table structure for table `workload_policy_metadata`

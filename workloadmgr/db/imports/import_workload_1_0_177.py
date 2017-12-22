@@ -179,6 +179,25 @@ def import_settings(cntx, new_version, upgrade=True):
         LOG.exception(ex)
 
 
+def import_policy(cntx, new_version, upgrade=True):
+    try:
+        db = WorkloadMgrDB().db
+        backup_target, path = vault.get_settings_backup_target()
+        policy_path = backup_target.get_policy_path()
+        policy_db_files = [f for f in os.listdir(policy_path) if (
+            os.path.isfile(os.path.join(policy_path, f)), f.startswith("policy_"))]
+        for policy_db in policy_db_files:
+            policy_json = json.loads(backup_target.get_object(
+                os.path.join(policy_path, policy_db)))
+            policy_assignments = policy_json.pop('policy_assignments', [])
+            _adjust_values(cntx, new_version, policy_json, upgrade)
+            db.policy_create(cntx, policy_json)
+            if len(policy_assignments) > 0:
+                db.policy_assignment_create(cntx, policy_assignments)
+    except Exception as ex:
+        LOG.exception(ex)
+
+
 def update_backup_media_target(file_path, backup_endpoint):
     try:
         file_data = vault_backend.get_object(file_path)

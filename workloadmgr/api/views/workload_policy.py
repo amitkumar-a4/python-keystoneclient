@@ -53,6 +53,7 @@ class ViewBuilder(common.ViewBuilder):
         d['description'] = policy['display_description']
         d['field_values'] = policy['field_values']
         d['metadata'] = policy['metadata']
+        d['policy_assignments'] = policy['policy_assignments']
         return {'policy': d}
 
     def _list_view(self, func, request, policy_list):

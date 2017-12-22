@@ -1278,7 +1278,8 @@ def snapshot_get_all(context, **kwargs):
             qs = qs.filter(or_(models.Snapshots.status ==
                                'available', models.Snapshots.status == 'mounted'))
         elif kwargs['status'] == 'running':
-            qs = qs.filter(and_(models.Snapshots.status != 'available', models.Snapshots.status != 'mounted', models.Snapshots.status != 'error') )
+            qs = qs.filter(and_(models.Snapshots.status != 'available',
+                                models.Snapshots.status != 'mounted', models.Snapshots.status != 'error'))
         else:
             qs = qs.filter_by(status=kwargs['status'])
 
@@ -4261,7 +4262,7 @@ def _config_backup_metadata_delete(context, metadata_ref, session):
 # Workload Policy API's
 
 
-@require_context
+@require_admin_context
 def _policy_field_update(context, policy_field_id, values, session):
     if policy_field_id:
         policy_field_ref = _policy_field_get(context, policy_field_id, session)
@@ -4276,19 +4277,19 @@ def _policy_field_update(context, policy_field_id, values, session):
     return policy_field_ref
 
 
-@require_context
+@require_admin_context
 def policy_field_create(context, values, **kwargs):
     session = get_session()
     return _policy_field_update(context, None, values, session)
 
 
-@require_context
+@require_admin_context
 def policy_field_update(context, id, values, **kwargs):
     session = get_session()
     return _policy_field_update(context, id, values, session)
 
 
-@require_context
+@require_admin_context
 def policy_fields_get_all(context, **kwargs):
     session = get_session()
     try:
@@ -4303,13 +4304,13 @@ def policy_fields_get_all(context, **kwargs):
     return policy_fields
 
 
-@require_context
+@require_admin_context
 def policy_field_get(context, id, **kwargs):
     session = get_session()
     return _policy_field_get(context, id, session)
 
 
-@require_context
+@require_admin_context
 def _policy_field_get(context, id, session):
     try:
         policy_field = model_query(
@@ -4325,7 +4326,7 @@ def _policy_field_get(context, id, session):
     return policy_field
 
 
-@require_context
+@require_admin_context
 def policy_field_delete(context, id, **kwargs):
     session = get_session()
     with session.begin():
@@ -4336,7 +4337,7 @@ def policy_field_delete(context, id, **kwargs):
                     'updated_at': literal_column('updated_at')})
 
 
-@require_context
+@require_admin_context
 def _policy_update(context, values, policy_id, purge_metadata, session):
     metadata = values.pop('metadata', {})
     field_values = values.pop('field_values', {})
@@ -4359,19 +4360,19 @@ def _policy_update(context, values, policy_id, purge_metadata, session):
     return policy_ref
 
 
-@require_context
+@require_admin_context
 def policy_create(context, values, **kwargs):
     session = get_session()
     return _policy_update(context, values, None, False, session)
 
 
-@require_context
+@require_admin_context
 def policy_update(context, id, values, purge_metadata=False, **kwargs):
     session = get_session()
     return _policy_update(context, values, id, purge_metadata, session)
 
 
-@require_context
+@require_admin_context
 def policy_get_all(context, **kwargs):
     qs = model_query(context, models.WorkloadPolicy, read_deleted="no", **kwargs). \
         options(sa_orm.joinedload(models.WorkloadPolicy.metadata)). \
@@ -4380,13 +4381,13 @@ def policy_get_all(context, **kwargs):
     return qs.all()
 
 
-@require_context
 def _policy_get(context, id, session, **kwargs):
     try:
         policy = model_query(
             context, models.WorkloadPolicy, session=session, read_deleted="no", **kwargs). \
             options(sa_orm.joinedload(models.WorkloadPolicy.metadata)). \
             options(sa_orm.joinedload(models.WorkloadPolicy.field_values)). \
+            options(sa_orm.joinedload(models.WorkloadPolicy.policy_assignments)). \
             filter_by(id=id).first()
 
         if policy is None:
@@ -4398,13 +4399,13 @@ def _policy_get(context, id, session, **kwargs):
     return policy
 
 
-@require_context
+@require_admin_context
 def policy_get(context, id, **kwargs):
     session = get_session()
     return _policy_get(context, id, session, **kwargs)
 
 
-@require_context
+@require_admin_context
 def policy_delete(context, id, **kwargs):
     session = get_session()
     with session.begin():
@@ -4416,7 +4417,6 @@ def policy_delete(context, id, **kwargs):
                     'updated_at': literal_column('updated_at')})
 
 
-@require_context
 def _set_metadata_for_policy(context, policy_ref, metadata,
                              purge_metadata, session):
     """
@@ -4448,7 +4448,6 @@ def _set_metadata_for_policy(context, policy_ref, metadata,
                 _policy_metadata_delete(context, metadata_ref, session)
 
 
-@require_context
 def _policy_metadata_create(context, values, session):
     """Create an WorkloadPolicyMetadata object"""
     metadata_ref = models.WorkloadPolicyMetadata()
@@ -4457,14 +4456,13 @@ def _policy_metadata_create(context, values, session):
     return _policy_metadata_update(context, metadata_ref, values, session)
 
 
-@require_context
+@require_admin_context
 def policy_metadata_create(context, values, **kwargs):
     """Create an WorkloadPolicyMetadata object"""
     session = get_session()
     return _policy_metadata_create(context, values, session)
 
 
-@require_context
 def _policy_metadata_update(context, metadata_ref, values, session):
     """
     Used internally by policy_metadata_create and policy_metadata_update
@@ -4475,7 +4473,6 @@ def _policy_metadata_update(context, metadata_ref, values, session):
     return metadata_ref
 
 
-@require_context
 def _policy_metadata_delete(context, metadata_ref, session):
     """
     Used internally by policy_metadata_create and policy_metadata_update
@@ -4484,7 +4481,6 @@ def _policy_metadata_delete(context, metadata_ref, session):
     return metadata_ref
 
 
-@require_context
 def _set_field_values_for_policy(context, policy_ref, policy_field_values,
                                  session):
     """
@@ -4510,7 +4506,6 @@ def _set_field_values_for_policy(context, policy_ref, policy_field_values,
             _policy_value_create(context, field_values, session)
 
 
-@require_context
 def _policy_value_create(context, values, session):
     """Create an WorkloadPolicyValues object"""
     policy_value_ref = models.WorkloadPolicyValues()
@@ -4519,14 +4514,13 @@ def _policy_value_create(context, values, session):
     return _policy_value_update(context, policy_value_ref, values, session)
 
 
-@require_context
+@require_admin_context
 def policy_value_create(context, values, **kwargs):
     """Create an WorkloadPolicyValues object"""
     session = get_session()
     return _policy_value_create(context, values, session)
 
 
-@require_context
 def _policy_value_update(context, policy_value_ref, values, session):
     """
     Used internally by policy_value_create and policy_value_update
@@ -4537,7 +4531,7 @@ def _policy_value_update(context, policy_value_ref, values, session):
     return policy_value_ref
 
 
-@require_context
+@require_admin_context
 def policy_values_get_all(context, **kwargs):
     session = get_session()
     try:
@@ -4552,7 +4546,7 @@ def policy_values_get_all(context, **kwargs):
     return policy_values
 
 
-@require_context
+@require_admin_context
 def policy_value_get(context, id, **kwargs):
     session = get_session()
     try:
@@ -4570,7 +4564,7 @@ def policy_value_get(context, id, **kwargs):
     return policy_values
 
 
-@require_context
+@require_admin_context
 def policy_value_delete(context, id, **kwargs):
     session = get_session()
     with session.begin():
@@ -4581,7 +4575,6 @@ def policy_value_delete(context, id, **kwargs):
                     'updated_at': literal_column('updated_at')})
 
 
-@require_context
 def _policy_assignment_update(context, values, policy_assignment_id, session):
     if policy_assignment_id:
         policy_assignment_ref = _policy_assignment_get(
@@ -4597,36 +4590,42 @@ def _policy_assignment_update(context, values, policy_assignment_id, session):
     return policy_assignment_ref
 
 
-@require_context
+@require_admin_context
 def policy_assignment_create(context, values, **kwargs):
     session = get_session()
     return _policy_assignment_update(context, values, None, session)
 
 
-@require_context
+@require_admin_context
 def policy_assignment_update(context, id, values, **kwargs):
     session = get_session()
     return _policy_assignment_update(context, values, id, session)
 
 
-@require_context
+@require_admin_context
 def policy_assignments_get_all(context, **kwargs):
     session = get_session()
-    query = model_query(context, models.WorkloadPolicyAssignmnets, session=session,
-                        read_deleted="no")
+    query = session.query(models.WorkloadPolicyAssignmnets)
 
     if 'policy_id' in kwargs and kwargs['policy_id'] is not None:
         query = query.filter_by(policy_id=kwargs['policy_id'])
+
+    if 'project_id' in kwargs and kwargs['project_id'] is not None:
+        query = query.filter_by(project_id=kwargs['project_id'])
+
+    if (kwargs.get('workloads', False) is True) \
+       and ('policy_id' in kwargs and kwargs['policy_id'] is not None):
+        query = session.query(models.Workloads.id).join(models.WorkloadMetadata).filter(and_(
+            models.WorkloadMetadata.key == 'policy_id'), models.WorkloadMetadata.value == kwargs['policy_id']).filter_by(deleted=False)
 
     policy_assignments = query.all()
     return policy_assignments
 
 
-@require_context
 def _policy_assignment_get(context, id, session, **kwargs):
     try:
         policy_assignments = model_query(
-            context, models.WorkloadPolicyAssignmnets, session=session, read_deleted="no"). \
+            context, models.WorkloadPolicyAssignmnets, session=session). \
             filter_by(id=id).first()
 
     except sa_orm.exc.NoResultFound:
@@ -4638,18 +4637,15 @@ def _policy_assignment_get(context, id, session, **kwargs):
     return policy_assignments
 
 
-@require_context
+@require_admin_context
 def policy_assignment_get(context, id, **kwargs):
     session = get_session()
     return _policy_assignment_get(context, id, session)
 
 
-@require_context
+@require_admin_context
 def policy_assignment_delete(context, id, **kwargs):
     session = get_session()
     with session.begin():
         session.query(models.WorkloadPolicyAssignmnets). \
-            filter_by(id=id). \
-            update({'deleted': True,
-                    'deleted_at': timeutils.utcnow(),
-                    'updated_at': literal_column('updated_at')})
+            filter_by(id=id).delete()
