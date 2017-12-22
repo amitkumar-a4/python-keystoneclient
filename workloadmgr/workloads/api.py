@@ -3998,10 +3998,10 @@ class API(base.Base):
         Delete the given policy.
         """
         try:
+            policy = self.db.policy_get(context, policy_id)
             AUDITLOG.log(context, 'Policy \'' +
                          policy['display_name'] + '\' Delete Requested', None)
 
-            policy = self.db.policy_get(context, policy_id)
             policy_assignments = self.db.policy_assignments_get_all(
                 context, policy_id=policy_id)
             if len(policy_assignments) > 0:
