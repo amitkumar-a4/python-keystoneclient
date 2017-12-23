@@ -4630,7 +4630,7 @@ def main():
             subprocess.call(command, shell=False, cwd="/etc/tvault/ssl")
             command = [ 'sudo', 'rm', '-rf', 
                         os.path.join("/etc/tvault/ssl/",
-                                     socket.gethostname() + ".csr"]
+                                     socket.gethostname() + ".csr")]
             subprocess.call(command, shell=False, cwd="/etc/tvault/ssl")
             Config.set(None, 'hostname', socket.gethostname())
 
