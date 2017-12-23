@@ -4609,6 +4609,9 @@ def main():
             TVAULT_SERVICE_PASSWORD]
         subprocess.call(command, shell=False)
 
+        if not os.path.exists('/etc/tvault-config/'):
+            os.makedirs('/etc/tvault-config')
+
         # SSL regeneration
         prev_hostname = 'none'
         Config = ConfigParser.RawConfigParser()
@@ -4620,81 +4623,42 @@ def main():
             prev_hostname = 'none'
 
         if prev_hostname != socket.gethostname():
-            if os.path.exists("/opt/stack/workloadmgr/etc/gen-cer"):
-                command = [
-                    'sudo',
-                    'mv',
-                    "/opt/stack/workloadmgr/etc/gen-cer",
-                    "/etc/tvault/ssl/"]
-                subprocess.call(command, shell=False, cwd="/etc/tvault/ssl")
-                os.chmod('/etc/tvault/ssl/gen-cer', 0o554)
-                command = ['sudo', 'sh', 'gen-cer', socket.gethostname()]
-                subprocess.call(command, shell=False, cwd="/etc/tvault/ssl")
-                command = [
-                    'sudo',
-                    'rm',
-                    '-rf',
-                    "/etc/tvault/ssl/" +
-                    socket.gethostname() +
-                    ".csr"]
-                subprocess.call(command, shell=False, cwd="/etc/tvault/ssl")
-                command = ['sudo', 'mv', "gen-cer",
-                           "/opt/stack/workloadmgr/etc/"]
-                subprocess.call(command, shell=False, cwd="/etc/tvault/ssl")
-                Config.set(None, 'hostname', socket.gethostname())
+            shutil.copy2("/opt/stack/workloadmgr/etc/gen-cer",
+                         "/etc/tvault/ssl/")
+            os.chmod('/etc/tvault/ssl/gen-cer', 0o554)
+            command = ['sudo', 'sh', 'gen-cer', socket.gethostname()]
+            subprocess.call(command, shell=False, cwd="/etc/tvault/ssl")
+            command = [ 'sudo', 'rm', '-rf', 
+                        os.path.join("/etc/tvault/ssl/",
+                                     socket.gethostname() + ".csr"]
+            subprocess.call(command, shell=False, cwd="/etc/tvault/ssl")
+            Config.set(None, 'hostname', socket.gethostname())
 
-                command = [
-                    'sudo',
-                    'mv',
-                    "/etc/tvault/ssl/localhost.crt",
-                    "/etc/tvault/ssl/localhost_bak.crt"]
-                subprocess.call(command, shell=False)
-                command = [
-                    'sudo',
-                    'mv',
-                    "/etc/tvault/ssl/localhost.key",
-                    "/etc/tvault/ssl/localhost_bak.key"]
-                subprocess.call(command, shell=False)
-                command = [
-                    'sudo',
-                    'mv',
-                    "/etc/tvault/ssl/" +
-                    socket.gethostname() +
-                    ".crt",
-                    "/etc/tvault/ssl/localhost.crt"]
-                subprocess.call(command, shell=False)
-                command = [
-                    'sudo',
-                    'mv',
-                    "/etc/tvault/ssl/" +
-                    socket.gethostname() +
-                    ".key",
-                    "/etc/tvault/ssl/localhost.key"]
-                subprocess.call(command, shell=False)
+            shutil.move( "/etc/tvault/ssl/localhost.crt",
+                         "/etc/tvault/ssl/localhost_bak.crt")
+            shutil.move( "/etc/tvault/ssl/localhost.key",
+                         "/etc/tvault/ssl/localhost_bak.key")
+            shutil.move( os.path.join("/etc/tvault/ssl/",
+                                      socket.gethostname() + ".crt"),
+                         "/etc/tvault/ssl/localhost.crt")
+            shutil.move( os.path.join("/etc/tvault/ssl/",
+                                      socket.gethostname() + ".key"),
+                         "/etc/tvault/ssl/localhost.key")
 
-                # create hostkeys
-                command = ['sudo', 'rm', "/etc/ssh/ssh_host_rsa_key"]
-                subprocess.call(command, shell=False)
-                command = [
-                    'sudo',
-                    'ssh-keygen',
-                    '-f',
-                    "/etc/ssh/ssh_host_rsa_key",
-                    '-b',
-                    '4096',
-                    '-t',
-                    'rsa',
-                    '-q',
-                    '-N',
-                    ""]
-                subprocess.call(command, shell=False)
+            # create hostkeys
+            command = ['sudo', 'rm', "/etc/ssh/ssh_host_rsa_key"]
+            subprocess.call(command, shell=False)
+            command = [ 'sudo', 'ssh-keygen', '-f',
+                        "/etc/ssh/ssh_host_rsa_key", '-b', '4096', '-t',
+                        'rsa', '-q', '-N', ""]
+            subprocess.call(command, shell=False)
 
-                with open('/etc/tvault-config/tvault-config.conf', 'wb') as configfile:
-                    Config.write(configfile)
+            with open('/etc/tvault-config/tvault-config.conf', 'wb') as configfile:
+                Config.write(configfile)
 
     except Exception as exception:
         # TODO: implement logging
-        pass
+        raise
 
     http_thread = Thread(target=main_http)
     http_thread.daemon = True  # thread dies with the program
