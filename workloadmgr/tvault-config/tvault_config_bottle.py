@@ -110,10 +110,11 @@ class SSLWSGIRefServer(ServerAdapter):
                     pass
             self.options['handler_class'] = QuietHandler
         srv = make_server(self.host, self.port, handler, **self.options)
+        hostname = socket.gethostname()
         srv.socket = ssl.wrap_socket(
             srv.socket,
-            keyfile='/etc/tvault/ssl/localhost.key',
-            certfile='/etc/tvault/ssl/localhost.crt',  # path to certificate
+            keyfile='/etc/tvault/ssl/%s.key' % hostname,
+            certfile='/etc/tvault/ssl/%s.crt' % hostname,  # path to certificate
             server_side=True)
         srv.serve_forever()
 
@@ -4626,6 +4627,14 @@ def main():
 
         if prev_hostname != socket.gethostname() or \
             fully_configured == 'false':
+
+            if os.path.exists("/etc/tvault/ssl/%s.crt" % prev_hostname):
+                shutil.move( "/etc/tvault/ssl/%s.crt" % prev_hostname,
+                             "/etc/tvault/ssl/%s_bak.crt" % prev_hostname)
+            if os.path.exists("/etc/tvault/ssl/%s.key" % prev_hostname):
+                shutil.move( "/etc/tvault/ssl/%s.key" % prev_hostname,
+                             "/etc/tvault/ssl/%s_bak.key" % prev_hostname)
+
             shutil.copy2("/opt/stack/workloadmgr/etc/gen-cer",
                          "/etc/tvault/ssl/")
             os.chmod('/etc/tvault/ssl/gen-cer', 0o554)
@@ -4636,21 +4645,6 @@ def main():
                                      socket.gethostname() + ".csr")]
             subprocess.call(command, shell=False, cwd="/etc/tvault/ssl")
             Config.set(None, 'hostname', socket.gethostname())
-
-            shutil.move( "/etc/tvault/ssl/localhost.crt",
-                         "/etc/tvault/ssl/localhost_bak.crt")
-            shutil.move( "/etc/tvault/ssl/localhost.key",
-                         "/etc/tvault/ssl/localhost_bak.key")
-            crtfile = os.path.join("/etc/tvault/ssl/",
-                                   socket.gethostname() + ".crt")
-            if os.path.exists(crtfile):
-                 shutil.move( crtfile,
-                             "/etc/tvault/ssl/localhost.crt")
-            keyfile =  os.path.join("/etc/tvault/ssl/",
-                                    socket.gethostname() + ".key")
-            if os.path.exists(keyfile):
-                shutil.move(keyfile,
-                            "/etc/tvault/ssl/localhost.key")
 
             # create hostkeys
             command = ['sudo', 'rm', "/etc/ssh/ssh_host_rsa_key"]
