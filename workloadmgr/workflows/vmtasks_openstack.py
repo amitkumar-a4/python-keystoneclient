@@ -788,8 +788,8 @@ def restore_keypairs(cntx, db, instances):
     compute_service = nova.API(production=True)
     keypairs = [kp.name.lower() for kp in compute_service.get_keypairs(cntx)]
     for inst in instances:
-        if 'keyname' not in inst or not inst['keyname'] or \
-           inst['keyname'].lower() in keypairs:
+        if not inst.get('keyname', None) or \
+            inst.get('keyname', None).lower() in keypairs:
             continue
 
         if 'keydata' not in inst:
