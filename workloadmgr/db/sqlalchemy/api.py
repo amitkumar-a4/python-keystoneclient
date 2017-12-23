@@ -1282,6 +1282,8 @@ def snapshot_get_all(context, **kwargs):
         if kwargs['status'] == 'available':
             qs = qs.filter(or_(models.Snapshots.status ==
                                'available', models.Snapshots.status == 'mounted'))
+        elif kwargs['status'] == 'running':
+            qs = qs.filter(and_(models.Snapshots.status != 'available', models.Snapshots.status != 'mounted', models.Snapshots.status != 'error') )
         else:
             qs = qs.filter_by(status=kwargs['status'])
 
