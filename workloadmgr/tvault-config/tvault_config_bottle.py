@@ -4614,15 +4614,18 @@ def main():
 
         # SSL regeneration
         prev_hostname = 'none'
+        fully_configured = 'false'
         Config = ConfigParser.RawConfigParser()
         try:
             Config.read('/etc/tvault-config/tvault-config.conf')
             config_data = dict(Config._defaults)
             prev_hostname = config_data.get('hostname', 'none')
+            fully_configured = config_data.get('fully_configured', 'false') 
         except Exception as exception:
             prev_hostname = 'none'
 
-        if prev_hostname != socket.gethostname():
+        if prev_hostname != socket.gethostname() or \
+            fully_configured == 'false':
             shutil.copy2("/opt/stack/workloadmgr/etc/gen-cer",
                          "/etc/tvault/ssl/")
             os.chmod('/etc/tvault/ssl/gen-cer', 0o554)
@@ -4638,12 +4641,16 @@ def main():
                          "/etc/tvault/ssl/localhost_bak.crt")
             shutil.move( "/etc/tvault/ssl/localhost.key",
                          "/etc/tvault/ssl/localhost_bak.key")
-            shutil.move( os.path.join("/etc/tvault/ssl/",
-                                      socket.gethostname() + ".crt"),
-                         "/etc/tvault/ssl/localhost.crt")
-            shutil.move( os.path.join("/etc/tvault/ssl/",
-                                      socket.gethostname() + ".key"),
-                         "/etc/tvault/ssl/localhost.key")
+            crtfile = os.path.join("/etc/tvault/ssl/",
+                                   socket.gethostname() + ".crt")
+            if os.path.exists(crtfile):
+                 shutil.move( crtfile,
+                             "/etc/tvault/ssl/localhost.crt")
+            keyfile =  os.path.join("/etc/tvault/ssl/",
+                                    socket.gethostname() + ".key")
+            if os.path.exists(keyfile):
+                shutil.move(keyfile,
+                            "/etc/tvault/ssl/localhost.key")
 
             # create hostkeys
             command = ['sudo', 'rm', "/etc/ssh/ssh_host_rsa_key"]
@@ -4653,6 +4660,7 @@ def main():
                         'rsa', '-q', '-N', ""]
             subprocess.call(command, shell=False)
 
+            Config.set(None, 'fully_configured', 'true')
             with open('/etc/tvault-config/tvault-config.conf', 'wb') as configfile:
                 Config.write(configfile)
 
