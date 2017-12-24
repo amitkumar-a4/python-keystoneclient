@@ -204,6 +204,7 @@ def update_service_account_password():
     else:
         return {'error': ''}
 
+
 @bottle.post('/update_service_account_password')
 @authorize()
 def change_service_password():
@@ -589,22 +590,22 @@ def change_service_endpoint(wlm_url, region_name):
         endpoints = keystone.endpoints.list()
         for service in services:
             if service.type == 'workloads':
-               ser_id = service.id
-               for endpoint in endpoints:
-                   if endpoint.service_id == service.id and endpoint.region == region_name:
-                      keystone.endpoints.delete(endpoint.id)
+                ser_id = service.id
+                for endpoint in endpoints:
+                    if endpoint.service_id == service.id and endpoint.region == region_name:
+                        keystone.endpoints.delete(endpoint.id)
 
         if keystone.version == 'v3':
-           keystone.endpoints.create(region=region_name,
-                                  service=ser_id,
-                                  url=wlm_url,
-                                  interface='public',
-                                  enabled=True)
+            keystone.endpoints.create(region=region_name,
+                                      service=ser_id,
+                                      url=wlm_url,
+                                      interface='public',
+                                      enabled=True)
         else:
-             keystone.endpoints.create(region_name,
-                                  ser_id, wlm_url, wlm_url, wlm_url)
+            keystone.endpoints.create(region_name,
+                                      ser_id, wlm_url, wlm_url, wlm_url)
     except Exception as ex:
-           raise ex
+        raise ex
 
 
 def replace_line(file_path, pattern, substitute, starts_with=False):
@@ -987,7 +988,7 @@ def _authenticate_with_keystone():
     configure_nova()
     configure_neutron()
     configure_glance()
-    #configure_horizon()
+    # configure_horizon()
 
     # image
     if keystone.version == 'v3':
@@ -1257,31 +1258,31 @@ def _register_service():
             'TrilioVaultWLM', 'workloads', 'Trilio Vault Workload Manager Service')
 
     if config_data['enable_ha'] == 'on':
-       command = 'iptables --append INPUT --in-interface  eth0 --protocol tcp --match tcp --dport 3306 \
-                  --source '+config_data['floating_ipaddress']+'  --jump ACCEPT'
-       subprocess.check_call(command, shell=True)
-       command = 'iptables --append INPUT --in-interface  eth0 --protocol tcp --match tcp --dport 4567 \
-                  --source '+config_data['floating_ipaddress']+'  --jump ACCEPT'
-       subprocess.check_call(command, shell=True)
-       command = 'iptables --append INPUT --in-interface  eth0 --protocol tcp --match tcp --dport 4568 \
-                  --source '+config_data['floating_ipaddress']+'  --jump ACCEPT'
-       subprocess.check_call(command, shell=True)
-       command = 'iptables --append INPUT --in-interface  eth0 --protocol tcp --match tcp --dport 4444 \
-                  --source '+config_data['floating_ipaddress']+'  --jump ACCEPT'
-       subprocess.check_call(command, shell=True)
-       command = "/sbin/ifconfig eth0 | awk '/Mask:/{ print $4;} '"
-       result = subprocess.check_output(command, shell=True)
-       byte = int(result.replace('\n','').split('.')[-1])
-       if byte != 0:
-          byte = 255 - byte + 1
-       arr1 = config_data['floating_ipaddress'].split('.')
-       arr2 = config_data['floating_ipaddress'].split('.')
-       arr1[-1] = str(byte + 1)
-       arr2[-1] = str(byte)
-       virtual_ip = '.'.join(arr1)
-       bindaddr = '.'.join(arr2)
-       config_data['virtual_ip'] = virtual_ip
-       config_data['bindaddr'] = bindaddr
+        command = 'iptables --append INPUT --in-interface  eth0 --protocol tcp --match tcp --dport 3306 \
+                  --source ' + config_data['floating_ipaddress'] + '  --jump ACCEPT'
+        subprocess.check_call(command, shell=True)
+        command = 'iptables --append INPUT --in-interface  eth0 --protocol tcp --match tcp --dport 4567 \
+                  --source ' + config_data['floating_ipaddress'] + '  --jump ACCEPT'
+        subprocess.check_call(command, shell=True)
+        command = 'iptables --append INPUT --in-interface  eth0 --protocol tcp --match tcp --dport 4568 \
+                  --source ' + config_data['floating_ipaddress'] + '  --jump ACCEPT'
+        subprocess.check_call(command, shell=True)
+        command = 'iptables --append INPUT --in-interface  eth0 --protocol tcp --match tcp --dport 4444 \
+                  --source ' + config_data['floating_ipaddress'] + '  --jump ACCEPT'
+        subprocess.check_call(command, shell=True)
+        command = "/sbin/ifconfig eth0 | awk '/Mask:/{ print $4;} '"
+        result = subprocess.check_output(command, shell=True)
+        byte = int(result.replace('\n', '').split('.')[-1])
+        if byte != 0:
+            byte = 255 - byte + 1
+        arr1 = config_data['floating_ipaddress'].split('.')
+        arr2 = config_data['floating_ipaddress'].split('.')
+        arr1[-1] = str(byte + 1)
+        arr2[-1] = str(byte)
+        virtual_ip = '.'.join(arr1)
+        bindaddr = '.'.join(arr2)
+        config_data['virtual_ip'] = virtual_ip
+        config_data['bindaddr'] = bindaddr
 
     #wlm_url = 'https://' + config_data['tvault_primary_node'] + ':8780' + '/v1/$(tenant_id)s'
     if config_data['enable_tls'] == 'on':
@@ -3621,43 +3622,45 @@ def configure_service():
             'insecure = True')
 
         if config_data['nodetype'] == 'controller' and config_data['enable_ha'] == 'off':
-           try:
-               command = 'crm node attribute '+socket.gethostname()+' show configured'
-               subprocess.check_call(command, shell=True)
-               command = 'crm node attribute '+socket.gethostname()+' set configured disabled'
-               subprocess.check_call(command, shell=True)
-           except:
-                  pass
+            try:
+                command = 'crm node attribute ' + socket.gethostname() + ' show configured'
+                subprocess.check_call(command, shell=True)
+                command = 'crm node attribute ' + socket.gethostname() + ' set configured disabled'
+                subprocess.check_call(command, shell=True)
+            except:
+                pass
 
         if config_data['nodetype'] == 'controller' and config_data['enable_ha'] == 'on':
-           replace_line(
-            '/etc/corosync/corosync.conf',
-            'bindnetaddr: ',
-            '                bindnetaddr: '+config_data['bindaddr'])
-           try:
-               command = ['sudo', 'service', 'corosync', 'restart']
-               subprocess.call(command, shell=False) 
-               command = ['sudo', 'service', 'pacemaker', 'restart']
-               subprocess.call(command, shell=False)
-               command = ['sudo', 'service', 'tvault-ha', 'restart']
-               subprocess.call(command, shell=False)
-               command = 'crm configure property pe-warn-series-max="1000" pe-input-series-max="1000" \
+            replace_line(
+                '/etc/corosync/corosync.conf',
+                'bindnetaddr: ',
+                '                bindnetaddr: ' + config_data['bindaddr'])
+            try:
+                command = ['sudo', 'service', 'corosync', 'restart']
+                subprocess.call(command, shell=False)
+                command = ['sudo', 'service', 'pacemaker', 'restart']
+                subprocess.call(command, shell=False)
+                command = ['sudo', 'service', 'tvault-ha', 'restart']
+                subprocess.call(command, shell=False)
+                command = 'crm configure property pe-warn-series-max="1000" pe-input-series-max="1000" \
                           pe-error-series-max="1000" cluster-recheck-interval="5min"'
-               subprocess.check_call(command, shell=True)
-               command = 'crm configure property stonith-enabled=false'
-               subprocess.check_call(command, shell=True)
-               try:
-                   command = 'crm node attribute '+socket.gethostname()+' set ip '+config_data['floating_ipaddress']
-                   subprocess.check_call(command, shell=True)
-               except:
-                      pass
-               try:
-                   command = 'crm node attribute '+socket.gethostname()+' set virtip '+config_data['virtual_ip']
-                   subprocess.check_call(command, shell=True)
-               except:
-                      pass
-           except Exception as ex:
-                  pass
+                subprocess.check_call(command, shell=True)
+                command = 'crm configure property stonith-enabled=false'
+                subprocess.check_call(command, shell=True)
+                try:
+                    command = 'crm node attribute ' + socket.gethostname() + ' set ip ' + \
+                        config_data['floating_ipaddress']
+                    subprocess.check_call(command, shell=True)
+                except:
+                    pass
+                try:
+                    command = 'crm node attribute ' + socket.gethostname() + ' set virtip ' + \
+                        config_data['virtual_ip']
+                    subprocess.check_call(command, shell=True)
+                except:
+                    pass
+            except Exception as ex:
+                pass
 
     except Exception as exception:
         bottle.request.environ['beaker.session']['error_message'] = "Error: %(exception)s" % {
@@ -4280,7 +4283,7 @@ def reinitialize():
             tables = engine.table_names()
             connection.execute("SET FOREIGN_KEY_CHECKS=0")
             for table in tables:
-                if table != 'workload_types':
+                if table not in ['workload_types', 'workload_policy_fields']:
                     connection.execute("TRUNCATE TABLE " + str(table))
             connection.execute("SET FOREIGN_KEY_CHECKS=1")
             trans.commit()

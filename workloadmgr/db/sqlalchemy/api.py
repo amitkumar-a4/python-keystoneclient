@@ -1283,7 +1283,8 @@ def snapshot_get_all(context, **kwargs):
             qs = qs.filter(or_(models.Snapshots.status ==
                                'available', models.Snapshots.status == 'mounted'))
         elif kwargs['status'] == 'running':
-            qs = qs.filter(and_(models.Snapshots.status != 'available', models.Snapshots.status != 'mounted', models.Snapshots.status != 'error') )
+            qs = qs.filter(and_(models.Snapshots.status != 'available',
+                                models.Snapshots.status != 'mounted', models.Snapshots.status != 'error'))
         else:
             qs = qs.filter_by(status=kwargs['status'])
 
@@ -4263,6 +4264,396 @@ def _config_backup_metadata_delete(context, metadata_ref, session):
     """
     metadata_ref.delete(session=session)
 
+# Workload Policy API's
+
+
+@require_admin_context
+def _policy_field_update(context, policy_field_id, values, session):
+    if policy_field_id:
+        policy_field_ref = _policy_field_get(context, policy_field_id, session)
+    else:
+        policy_field_ref = models.WorkloadPolicyFields()
+        if not values.get('id'):
+            values['id'] = str(uuid.uuid4())
+
+    policy_field_ref.update(values)
+    policy_field_ref.save(session)
+
+    return policy_field_ref
+
+
+@require_admin_context
+def policy_field_create(context, values, **kwargs):
+    session = get_session()
+    return _policy_field_update(context, None, values, session)
+
+
+@require_admin_context
+def policy_field_update(context, id, values, **kwargs):
+    session = get_session()
+    return _policy_field_update(context, id, values, session)
+
+
+@require_admin_context
+def policy_fields_get_all(context, **kwargs):
+    session = get_session()
+    try:
+        query = model_query(context, models.WorkloadPolicyFields, session=session,
+                            read_deleted="no")
+
+        policy_fields = query.all()
+
+    except sa_orm.exc.NoResultFound:
+        raise exception.PolicyFieldNotFound()
+
+    return policy_fields
+
+
+@require_admin_context
+def policy_field_get(context, id, **kwargs):
+    session = get_session()
+    return _policy_field_get(context, id, session)
+
+
+@require_admin_context
+def _policy_field_get(context, id, session):
+    try:
+        policy_field = model_query(
+            context, models.WorkloadPolicyFields, session=session, read_deleted="no").\
+            filter_by(id=id).first()
+
+    except sa_orm.exc.NoResultFound:
+        raise exception.PolicyFieldNotFound(policy_field_id=id)
+
+    if policy_field is None:
+        raise exception.PolicyFieldNotFound(policy_field_id=id)
+
+    return policy_field
+
+
+@require_admin_context
+def policy_field_delete(context, id, **kwargs):
+    session = get_session()
+    with session.begin():
+        session.query(models.WorkloadPolicyFields). \
+            filter_by(id=id). \
+            update({'deleted': True,
+                    'deleted_at': timeutils.utcnow(),
+                    'updated_at': literal_column('updated_at')})
+
+
+@require_admin_context
+def _policy_update(context, values, policy_id, purge_metadata, session):
+    metadata = values.pop('metadata', {})
+    field_values = values.pop('field_values', {})
+    if policy_id:
+        policy_ref = _policy_get(context, policy_id, session)
+    else:
+        policy_ref = models.WorkloadPolicy()
+        if not values.get('id'):
+            values['id'] = str(uuid.uuid4())
+
+    policy_ref.update(values)
+    policy_ref.save(session)
+
+    if metadata:
+        _set_metadata_for_policy(
+            context, policy_ref, metadata, purge_metadata, session)
+    if field_values:
+        field_values = _set_field_values_for_policy(
+            context, policy_ref, field_values, session)
+    return policy_ref
+
+
+@require_admin_context
+def policy_create(context, values, **kwargs):
+    session = get_session()
+    return _policy_update(context, values, None, False, session)
+
+
+@require_admin_context
+def policy_update(context, id, values, purge_metadata=False, **kwargs):
+    session = get_session()
+    return _policy_update(context, values, id, purge_metadata, session)
+
+
+@require_admin_context
+def policy_get_all(context, **kwargs):
+    qs = model_query(context, models.WorkloadPolicy, read_deleted="no", **kwargs). \
+        options(sa_orm.joinedload(models.WorkloadPolicy.metadata)). \
+        options(sa_orm.joinedload(models.WorkloadPolicy.field_values))
+
+    return qs.all()
+
+
+def _policy_get(context, id, session, **kwargs):
+    try:
+        policy = model_query(
+            context, models.WorkloadPolicy, session=session, read_deleted="no", **kwargs). \
+            options(sa_orm.joinedload(models.WorkloadPolicy.metadata)). \
+            options(sa_orm.joinedload(models.WorkloadPolicy.field_values)). \
+            options(sa_orm.joinedload(models.WorkloadPolicy.policy_assignments)). \
+            filter_by(id=id).first()
+
+        if policy is None:
+            raise exception.PolicyNotFound(policy_id=id)
+
+    except sa_orm.exc.NoResultFound:
+        raise exception.PolicyNotFound(policy_id=id)
+
+    return policy
+
+
+@require_admin_context
+def policy_get(context, id, **kwargs):
+    session = get_session()
+    return _policy_get(context, id, session, **kwargs)
+
+
+@require_admin_context
+def policy_delete(context, id, **kwargs):
+    session = get_session()
+    with session.begin():
+        session.query(models.WorkloadPolicy). \
+            filter_by(id=id). \
+            update({'status': 'deleted',
+                    'deleted': True,
+                    'deleted_at': timeutils.utcnow(),
+                    'updated_at': literal_column('updated_at')})
+
+
+def _set_metadata_for_policy(context, policy_ref, metadata,
+                             purge_metadata, session):
+    """
+    Create or update a set of policy_metadata for a given policy
+    :param context: Request context
+    :param policy_ref: An policy object
+    :param metadata: A dict of metadata to set
+    :param session: A SQLAlchemy session to use (if present)
+    """
+    orig_metadata = {}
+    for metadata_ref in policy_ref.metadata:
+        orig_metadata[metadata_ref.key] = metadata_ref
+
+    for key, value in metadata.iteritems():
+        metadata_values = {'policy_id': policy_ref.id,
+                           'key': key,
+                           'value': value}
+        if key in orig_metadata:
+            metadata_ref = orig_metadata[key]
+            _policy_metadata_update(
+                context, metadata_ref, metadata_values, session)
+        else:
+            _policy_metadata_create(context, metadata_values, session)
+
+    if purge_metadata:
+        for key in orig_metadata.keys():
+            if key not in metadata:
+                metadata_ref = orig_metadata[key]
+                _policy_metadata_delete(context, metadata_ref, session)
+
+
+def _policy_metadata_create(context, values, session):
+    """Create an WorkloadPolicyMetadata object"""
+    metadata_ref = models.WorkloadPolicyMetadata()
+    if not values.get('id'):
+        values['id'] = str(uuid.uuid4())
+    return _policy_metadata_update(context, metadata_ref, values, session)
+
+
+@require_admin_context
+def policy_metadata_create(context, values, **kwargs):
+    """Create an WorkloadPolicyMetadata object"""
+    session = get_session()
+    return _policy_metadata_create(context, values, session)
+
+
+def _policy_metadata_update(context, metadata_ref, values, session):
+    """
+    Used internally by policy_metadata_create and policy_metadata_update
+    """
+    values["deleted"] = False
+    metadata_ref.update(values)
+    metadata_ref.save(session=session)
+    return metadata_ref
+
+
+def _policy_metadata_delete(context, metadata_ref, session):
+    """
+    Used internally by policy_metadata_create and policy_metadata_update
+    """
+    metadata_ref.delete(session=session)
+    return metadata_ref
+
+
+def _set_field_values_for_policy(context, policy_ref, policy_field_values,
+                                 session):
+    """
+    Create or update a set of policy_values for a given policy
+    :param context: Request context
+    :param policy_ref: An policy object
+    :param policy_field_values: A dict of policy values to set
+    :param session: A SQLAlchemy session to use (if present)
+    """
+    orig_field_values = {}
+    for field_value in policy_ref.field_values:
+        orig_field_values[field_value.policy_field_name] = field_value
+
+    for field_name, field_value in policy_field_values.iteritems():
+        field_values = {'policy_id': policy_ref.id,
+                        'policy_field_name': field_name,
+                        'value': field_value}
+        if field_name in orig_field_values:
+            field_value_ref = orig_field_values[field_name]
+            _policy_value_update(context, field_value_ref,
+                                 field_values, session)
+        else:
+            _policy_value_create(context, field_values, session)
+
+
+def _policy_value_create(context, values, session):
+    """Create an WorkloadPolicyValues object"""
+    policy_value_ref = models.WorkloadPolicyValues()
+    if not values.get('id'):
+        values['id'] = str(uuid.uuid4())
+    return _policy_value_update(context, policy_value_ref, values, session)
+
+
+@require_admin_context
+def policy_value_create(context, values, **kwargs):
+    """Create an WorkloadPolicyValues object"""
+    session = get_session()
+    return _policy_value_create(context, values, session)
+
+
+def _policy_value_update(context, policy_value_ref, values, session):
+    """
+    Used internally by policy_value_create and policy_value_update
+    """
+    values["deleted"] = False
+    policy_value_ref.update(values)
+    policy_value_ref.save(session=session)
+    return policy_value_ref
+
+
+@require_admin_context
+def policy_values_get_all(context, **kwargs):
+    session = get_session()
+    try:
+        query = model_query(context, models.WorkloadPolicyValues, session=session,
+                            read_deleted="no")
+
+        policy_values = query.all()
+
+    except sa_orm.exc.NoResultFound:
+        raise exception.PolicyValueNotFound()
+
+    return policy_values
+
+
+@require_admin_context
+def policy_value_get(context, id, **kwargs):
+    session = get_session()
+    try:
+        query = session.query(models.WorkloadPolicyValues) \
+            .filter_by(id=id)
+
+        policy_values = query.first()
+
+    except sa_orm.exc.NoResultFound:
+        raise exception.PolicyValueNotFound(policy_value_id=id)
+
+    if policy_values is None:
+        raise exception.PolicyValueNotFound(policy_value_id=id)
+
+    return policy_values
+
+
+@require_admin_context
+def policy_value_delete(context, id, **kwargs):
+    session = get_session()
+    with session.begin():
+        session.query(models.WorkloadPolicyValues). \
+            filter_by(id=id). \
+            update({'deleted': True,
+                    'deleted_at': timeutils.utcnow(),
+                    'updated_at': literal_column('updated_at')})
+
+
+def _policy_assignment_update(context, values, policy_assignment_id, session):
+    if policy_assignment_id:
+        policy_assignment_ref = _policy_assignment_get(
+            context, policy_assignment_id, session)
+    else:
+        policy_assignment_ref = models.WorkloadPolicyAssignmnets()
+        if not values.get('id'):
+            values['id'] = str(uuid.uuid4())
+
+    policy_assignment_ref.update(values)
+    policy_assignment_ref.save(session)
+
+    return policy_assignment_ref
+
+
+@require_admin_context
+def policy_assignment_create(context, values, **kwargs):
+    session = get_session()
+    return _policy_assignment_update(context, values, None, session)
+
+
+@require_admin_context
+def policy_assignment_update(context, id, values, **kwargs):
+    session = get_session()
+    return _policy_assignment_update(context, values, id, session)
+
+
+@require_admin_context
+def policy_assignments_get_all(context, **kwargs):
+    session = get_session()
+    query = session.query(models.WorkloadPolicyAssignmnets)
+
+    if 'policy_id' in kwargs and kwargs['policy_id'] is not None:
+        query = query.filter_by(policy_id=kwargs['policy_id'])
+
+    if 'project_id' in kwargs and kwargs['project_id'] is not None:
+        query = query.filter_by(project_id=kwargs['project_id'])
+
+    if (kwargs.get('workloads', False) is True) \
+       and ('policy_id' in kwargs and kwargs['policy_id'] is not None):
+        query = session.query(models.Workloads.id).join(models.WorkloadMetadata).filter(and_(
+            models.WorkloadMetadata.key == 'policy_id'), models.WorkloadMetadata.value == kwargs['policy_id']).filter_by(deleted=False)
+
+    policy_assignments = query.all()
+    return policy_assignments
+
+
+def _policy_assignment_get(context, id, session, **kwargs):
+    try:
+        policy_assignments = model_query(
+            context, models.WorkloadPolicyAssignmnets, session=session). \
+            filter_by(id=id).first()
+
+    except sa_orm.exc.NoResultFound:
+        raise exception.PolicyAssignmentNotFound(policy_assignment_id=id)
+
+    if policy_assignments is None:
+        raise exception.PolicyAssignmentNotFound(policy_assignment_id=id)
+
+    return policy_assignments
+
+
+@require_admin_context
+def policy_assignment_get(context, id, **kwargs):
+    session = get_session()
+    return _policy_assignment_get(context, id, session)
+
+
+@require_admin_context
+def policy_assignment_delete(context, id, **kwargs):
+    session = get_session()
+    with session.begin():
+        session.query(models.WorkloadPolicyAssignmnets). \
+            filter_by(id=id).delete()
 
 @require_admin_context
 def get_tenants_usage(context, **kwargs):
@@ -4288,3 +4679,4 @@ def get_tenants_usage(context, **kwargs):
         return tenant_chargeback
     except Exception as ex:
         LOG.exception(ex)
+        
