@@ -1085,6 +1085,28 @@ class WorkloadMgrsController(wsgi.Controller):
             LOG.exception(error)
             raise exc.HTTPServerError(explanation=unicode(error))
 
+    def get_protected_vms(self, req):
+        try:
+            context = req.environ['workloadmgr.context']
+            try:
+                protected_vms = self.workload_api.workload_vms_get_all(context)
+                return protected_vms
+            except Exception as ex:
+                LOG.exception(ex)
+                raise ex
+        except exc.HTTPNotFound as error:
+            LOG.exception(error)
+            raise error
+        except exc.HTTPBadRequest as error:
+            LOG.exception(error)
+            raise error
+        except exc.HTTPServerError as error:
+            LOG.exception(error)
+            raise error
+        except Exception as error:
+            LOG.exception(error)
+            raise exc.HTTPServerError(explanation=unicode(error))
+
 
 def create_resource():
     return wsgi.Resource(WorkloadMgrsController())

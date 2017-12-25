@@ -804,6 +804,13 @@ class API(base.Base):
         return workloads
 
     @autolog.log_method(logger=Logger)
+    @wrap_check_policy
+    def workload_vms_get_all(self, context, search_opts={}):
+        db_vms = self.db.workload_vms_get(context, None, **search_opts)
+        vms = [{'id': vm.vm_id} for vm in db_vms]
+        return {'protected_vms': vms}
+
+    @autolog.log_method(logger=Logger)
     @create_trust
     @check_license
     @wrap_check_policy
