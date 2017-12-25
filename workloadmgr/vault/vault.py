@@ -594,6 +594,12 @@ class NfsTrilioVaultBackupTarget(TrilioVaultBackupTarget):
             restore_vm_disk_resource_metadata['vm_disk_resource_snap_id'])
         return restore_vm_disk_resource_staging_path
 
+    @ensure_mounted()
+    def get_policy_path(self):
+        policy_path = os.path.join(
+            self.mount_path, CONF.cloud_unique_id, 'workload_policy')
+        return policy_path
+
     def remove_directory(self, path):
         try:
             if os.path.isdir(path):
@@ -853,6 +859,17 @@ class NfsTrilioVaultBackupTarget(TrilioVaultBackupTarget):
         try:
             backup_path = self.get_config_backup_path(backup_id)
             self.remove_directory(backup_path)
+        except Exception as ex:
+            LOG.exception(ex)
+
+    @autolog.log_method(logger=Logger)
+    def policy_delete(self, context, policy_id):
+        try:
+            policy_path = self.get_policy_path()
+            policy_path = os.path.join(
+                policy_path, 'policy' + '_' + str(policy_id))
+            if isfile(policy_path):
+                os.remove(policy_path)
         except Exception as ex:
             LOG.exception(ex)
 

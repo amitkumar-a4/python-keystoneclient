@@ -214,6 +214,19 @@ def upload_config_backup_db_entry(cntx, backup_id):
         LOG.exception(ex)
 
 
+def upload_policy_db_entry(cntx, policy_id):
+    try:
+        policy = db.policy_get(cntx, policy_id)
+        backup_target, path = vault.get_settings_backup_target()
+        policy_path = backup_target.get_policy_path()
+        policy_path = os.path.join(
+            policy_path, 'policy' + '_' + str(policy_id))
+        policy_json = jsonutils.dumps(policy)
+        backup_target.put_object(policy_path, policy_json)
+    except Exception as ex:
+        LOG.exception(ex)
+
+
 @autolog.log_method(logger=Logger)
 def _remove_data(context, snapshot_id):
     snapshot_with_data = db.snapshot_get(
@@ -776,6 +789,18 @@ def config_backup_delete(context, backup_id):
     try:
         db.config_backup_delete(context, backup_id)
         _remove_config_backup_data(context, backup_id)
+    except Exception as ex:
+        LOG.exception(ex)
+
+
+@autolog.log_method(logger=Logger)
+def policy_delete(context, policy_id):
+    """
+    Delete an existing policy.
+    """
+    try:
+        backup_target, path = vault.get_settings_backup_target()
+        backup_target.policy_delete(context, policy_id)
     except Exception as ex:
         LOG.exception(ex)
 
