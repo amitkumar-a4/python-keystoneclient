@@ -314,10 +314,13 @@ def get_effective_size(path, run_as_root=False):
     if qemuinfo.file_format != 'qcow2':
         return qemuinfo.virtual_size
 
-    restore_size = 0
-    for line in subprocess.check_output(
-            ["qemu-img", "map", path]).split('\n')[1:]:
-        if line.split():
-            restore_size += int(line.split()[1], 16)
+    try:
+        restore_size = 0
+        for line in json.loads(subprocess.check_output(
+               ["qemu-img", "map", "--output", "json", path])):
+            if line['data'] is True:
+                restore_size += int(line['length'])
 
-    return restore_size
+        return  restore_size
+    except Exception as ex:
+        return qemuinfo.virtual_size
