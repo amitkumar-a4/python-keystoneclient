@@ -4060,6 +4060,7 @@ class API(base.Base):
                 values = {'policy_id': policy_id, 'project_id': proj_id}
                 self.db.policy_assignment_create(context, values)
 
+            workload_utils.upload_policy_db_entry(context, policy_id)
             policy = self.db.policy_get(context, policy_id)
             return (policy, failed_project_ids)
         except Exception as ex:
