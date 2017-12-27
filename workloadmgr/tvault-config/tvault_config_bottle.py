@@ -27,6 +27,7 @@ import shutil
 import datetime
 from threading import Thread
 import uuid
+import netifaces
 
 import bottle
 from bottle import static_file, ServerAdapter
@@ -86,6 +87,9 @@ def get_https_app(app):
         return app(environ, start_response)
     return https_app
 
+def get_default_nic():
+   gws = netifaces.gateways()
+   return gws['default'][netifaces.AF_INET]
 
 app = get_https_app(bottle.app())
 session_opts = {
@@ -1258,19 +1262,20 @@ def _register_service():
             'TrilioVaultWLM', 'workloads', 'Trilio Vault Workload Manager Service')
 
     if config_data['enable_ha'] == 'on':
-        command = 'iptables --append INPUT --in-interface  eth0 --protocol tcp --match tcp --dport 3306 \
+        ip, nic_name = get_default_nic()
+        command = 'iptables --append INPUT --in-interface ' + nic_name + ' --protocol tcp --match tcp --dport 3306 \
                   --source ' + config_data['floating_ipaddress'] + '  --jump ACCEPT'
         subprocess.check_call(command, shell=True)
-        command = 'iptables --append INPUT --in-interface  eth0 --protocol tcp --match tcp --dport 4567 \
+        command = 'iptables --append INPUT --in-interface ' + nic_name + ' --protocol tcp --match tcp --dport 4567 \
                   --source ' + config_data['floating_ipaddress'] + '  --jump ACCEPT'
         subprocess.check_call(command, shell=True)
-        command = 'iptables --append INPUT --in-interface  eth0 --protocol tcp --match tcp --dport 4568 \
+        command = 'iptables --append INPUT --in-interface ' + nic_name + ' --protocol tcp --match tcp --dport 4568 \
                   --source ' + config_data['floating_ipaddress'] + '  --jump ACCEPT'
         subprocess.check_call(command, shell=True)
-        command = 'iptables --append INPUT --in-interface  eth0 --protocol tcp --match tcp --dport 4444 \
+        command = 'iptables --append INPUT --in-interface ' + nic_name + ' --protocol tcp --match tcp --dport 4444 \
                   --source ' + config_data['floating_ipaddress'] + '  --jump ACCEPT'
         subprocess.check_call(command, shell=True)
-        command = "/sbin/ifconfig eth0 | awk '/Mask:/{ print $4;} '"
+        command = "/sbin/ifconfig " + nic_name + " | awk '/Mask:/{ print $4;} '"
         result = subprocess.check_output(command, shell=True)
         byte = int(result.replace('\n', '').split('.')[-1])
         if byte != 0:
