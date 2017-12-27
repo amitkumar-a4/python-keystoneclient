@@ -1,7 +1,7 @@
 #!/usr/bin/env python
 # vim: tabstop=4 shiftwidth=4 softtabstop=4
 #
-# Copyright (c) 2014 TrilioData, Inc.
+# Copyright (c) 2017 Trilio Data, Inc.
 # All Rights Reserved.
 #
 # The following users are already available:
@@ -51,6 +51,12 @@ from tzlocal import get_localzone
 
 from workloadmgr import auditlog
 from workloadmgr.openstack.common import timeutils
+
+# AWS S3 API
+import boto3
+import botocore
+from botocore.exceptions import ClientError
+
 
 logging.basicConfig(
     format='localhost - - [%(asctime)s] %(message)s',
@@ -4456,6 +4462,50 @@ def validate_nfs_share():
     except Exception as exception:
         body = str("NFS Daemon is not running on the server '%s'" % nfsserver)
         return bottle.HTTPResponse(status=500, body=body)
+
+
+@bottle.route('/validate_s3_credentials')
+@authorize()
+def validate_s3_credentials():
+    """ Validate the S3 credentials.
+
+    Validate all of the S3 credentials by attempting to get some bucket information.
+
+    Returns:
+        Success will be returned otherwise error 403, 404, or 500 will be retured
+        with any relevent information.
+    """
+
+    s3_access_key_id = bottle.request.query['s3_access_key_id']
+    s3_secret_access_key = bottle.request.query['s3_secret_access_key']
+    s3_endpoint = bottle.request.query['s3_endpoint']
+    s3_ssl = bottle.request.query['s3_ssl']
+    s3_region = bottle.request.query['s3_region']
+    s3_bucket = bottle.request.query['s3_bucket']
+    s3_signature_version = bottle.request.query['s3_signature']
+    s3_config_object = None
+    if s3_signature_version != 'default' and s3_signature_version != '':
+        s3_config_object = botocore.client.Config(signature_version=s3_signature_version)
+
+    try:
+        s3_client = boto3.client('s3',
+                                 region_name=s3_region,
+                                 use_ssl=s3_ssl,
+                                 aws_access_key_id=s3_access_key_id,
+                                 aws_secret_access_key=s3_secret_access_key,
+                                 endpoint_url=s3_endpoint,
+                                 config=s3_config_object)
+
+        bucket_info = s3_client.head_bucket(Bucket=s3_bucket)
+    except ClientError as error:
+        if error.response['ResponseMetadata']['HTTPStatusCode'] == 404:
+            return bottle.HTTPResponse(status=404, body='S3 bucket not found.')
+        elif error.response['ResponseMetadata']['HTTPStatusCode'] == 403:
+            return bottle.HTTPResponse(status=403, body='Authorization error. Check keys.')
+        else:
+            return bottle.HTTPResponse(status=500, body=body=str(error))
+
+    return {'status': 'Success'}
 
 
 def findXmlSection(dom, sectionName):
