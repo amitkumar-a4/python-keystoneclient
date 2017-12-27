@@ -314,7 +314,7 @@ class WorkloadMgrsController(wsgi.Controller):
 
             assignments = self.workload_api.get_assigned_policies(
                 context, context.project_id)
-            assigned_policies = [
+            available_policies = [
                 assignment.policy_id for assignment in assignments]
             policy_id = metadata.get('policy_id', None)
 
