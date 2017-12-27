@@ -114,10 +114,11 @@ class SSLWSGIRefServer(ServerAdapter):
                     pass
             self.options['handler_class'] = QuietHandler
         srv = make_server(self.host, self.port, handler, **self.options)
+        hostname = socket.gethostname()
         srv.socket = ssl.wrap_socket(
             srv.socket,
-            keyfile='/etc/tvault/ssl/localhost.key',
-            certfile='/etc/tvault/ssl/localhost.crt',  # path to certificate
+            keyfile='/etc/tvault/ssl/%s.key' % hostname,
+            certfile='/etc/tvault/ssl/%s.crt' % hostname,  # path to certificate
             server_side=True)
         srv.serve_forever()
 
@@ -4617,92 +4618,57 @@ def main():
             TVAULT_SERVICE_PASSWORD]
         subprocess.call(command, shell=False)
 
+        if not os.path.exists('/etc/tvault-config/'):
+            os.makedirs('/etc/tvault-config')
+
         # SSL regeneration
         prev_hostname = 'none'
+        fully_configured = 'false'
         Config = ConfigParser.RawConfigParser()
         try:
             Config.read('/etc/tvault-config/tvault-config.conf')
             config_data = dict(Config._defaults)
             prev_hostname = config_data.get('hostname', 'none')
+            fully_configured = config_data.get('fully_configured', 'false') 
         except Exception as exception:
             prev_hostname = 'none'
 
-        if prev_hostname != socket.gethostname():
-            if os.path.exists("/opt/stack/workloadmgr/etc/gen-cer"):
-                command = [
-                    'sudo',
-                    'mv',
-                    "/opt/stack/workloadmgr/etc/gen-cer",
-                    "/etc/tvault/ssl/"]
-                subprocess.call(command, shell=False, cwd="/etc/tvault/ssl")
-                os.chmod('/etc/tvault/ssl/gen-cer', 0o554)
-                command = ['sudo', 'sh', 'gen-cer', socket.gethostname()]
-                subprocess.call(command, shell=False, cwd="/etc/tvault/ssl")
-                command = [
-                    'sudo',
-                    'rm',
-                    '-rf',
-                    "/etc/tvault/ssl/" +
-                    socket.gethostname() +
-                    ".csr"]
-                subprocess.call(command, shell=False, cwd="/etc/tvault/ssl")
-                command = ['sudo', 'mv', "gen-cer",
-                           "/opt/stack/workloadmgr/etc/"]
-                subprocess.call(command, shell=False, cwd="/etc/tvault/ssl")
-                Config.set(None, 'hostname', socket.gethostname())
+        if prev_hostname != socket.gethostname() or \
+            fully_configured == 'false':
 
-                command = [
-                    'sudo',
-                    'mv',
-                    "/etc/tvault/ssl/localhost.crt",
-                    "/etc/tvault/ssl/localhost_bak.crt"]
-                subprocess.call(command, shell=False)
-                command = [
-                    'sudo',
-                    'mv',
-                    "/etc/tvault/ssl/localhost.key",
-                    "/etc/tvault/ssl/localhost_bak.key"]
-                subprocess.call(command, shell=False)
-                command = [
-                    'sudo',
-                    'mv',
-                    "/etc/tvault/ssl/" +
-                    socket.gethostname() +
-                    ".crt",
-                    "/etc/tvault/ssl/localhost.crt"]
-                subprocess.call(command, shell=False)
-                command = [
-                    'sudo',
-                    'mv',
-                    "/etc/tvault/ssl/" +
-                    socket.gethostname() +
-                    ".key",
-                    "/etc/tvault/ssl/localhost.key"]
-                subprocess.call(command, shell=False)
+            if os.path.exists("/etc/tvault/ssl/%s.crt" % prev_hostname):
+                shutil.move( "/etc/tvault/ssl/%s.crt" % prev_hostname,
+                             "/etc/tvault/ssl/%s_bak.crt" % prev_hostname)
+            if os.path.exists("/etc/tvault/ssl/%s.key" % prev_hostname):
+                shutil.move( "/etc/tvault/ssl/%s.key" % prev_hostname,
+                             "/etc/tvault/ssl/%s_bak.key" % prev_hostname)
 
-                # create hostkeys
-                command = ['sudo', 'rm', "/etc/ssh/ssh_host_rsa_key"]
-                subprocess.call(command, shell=False)
-                command = [
-                    'sudo',
-                    'ssh-keygen',
-                    '-f',
-                    "/etc/ssh/ssh_host_rsa_key",
-                    '-b',
-                    '4096',
-                    '-t',
-                    'rsa',
-                    '-q',
-                    '-N',
-                    ""]
-                subprocess.call(command, shell=False)
+            shutil.copy2("/opt/stack/workloadmgr/etc/gen-cer",
+                         "/etc/tvault/ssl/")
+            os.chmod('/etc/tvault/ssl/gen-cer', 0o554)
+            command = ['sudo', 'sh', 'gen-cer', socket.gethostname()]
+            subprocess.call(command, shell=False, cwd="/etc/tvault/ssl")
+            command = [ 'sudo', 'rm', '-rf', 
+                        os.path.join("/etc/tvault/ssl/",
+                                     socket.gethostname() + ".csr")]
+            subprocess.call(command, shell=False, cwd="/etc/tvault/ssl")
+            Config.set(None, 'hostname', socket.gethostname())
 
-                with open('/etc/tvault-config/tvault-config.conf', 'wb') as configfile:
-                    Config.write(configfile)
+            # create hostkeys
+            command = ['sudo', 'rm', "/etc/ssh/ssh_host_rsa_key"]
+            subprocess.call(command, shell=False)
+            command = [ 'sudo', 'ssh-keygen', '-f',
+                        "/etc/ssh/ssh_host_rsa_key", '-b', '4096', '-t',
+                        'rsa', '-q', '-N', ""]
+            subprocess.call(command, shell=False)
+
+            Config.set(None, 'fully_configured', 'true')
+            with open('/etc/tvault-config/tvault-config.conf', 'wb') as configfile:
+                Config.write(configfile)
 
     except Exception as exception:
         # TODO: implement logging
-        pass
+        raise
 
     http_thread = Thread(target=main_http)
     http_thread.daemon = True  # thread dies with the program
