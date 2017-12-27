@@ -443,13 +443,6 @@ class GlanceImageServiceV2(GlanceImageService):
                 return self._translate_from_glance(image_meta)
 
 
-def get_glance_client():
-    if CONF.glance_api_version == 1:
-        self.glanceclient =  GlanceImageServiceV1(client, production)
-    else:
-        self.glanceclient =  GlanceImageServiceV2(client, production)
-
-
 def _convert_timestamps_to_datetimes(image_meta):
     """Returns image with timestamp fields converted to datetime objects."""
     for attr in ['created_at', 'updated_at', 'deleted_at']:
@@ -589,5 +582,7 @@ def get_remote_image_service(context, image_href, production=True):
 
 
 def get_default_image_service(production=True):
-    return GlanceImageService(production=production)
-class GlanceImageService(object):
+    if CONF.glance_api_version == 1:
+        return GlanceImageServiceV1(client, production)
+    else:
+        return GlanceImageServiceV2(client, production)
