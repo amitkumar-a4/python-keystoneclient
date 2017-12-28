@@ -4039,6 +4039,7 @@ class API(base.Base):
         """
         try:
             failed_project_ids = []
+            project_to_add = {}
             # Remove those project id's which are wrong.
             try:
                 for project_id in add_projects[:]:
@@ -4047,9 +4048,9 @@ class API(base.Base):
                     keystoneclient = clients.Clients(
                         context).client("keystone")
                     project = keystoneclient.client.projects.get(project_id)
+                    project_to_add[project_id] = project.name
             except Exception as ex:
                 failed_project_ids.append(project_id)
-                add_projects.remove(project_id)
 
             # Validate policy_id
             policy = self.db.policy_get(context, policy_id)
@@ -4061,14 +4062,14 @@ class API(base.Base):
                 if pa.project_id in remove_projects:
                     self.db.policy_assignment_delete(context, pa.id)
                     remove_projects.remove(pa.project_id)
-                elif pa.project_id in add_projects:
-                    add_projects.remove(pa.project_id)
+                elif pa.project_id in project_to_add.keys():
+                    project_to_add.pop(pa.project_id)
 
             if len(remove_projects) > 0:
                 failed_project_ids.extend(remove_projects)
 
-            for proj_id in add_projects:
-                values = {'policy_id': policy_id, 'project_id': proj_id, 'policy_name': policy.display_name}
+            for proj_id, proj_name in project_to_add.iteritems():
+                values = {'policy_id': policy_id, 'project_id': proj_id, 'policy_name': policy.display_name, 'project_name': proj_name}
                 self.db.policy_assignment_create(context, values)
 
             workload_utils.upload_policy_db_entry(context, policy_id)
