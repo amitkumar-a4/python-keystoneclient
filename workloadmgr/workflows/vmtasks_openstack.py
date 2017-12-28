@@ -1300,7 +1300,7 @@ def restore_vm_security_groups(cntx, db, restore):
             return False
 
     def security_group_inside_check(
-            cntx, vm_security_group_rule_snaps, existinggroup):
+            cntx, vm_security_group_rule_snaps, existinggroup, parent_sg_id=None):
         existinggroup = network_service.security_group_get(
             cntx, existinggroup['id'])
         if len(vm_security_group_rule_snaps) != \
@@ -1365,10 +1365,10 @@ def restore_vm_security_groups(cntx, db, restore):
                         cntx, rule_remote_group_id)
                     rule.pop('remote_group_id')
 
-                    if rule_remote_group_id != existinggroup['id']:
+                    if rule_remote_group_id != existinggroup['id'] and rule_remote_group_id != str(parent_sg_id):
                         if not security_group_inside_check(
                                 cntx, remote_group_rule_snaps,
-                                rule_remote_group):
+                                rule_remote_group, parent_sg_id=existinggroup['id']):
                             continue
 
                 if match_rule_values(
