@@ -1290,14 +1290,15 @@ def restore_vm_security_groups(cntx, db, restore):
     def match_rule_values(rule1, rule2):
         # Removing id, security_group_id, tenant_id and remote_group_id,
         # from rules as values for this will not match
-        for key in ['id', 'tenant_id', 'security_group_id', 'remote_group_id']:
+        rules1 = copy.deepcopy(rule1)
+        rules2 = copy.deepcopy(rule2)
+        for key in ['id', 'name', 'tenant_id',
+                    'security_group_id', 'remote_group_id']:
             rule1.pop(key, None)
             rule2.pop(key, None)
+
         matched_items = set(rule1.items()) & set(rule2.items())
-        if len(matched_items) == len(rule1):
-            return True
-        else:
-            return False
+        retutn len(matched_items) == len(rule1):
 
     def security_group_inside_check(
             cntx, vm_security_group_rule_snaps, existinggroup, parent_sg_ids=[]):
@@ -1313,22 +1314,10 @@ def restore_vm_security_groups(cntx, db, restore):
 
             found = False
             remote_group_id = None
-            'description' in vm_security_group_rule_values and vm_security_group_rule_values.pop(
-                'description')
-            'updated_at' in vm_security_group_rule_values and vm_security_group_rule_values.pop(
-                'updated_at')
-            'created_at' in vm_security_group_rule_values and vm_security_group_rule_values.pop(
-                'created_at')
-            'id' in vm_security_group_rule_values and vm_security_group_rule_values.pop(
-                'id')
-            'project_id' in vm_security_group_rule_values and vm_security_group_rule_values.pop(
-                'project_id')
-            'tenant_id' in vm_security_group_rule_values and vm_security_group_rule_values.pop(
-                'tenant_id')
-            'revision_number' in vm_security_group_rule_values and vm_security_group_rule_values.pop(
-                'revision_number')
-            'security_group_id' in vm_security_group_rule_values and vm_security_group_rule_values.pop(
-                'security_group_id')
+            for key in ['description', 'updated_at', 'created_at', 'id',
+                        'project_id', 'tenant_id', 'revision_number',
+                        'security_group_id',]
+                vm_security_group_rule_values.pop(key, None)
 
             if vm_security_group_rule_values.get('remote_group_id', None):
                 remote_group_id = vm_security_group_rule_values.get(
@@ -1403,11 +1392,35 @@ def restore_vm_security_groups(cntx, db, restore):
         else:
             return None
 
+    def build_secgrp_graph(secgrp):
+        secgraph = Graph(directed=True)
+        # add vertices
+        for sec1 in secgrps:
+            secgraph.add_vertex(**sec1)
+
+        # add edges
+        for vs in secgraph.vs:
+            for rule in vs['rules']:
+                if rule.get('remote_group', None):
+                    rvs = secgraph.vs.find(id=rule.get('remote_group'))
+                    secgraph.add_edge(vs.index, rvs.index)
+
+        return secgraph
+
+    def build_graph_from_existing_secgrps():
+        existing_secgroups = network_service.security_group_list(cntx)
+        import pdb;pdb.set_trace()
+        for secgrp in existing_secgroups['security_groups']:
+            existing_secgroups_graph.append(build_secgrp_graph(secgrp))
+
     # refresh token
     cntx = nova._get_tenant_context(cntx)
 
     network_service = neutron.API(production=restore['restore_type'] != 'test')
     restored_security_groups = {}
+    existing_secgroups_graph = []
+
+    build_graph_from_existing_secgrps()
 
     snapshot_vm_resources = db.snapshot_resources_get(
         cntx, restore['snapshot_id'])
@@ -1431,6 +1444,7 @@ def restore_vm_security_groups(cntx, db, restore):
                      'res_id': snapshot_vm_resource.id}
                 continue
 
+            # create new security group here
             name = 'snap_of_' + db.get_metadata_value(
                 snapshot_vm_resource.metadata, 'name')
             description = 'snapshot - ' + db.get_metadata_value(
