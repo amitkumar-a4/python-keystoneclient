@@ -27,6 +27,7 @@ import shutil
 import datetime
 from threading import Thread
 import uuid
+import netifaces
 
 import bottle
 from bottle import static_file, ServerAdapter
@@ -86,6 +87,9 @@ def get_https_app(app):
         return app(environ, start_response)
     return https_app
 
+def get_default_nic():
+   gws = netifaces.gateways()
+   return gws['default'][netifaces.AF_INET]
 
 app = get_https_app(bottle.app())
 session_opts = {
@@ -110,10 +114,11 @@ class SSLWSGIRefServer(ServerAdapter):
                     pass
             self.options['handler_class'] = QuietHandler
         srv = make_server(self.host, self.port, handler, **self.options)
+        hostname = socket.gethostname()
         srv.socket = ssl.wrap_socket(
             srv.socket,
-            keyfile='/etc/tvault/ssl/localhost.key',
-            certfile='/etc/tvault/ssl/localhost.crt',  # path to certificate
+            keyfile='/etc/tvault/ssl/%s.key' % hostname,
+            certfile='/etc/tvault/ssl/%s.crt' % hostname,  # path to certificate
             server_side=True)
         srv.serve_forever()
 
@@ -556,6 +561,58 @@ def send_tvaultlogs_all():
 """############################ tvault config API's ########################"""
 
 
+def change_service_endpoint(wlm_url, region_name):
+    try:
+        Config = ConfigParser.RawConfigParser()
+        Config.read('/etc/workloadmgr/workloadmgr.conf')
+        service_tenant_name = Config.get(
+            'keystone_authtoken', 'admin_tenant_name')
+        data = {}
+        data['admin_username'] = Config.get('DEFAULT', 'nova_admin_username')
+        data['admin_password'] = Config.get('DEFAULT', 'nova_admin_password')
+        data['admin_tenant_name'] = Config.get(
+            'DEFAULT', 'neutron_admin_tenant_name')
+        data['keystone_admin_url'] = Config.get(
+            'keystone_authtoken', 'auth_url')
+        data['keystone_public_url'] = Config.get(
+            'keystone_authtoken', 'auth_uri')
+        data['domain_name'] = Config.get('DEFAULT', 'domain_name')
+
+        if data['domain_name'] == '':
+            data['domain_name'] = 'default'
+
+        global config_data
+        config_data = data
+        try:
+            keystone, tenants = _validate_keystone_client_and_version(
+                is_admin_url=False)
+        except Exception as e:
+            raise Exception(
+                "KeystoneError:Unable to connect to keystone Public URL " +
+                e.message)
+
+        services = keystone.services.list()
+        endpoints = keystone.endpoints.list()
+        for service in services:
+            if service.type == 'workloads':
+                ser_id = service.id
+                for endpoint in endpoints:
+                    if endpoint.service_id == service.id and endpoint.region == region_name:
+                        keystone.endpoints.delete(endpoint.id)
+
+        if keystone.version == 'v3':
+            keystone.endpoints.create(region=region_name,
+                                      service=ser_id,
+                                      url=wlm_url,
+                                      interface='public',
+                                      enabled=True)
+        else:
+            keystone.endpoints.create(region_name,
+                                      ser_id, wlm_url, wlm_url, wlm_url)
+    except Exception as ex:
+        raise ex
+
+
 def replace_line(file_path, pattern, substitute, starts_with=False):
     # Create temp file
     fh, abs_path = mkstemp()
@@ -936,7 +993,7 @@ def _authenticate_with_keystone():
     configure_nova()
     configure_neutron()
     configure_glance()
-    configure_horizon()
+    # configure_horizon()
 
     # image
     if keystone.version == 'v3':
@@ -1205,9 +1262,37 @@ def _register_service():
         wlm_service = keystone.services.create(
             'TrilioVaultWLM', 'workloads', 'Trilio Vault Workload Manager Service')
 
-    appliance_name = socket.gethostname()
+    if config_data['enable_ha'] == 'on':
+        ip, nic_name = get_default_nic()
+        command = 'iptables --append INPUT --in-interface ' + nic_name + ' --protocol tcp --match tcp --dport 3306 \
+                  --source ' + config_data['floating_ipaddress'] + '  --jump ACCEPT'
+        subprocess.check_call(command, shell=True)
+        command = 'iptables --append INPUT --in-interface ' + nic_name + ' --protocol tcp --match tcp --dport 4567 \
+                  --source ' + config_data['floating_ipaddress'] + '  --jump ACCEPT'
+        subprocess.check_call(command, shell=True)
+        command = 'iptables --append INPUT --in-interface ' + nic_name + ' --protocol tcp --match tcp --dport 4568 \
+                  --source ' + config_data['floating_ipaddress'] + '  --jump ACCEPT'
+        subprocess.check_call(command, shell=True)
+        command = 'iptables --append INPUT --in-interface ' + nic_name + ' --protocol tcp --match tcp --dport 4444 \
+                  --source ' + config_data['floating_ipaddress'] + '  --jump ACCEPT'
+        subprocess.check_call(command, shell=True)
+        command = "/sbin/ifconfig " + nic_name + " | awk '/Mask:/{ print $4;} '"
+        result = subprocess.check_output(command, shell=True)
+        byte = int(result.replace('\n', '').split('.')[-1])
+        if byte != 0:
+            byte = 255 - byte + 1
+        arr1 = config_data['floating_ipaddress'].split('.')
+        arr2 = config_data['floating_ipaddress'].split('.')
+        arr1[-1] = str(byte + 1)
+        arr2[-1] = str(byte)
+        virtual_ip = '.'.join(arr1)
+        bindaddr = '.'.join(arr2)
+        config_data['virtual_ip'] = virtual_ip
+        config_data['bindaddr'] = bindaddr
+
     #wlm_url = 'https://' + config_data['tvault_primary_node'] + ':8780' + '/v1/$(tenant_id)s'
     if config_data['enable_tls'] == 'on':
+        appliance_name = socket.gethostname()
         wlm_url = 'https://' + appliance_name + ':8780' + '/v1/$(tenant_id)s'
     else:
         wlm_url = 'http://' + \
@@ -3428,6 +3513,10 @@ def configure_service():
                      'enable_tls = ' + config_data.get('enable_tls', 'off'),
                      starts_with=True)
 
+        replace_line('/etc/workloadmgr/workloadmgr.conf', 'enable_ha = ',
+                     'enable_ha = ' + config_data.get('enable_ha', 'off'),
+                     starts_with=True)
+
         if config_data.get('enable_tls', 'off') == 'off':
             replace_line(
                 '/etc/workloadmgr/workloadmgr.conf',
@@ -3537,6 +3626,47 @@ def configure_service():
             '/etc/workloadmgr/api-paste.ini',
             'insecure = ',
             'insecure = True')
+
+        if config_data['nodetype'] == 'controller' and config_data['enable_ha'] == 'off':
+            try:
+                command = 'crm node attribute ' + socket.gethostname() + ' show configured'
+                subprocess.check_call(command, shell=True)
+                command = 'crm node attribute ' + socket.gethostname() + ' set configured disabled'
+                subprocess.check_call(command, shell=True)
+            except:
+                pass
+
+        if config_data['nodetype'] == 'controller' and config_data['enable_ha'] == 'on':
+            replace_line(
+                '/etc/corosync/corosync.conf',
+                'bindnetaddr: ',
+                '                bindnetaddr: ' + config_data['bindaddr'])
+            try:
+                command = ['sudo', 'service', 'corosync', 'restart']
+                subprocess.call(command, shell=False)
+                command = ['sudo', 'service', 'pacemaker', 'restart']
+                subprocess.call(command, shell=False)
+                command = ['sudo', 'service', 'tvault-ha', 'restart']
+                subprocess.call(command, shell=False)
+                command = 'crm configure property pe-warn-series-max="1000" pe-input-series-max="1000" \
+                          pe-error-series-max="1000" cluster-recheck-interval="5min"'
+                subprocess.check_call(command, shell=True)
+                command = 'crm configure property stonith-enabled=false'
+                subprocess.check_call(command, shell=True)
+                try:
+                    command = 'crm node attribute ' + socket.gethostname() + ' set ip ' + \
+                        config_data['floating_ipaddress']
+                    subprocess.check_call(command, shell=True)
+                except:
+                    pass
+                try:
+                    command = 'crm node attribute ' + socket.gethostname() + ' set virtip ' + \
+                        config_data['virtual_ip']
+                    subprocess.check_call(command, shell=True)
+                except:
+                    pass
+            except Exception as ex:
+                pass
 
     except Exception as exception:
         bottle.request.environ['beaker.session']['error_message'] = "Error: %(exception)s" % {
@@ -4036,6 +4166,7 @@ def configure_openstack():
                 raise Exception(
                     "cert or private key is empty. Please enter valid values")
 
+        config_data['enable_ha'] = config_inputs.get('enable_ha', 'off')
         config_data['guest_name'] = config_inputs['guest-name'].strip()
 
         parse_result = urlparse(config_data['keystone_admin_url'])
@@ -4158,7 +4289,7 @@ def reinitialize():
             tables = engine.table_names()
             connection.execute("SET FOREIGN_KEY_CHECKS=0")
             for table in tables:
-                if table != 'workload_types':
+                if table not in ['workload_types', 'workload_policy_fields']:
                     connection.execute("TRUNCATE TABLE " + str(table))
             connection.execute("SET FOREIGN_KEY_CHECKS=1")
             trans.commit()
@@ -4487,92 +4618,57 @@ def main():
             TVAULT_SERVICE_PASSWORD]
         subprocess.call(command, shell=False)
 
+        if not os.path.exists('/etc/tvault-config/'):
+            os.makedirs('/etc/tvault-config')
+
         # SSL regeneration
         prev_hostname = 'none'
+        fully_configured = 'false'
         Config = ConfigParser.RawConfigParser()
         try:
             Config.read('/etc/tvault-config/tvault-config.conf')
             config_data = dict(Config._defaults)
             prev_hostname = config_data.get('hostname', 'none')
+            fully_configured = config_data.get('fully_configured', 'false') 
         except Exception as exception:
             prev_hostname = 'none'
 
-        if prev_hostname != socket.gethostname():
-            if os.path.exists("/opt/stack/workloadmgr/etc/gen-cer"):
-                command = [
-                    'sudo',
-                    'mv',
-                    "/opt/stack/workloadmgr/etc/gen-cer",
-                    "/etc/tvault/ssl/"]
-                subprocess.call(command, shell=False, cwd="/etc/tvault/ssl")
-                os.chmod('/etc/tvault/ssl/gen-cer', 0o554)
-                command = ['sudo', 'sh', 'gen-cer', socket.gethostname()]
-                subprocess.call(command, shell=False, cwd="/etc/tvault/ssl")
-                command = [
-                    'sudo',
-                    'rm',
-                    '-rf',
-                    "/etc/tvault/ssl/" +
-                    socket.gethostname() +
-                    ".csr"]
-                subprocess.call(command, shell=False, cwd="/etc/tvault/ssl")
-                command = ['sudo', 'mv', "gen-cer",
-                           "/opt/stack/workloadmgr/etc/"]
-                subprocess.call(command, shell=False, cwd="/etc/tvault/ssl")
-                Config.set(None, 'hostname', socket.gethostname())
+        if prev_hostname != socket.gethostname() or \
+            fully_configured == 'false':
 
-                command = [
-                    'sudo',
-                    'mv',
-                    "/etc/tvault/ssl/localhost.crt",
-                    "/etc/tvault/ssl/localhost_bak.crt"]
-                subprocess.call(command, shell=False)
-                command = [
-                    'sudo',
-                    'mv',
-                    "/etc/tvault/ssl/localhost.key",
-                    "/etc/tvault/ssl/localhost_bak.key"]
-                subprocess.call(command, shell=False)
-                command = [
-                    'sudo',
-                    'mv',
-                    "/etc/tvault/ssl/" +
-                    socket.gethostname() +
-                    ".crt",
-                    "/etc/tvault/ssl/localhost.crt"]
-                subprocess.call(command, shell=False)
-                command = [
-                    'sudo',
-                    'mv',
-                    "/etc/tvault/ssl/" +
-                    socket.gethostname() +
-                    ".key",
-                    "/etc/tvault/ssl/localhost.key"]
-                subprocess.call(command, shell=False)
+            if os.path.exists("/etc/tvault/ssl/%s.crt" % prev_hostname):
+                shutil.move( "/etc/tvault/ssl/%s.crt" % prev_hostname,
+                             "/etc/tvault/ssl/%s_bak.crt" % prev_hostname)
+            if os.path.exists("/etc/tvault/ssl/%s.key" % prev_hostname):
+                shutil.move( "/etc/tvault/ssl/%s.key" % prev_hostname,
+                             "/etc/tvault/ssl/%s_bak.key" % prev_hostname)
 
-                # create hostkeys
-                command = ['sudo', 'rm', "/etc/ssh/ssh_host_rsa_key"]
-                subprocess.call(command, shell=False)
-                command = [
-                    'sudo',
-                    'ssh-keygen',
-                    '-f',
-                    "/etc/ssh/ssh_host_rsa_key",
-                    '-b',
-                    '4096',
-                    '-t',
-                    'rsa',
-                    '-q',
-                    '-N',
-                    ""]
-                subprocess.call(command, shell=False)
+            shutil.copy2("/opt/stack/workloadmgr/etc/gen-cer",
+                         "/etc/tvault/ssl/")
+            os.chmod('/etc/tvault/ssl/gen-cer', 0o554)
+            command = ['sudo', 'sh', 'gen-cer', socket.gethostname()]
+            subprocess.call(command, shell=False, cwd="/etc/tvault/ssl")
+            command = [ 'sudo', 'rm', '-rf', 
+                        os.path.join("/etc/tvault/ssl/",
+                                     socket.gethostname() + ".csr")]
+            subprocess.call(command, shell=False, cwd="/etc/tvault/ssl")
+            Config.set(None, 'hostname', socket.gethostname())
 
-                with open('/etc/tvault-config/tvault-config.conf', 'wb') as configfile:
-                    Config.write(configfile)
+            # create hostkeys
+            command = ['sudo', 'rm', "/etc/ssh/ssh_host_rsa_key"]
+            subprocess.call(command, shell=False)
+            command = [ 'sudo', 'ssh-keygen', '-f',
+                        "/etc/ssh/ssh_host_rsa_key", '-b', '4096', '-t',
+                        'rsa', '-q', '-N', ""]
+            subprocess.call(command, shell=False)
+
+            Config.set(None, 'fully_configured', 'true')
+            with open('/etc/tvault-config/tvault-config.conf', 'wb') as configfile:
+                Config.write(configfile)
 
     except Exception as exception:
         # TODO: implement logging
-        pass
+        raise
 
     http_thread = Thread(target=main_http)
     http_thread.daemon = True  # thread dies with the program

@@ -179,6 +179,32 @@ def import_settings(cntx, new_version, upgrade=True):
         LOG.exception(ex)
 
 
+def import_policy(cntx, new_version, upgrade=True):
+    try:
+        db = WorkloadMgrDB().db
+        backup_target, path = vault.get_settings_backup_target()
+        policy_path = backup_target.get_policy_path()
+        policy_db_files = [f for f in os.listdir(policy_path) if (
+            os.path.isfile(os.path.join(policy_path, f)) and f.startswith("policy_"))]
+        for policy_db in policy_db_files:
+            get_values = lambda objs, k , v: {obj[k]: obj[v] for obj in objs}
+            policy_json = json.loads(backup_target.get_object(
+                os.path.join(policy_path, policy_db)))
+            policy_assignments = policy_json.pop('policy_assignments', [])
+            field_values = policy_json.pop('field_values', [])
+            policy_json['field_values'] = get_values(field_values, 'policy_field_name', 'value')
+            metadata = policy_json.pop('metadata', [])
+            policy_json['metadata'] = get_values(metadata, 'key', 'value')
+            _adjust_values(cntx, new_version, policy_json, upgrade)
+            db.policy_create(cntx, policy_json)
+            if len(policy_assignments) > 0:
+                for pa in policy_assignments:
+                    values = {'policy_id': pa['policy_id'], 'project_id': pa['project_id']}
+                    db.policy_assignment_create(cntx, values)
+    except Exception as ex:
+        LOG.exception(ex)
+
+
 def update_backup_media_target(file_path, backup_endpoint):
     try:
         file_data = vault_backend.get_object(file_path)

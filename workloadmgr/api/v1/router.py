@@ -24,6 +24,8 @@ from workloadmgr.api.v1 import workload_transfer as transfers
 from workloadmgr.api.v1 import global_job_scheduler
 from workloadmgr.api.v1 import config_workload
 from workloadmgr.api.v1 import config_backup
+from workloadmgr.api.v1 import workload_policy
+
 LOG = logging.getLogger(__name__)
 
 
@@ -221,6 +223,20 @@ class APIRouter(workloadmgr.api.APIRouter):
                        "/{project_id}/workloads/metrics/storage_usage",
                        controller=self.resources['workloads'],
                        action='get_storage_usage',
+                       conditions={"method": ['GET']})
+
+        # get total storage used and vms protected by tenants
+        mapper.connect("tenants_usage",
+                       "/{project_id}/workloads/metrics/tenants_usage",
+                       controller=self.resources['workloads'],
+                       action='get_tenants_usage',
+                       conditions={"method": ['GET']})
+
+        # get vms protected by tenant
+        mapper.connect("workload_vms_protected",
+                       "/{project_id}/workloads/metrics/vms_protected",
+                       controller=self.resources['workloads'],
+                       action='get_protected_vms',
                        conditions={"method": ['GET']})
 
         # get recent activities
@@ -746,3 +762,61 @@ class APIRouter(workloadmgr.api.APIRouter):
                        controller=self.resources['config_backup'],
                        action='config_backup_delete',
                        conditions={"method": ['DELETE']})
+
+        #######################################################################
+        # Workload Policy
+        self.resources['workload_policy'] = workload_policy.create_resource(
+            ext_mgr)
+        mapper.connect("workload_policy_create",
+                       "/{project_id}/workload_policy/",
+                       controller=self.resources['workload_policy'],
+                       action='policy_create',
+                       conditions={"method": ['POST']})
+
+        mapper.connect("workload_policy_update",
+                       "/{project_id}/workload_policy/{id}",
+                       controller=self.resources['workload_policy'],
+                       action='policy_update',
+                       conditions={"method": ['PUT']})
+
+        mapper.connect("workload_policy_get",
+                       "/{project_id}/workload_policy/{id}",
+                       controller=self.resources['workload_policy'],
+                       action='policy_get',
+                       conditions={"method": ['GET']})
+
+        mapper.connect("workload_policy_list",
+                       "/{project_id}/workload_policy/",
+                       controller=self.resources['workload_policy'],
+                       action='policy_get_all',
+                       conditions={"method": ['GET']})
+
+        mapper.connect("workload_policy_delete",
+                       "/{project_id}/workload_policy/{id}",
+                       controller=self.resources['workload_policy'],
+                       action='policy_delete',
+                       conditions={"method": ['DELETE']})
+
+        mapper.connect("workload_policy_assign",
+                       "/{project_id}/workload_policy/{policy_id}/assign",
+                       controller=self.resources['workload_policy'],
+                       action='policy_assign',
+                       conditions={"method": ['POST']})
+
+        mapper.connect("list_assigned_policies",
+                       "/{project_id}/workload_policy/assigned/{tenant_id}",
+                       controller=self.resources['workload_policy'],
+                       action='get_assigned_policies',
+                       conditions={"method": ['GET']})
+
+        mapper.connect("create_policy_field",
+                       "/{project_id}/policy_field/",
+                       controller=self.resources['workload_policy'],
+                       action='policy_field_create',
+                       conditions={"method": ['POST']})
+
+        mapper.connect("list_policy_fields",
+                       "/{project_id}/policy_field/",
+                       controller=self.resources['workload_policy'],
+                       action='policy_field_list',
+                       conditions={"method": ['GET']})

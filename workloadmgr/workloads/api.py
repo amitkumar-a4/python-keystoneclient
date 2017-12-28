@@ -439,6 +439,31 @@ class API(base.Base):
             self.workload_ensure_global_job_scheduler(context)
 
     @autolog.log_method(logger=Logger)
+    def _apply_workload_policy(self, context, policy_id, jobschedule):
+        try:
+            policy = self.policy_get(context, policy_id)
+            assignments = self.get_assigned_policies(
+                context, context.project_id)
+
+            assigned_policies = [
+                assignment.policy_id for assignment in assignments]
+            if len(available_policies) == 0:
+                message = "No policy is assigned to project: %s" % (
+                    context.project_id)
+                raise wlm_exceptions.ErrorOccurred(message)
+            if policy_id not in available_policies:
+                message = "Given policy: %s not availabe for project: %s" % (
+                    policy_id, context.project_id)
+                raise wlm_exceptions.ErrorOccurred(message)
+
+            for field_value in policy.field_values:
+                jobschedule[field_value['policy_field_name']
+                            ] = field_value['value']
+        except Exception as ex:
+            LOG.exception(ex)
+            raise ex
+
+    @autolog.log_method(logger=Logger)
     @wrap_check_policy
     def search(self, context, data):
         if not re.match("^(/[^/ ]*)+/?$", data['filepath']):
@@ -804,6 +829,13 @@ class API(base.Base):
         return workloads
 
     @autolog.log_method(logger=Logger)
+    @wrap_check_policy
+    def workload_vms_get_all(self, context, search_opts={}):
+        db_vms = self.db.workload_vms_get(context, None, **search_opts)
+        vms = [{'id': vm.vm_id} for vm in db_vms]
+        return {'protected_vms': vms}
+
+    @autolog.log_method(logger=Logger)
     @create_trust
     @check_license
     @wrap_check_policy
@@ -820,6 +852,11 @@ class API(base.Base):
                 name +
                 '\' Create Requested',
                 None)
+
+            policy_id = metadata.get('policy_id', None)
+            if policy_id is not None:
+                self._apply_workload_policy(context, policy_id, jobschedule)
+
             compute_service = nova.API(production=True)
             instances_with_name = compute_service.get_servers(context)
             instance_ids = map(lambda x: x.id, instances_with_name)
@@ -898,6 +935,7 @@ class API(base.Base):
                        'jobschedule': pickle.dumps(jobschedule, 0),
                        'host': socket.gethostname(), }
             workload = self.db.workload_create(context, options)
+
             for instance in instances:
                 values = {'workload_id': workload.id,
                           'vm_id': instance['instance-id'],
@@ -1023,6 +1061,21 @@ class API(base.Base):
         if 'metadata' in workload and workload['metadata']:
             purge_metadata = True
             options['metadata'] = workload['metadata']
+            if 'policy_id' in workload['metadata'] and workload['metadata']['policy_id'] is not None:
+                policy_id = workload['metadata']['policy_id']
+                assignments = self.get_assigned_policies(
+                    context, context.project_id)
+                assigned_policies = [
+                    assignment.policy_id for assignment in assignments]
+                if policy_id not in available_policies:
+                    message = "Policy %s is not assigned to project %s" % (
+                        policy_id, context.project_id)
+                    raise wlm_exceptions.ErrorOccurred(message)
+
+                if 'jobschedule' not in workload:
+                    workload['jobschedule'] = {}
+                self._apply_workload_policy(
+                    context, policy_id, workload['jobschedule'])
 
         if 'jobschedule' in workload and workload['jobschedule'] and self._scheduler.running:
 
@@ -1346,6 +1399,13 @@ class API(base.Base):
             import_settings_method = getattr(import_workload_module,
                                              'import_settings')
             import_settings_method(context, models.DB_VERSION)
+
+            # Import Workload policies
+            import_policy_module = importlib.import_module(
+                "workloadmgr.db.imports.import_workload_1_0_177")
+            import_policy_method = getattr(import_policy_module,
+                                           'import_policy')
+            import_policy_method(context, models.DB_VERSION)
 
             self.workload_ensure_global_job_scheduler(context)
 
@@ -3241,9 +3301,9 @@ class API(base.Base):
     @autolog.log_method(logger=Logger)
     @upload_settings
     @wrap_check_policy
-    def license_create(self, context, license_text):
+    def license_create(self, context, license_data):
 
-        license_json = json.dumps(parse_license_text(license_text))
+        license_json = json.dumps(parse_license_text(license_data['lic_txt']))
         setting = {u'category': "license",
                    u'name': "license-%s" % str(uuid.uuid4()),
                    u'description': u'TrilioVault License Key',
@@ -3251,7 +3311,7 @@ class API(base.Base):
                    u'user_id': context.user_id,
                    u'is_public': False,
                    u'is_hidden': True,
-                   u'metadata': {},
+                   u'metadata': {'filename': license_data['file_name']},
                    u'type': "license_key", }
         created_license = []
         try:
@@ -3280,7 +3340,9 @@ class API(base.Base):
         if len(license) == 0:
             raise Exception("No licenses added to TrilioVault")
 
-        return json.loads(license[0].value)
+        lic = json.loads(license[0].value)
+        lic['metadata'] = license[0]['metadata']
+        return lic
 
     @autolog.log_method(logger=Logger)
     @wrap_check_policy
@@ -3611,12 +3673,17 @@ class API(base.Base):
                         config_data.pop('trusted_user'))
                 if 'authorized_key' in config_data:
                     os.remove(authorized_key)
-                    metadata['authorized_key'] = vault.get_key_file(
+                    trust_creds['authorized_key'] = metadata['authorized_key'] = vault.get_key_file(
                         config_data['authorized_key'])
 
             if 'databases' in config_data:
+                if 'trust_creds' not in locals():
+                    trust_creds['trusted_user'] = _get_matadata(
+                        existing_config_workload.metadata, 'trusted_user')
+                    trust_creds['authorized_key'] = _get_matadata(
+                        existing_config_workload.metadata, 'authorized_key')
                 workload_utils.validate_database_creds(
-                    context, config_data['databases'])
+                    context, config_data['databases'], trust_creds)
                 metadata['databases'] = pickle.dumps(
                     config_data.pop('databases'))
 
@@ -3832,6 +3899,288 @@ class API(base.Base):
                 ' Delete Submited',
                 config_backup)
             return backup
+        except Exception as ex:
+            LOG.exception(ex)
+            raise wlm_exceptions.ErrorOccurred(
+                reason=ex.message %
+                (ex.kwargs if hasattr(
+                    ex, 'kwargs') else {}))
+
+    # Workload Policy API's
+    @wrap_check_policy
+    def policy_create(self, context, name, description, metadata, field_values):
+        """
+        Create a policy.
+        """
+        try:
+            AUDITLOG.log(context, 'Policy \'' + name +
+                         '\' Create Requested', None)
+
+            # verify field names provided with available policy fields
+            fields = self.db.policy_fields_get_all(context)
+            policy_fields = [f.field_name for f in fields]
+
+            if (len(field_values.keys()) != len(policy_fields)) or len(set(field_values.keys()).difference(set(policy_fields))) > 0:
+                raise wlm_exceptions.InvalidRequest(
+                    reason="Please provide only %s as part of policy fields" % str(policy_fields))
+
+            options = {'user_id': context.user_id,
+                       'project_id': context.project_id,
+                       'display_name': name,
+                       'display_description': description,
+                       'status': 'available',
+                       'metadata': metadata,
+                       'field_values': field_values}
+            policy = self.db.policy_create(context, options)
+
+            workload_utils.upload_policy_db_entry(context, policy.id)
+            AUDITLOG.log(context, 'Policy \'' +
+                         policy['display_name'] + '\' Create Submitted', policy)
+            return self.db.policy_get(context, policy['id'])
+        except Exception as ex:
+            LOG.exception(ex)
+            if 'policy' in locals():
+                self.db.policy_update(context, policy['id'],
+                                      {'status': 'error',
+                                       'error_msg': ex.kwargs['reason'] if hasattr(ex,
+                                                                                   'kwargs') and 'reason' in ex.kwargs else {}})
+            raise
+
+    @wrap_check_policy
+    def policy_update(self, context, policy_id, values):
+        """
+        Update given policy.
+        """
+        try:
+            policy = self.db.policy_get(context, policy_id)
+
+            AUDITLOG.log(context, 'Policy \'' +
+                         policy['display_name'] + '\' Update Requested', None)
+
+            policy_assignments = self.db.policy_assignments_get_all(
+                context, policy_id=policy_id, workloads=True)
+            if len(policy_assignments) > 0:
+                raise wlm_exceptions.ErrorOccurred(
+                    reason="Can not update policy: %s. It's assigned to workloads." % (policy_id))
+
+            # verify field names provided with available policy fields
+            field_values = values.get('field_values', {})
+            if len(field_values) > 0:
+                fields = self.db.policy_fields_get_all(context)
+                policy_fields = [f.field_name for f in fields]
+
+                if len(set(policy_fields).union(set(field_values.keys()))) > len(policy_fields):
+                    raise wlm_exceptions.InvalidRequest(
+                        reason="Please provide only %s as part of policy fields" % str(policy_fields))
+
+            policy = self.db.policy_update(context, policy_id, values)
+
+            workload_utils.upload_policy_db_entry(context, policy_id)
+            AUDITLOG.log(context, 'Policy \'' +
+                         policy['display_name'] + '\' Update Submitted', policy)
+            return policy
+        except Exception as ex:
+            LOG.exception(ex)
+            raise
+
+    @wrap_check_policy
+    def policy_get(self, context, policy_id):
+        """
+        Get policy object.
+        """
+        try:
+            policy = self.db.policy_get(context, policy_id)
+            return policy
+        except Exception as ex:
+            LOG.exception(ex)
+            raise
+
+    @wrap_check_policy
+    def policy_list(self, context, search_opts={}):
+        """
+        List all available policies.
+        """
+        try:
+            policies = self.db.policy_get_all(context, **search_opts)
+            return policies
+        except Exception as ex:
+            LOG.exception(ex)
+            raise
+
+    @wrap_check_policy
+    def policy_delete(self, context, policy_id):
+        """
+        Delete the given policy.
+        """
+        try:
+            policy = self.db.policy_get(context, policy_id)
+            AUDITLOG.log(context, 'Policy \'' +
+                         policy['display_name'] + '\' Delete Requested', None)
+
+            #Check policy is not assigned to any workload
+            workload_assignments = self.db.policy_assignments_get_all(
+                context, policy_id=policy_id, workloads=True)
+            if len(workload_assignments) > 0:
+                raise wlm_exceptions.ErrorOccurred(
+                    reason="Can not delete policy: %s. It's assigned to workloads." % (policy_id))
+
+            #Remove policy assignments from projects.
+            policy_assignments = self.db.policy_assignments_get_all(
+                context, policy_id=policy_id)
+
+            for pa in policy_assignments:
+                self.db.policy_assignment_delete(context, pa.id)
+
+            self.db.policy_delete(context, policy_id)
+            workload_utils.policy_delete(context, policy_id)
+            AUDITLOG.log(context, 'Policy \'' +
+                         policy['display_name'] + '\' Delete Submitted', None)
+        except Exception as ex:
+            LOG.exception(ex)
+            raise
+
+    @wrap_check_policy
+    def policy_assign(self, context, policy_id, add_projects, remove_projects):
+        """
+        Assign/remove the policy to a tenant.
+        """
+        try:
+            failed_project_ids = []
+            # Remove those project id's which are wrong.
+            try:
+                for project_id in add_projects[:]:
+                    # Validate tenant_id existance
+                    clients.initialise()
+                    keystoneclient = clients.Clients(
+                        context).client("keystone")
+                    project = keystoneclient.client.projects.get(project_id)
+            except Exception as ex:
+                failed_project_ids.append(project_id)
+                add_projects.remove(project_id)
+
+            # Validate policy_id
+            policy = self.db.policy_get(context, policy_id)
+
+            policy_assignments = self.db.policy_assignments_get_all(
+                context, policy_id=policy_id)
+
+            for pa in policy_assignments:
+                if pa.project_id in remove_projects:
+                    self.db.policy_assignment_delete(context, pa.id)
+                    remove_projects.remove(pa.project_id)
+                elif pa.project_id in add_projects:
+                    add_projects.remove(pa.project_id)
+
+            if len(remove_projects) > 0:
+                failed_project_ids.extend(remove_projects)
+
+            for proj_id in add_projects:
+                values = {'policy_id': policy_id, 'project_id': proj_id, 'policy_name': policy.display_name}
+                self.db.policy_assignment_create(context, values)
+
+            workload_utils.upload_policy_db_entry(context, policy_id)
+            policy = self.db.policy_get(context, policy_id)
+            return (policy, failed_project_ids)
+        except Exception as ex:
+            LOG.exception(ex)
+            raise
+
+    @wrap_check_policy
+    def get_assigned_policies(self, context, project_id):
+        """
+        list the policies which are assigned to given project
+        """
+        try:
+            assigned_policies = self.db.policy_assignments_get_all(
+                context, project_id=project_id)
+            return assigned_policies
+        except Exception as ex:
+            LOG.exception(ex)
+            raise
+
+    @autolog.log_method(logger=Logger)
+    @wrap_check_policy
+    def policy_field_create(self, context, name, type):
+        """
+        Create a policy_field. No RPC call is made
+        """
+        AUDITLOG.log(context, 'Policy Field \'' +
+                     name + '\' Create Requested', None)
+        options = {'field_name': name,
+                   'type': type,
+                   }
+        policy_field = self.db.policy_field_create(context, options)
+        AUDITLOG.log(context, 'Policy Field \'' + name +
+                     '\' Create Submitted', policy_field)
+        return policy_field
+
+    @autolog.log_method(logger=Logger)
+    @wrap_check_policy
+    def policy_field_list(self, context):
+        """
+        List all policy fields.
+        """
+        policy_fields = self.db.policy_fields_get_all(context)
+        return policy_fields
+
+    @autolog.log_method(logger=Logger)
+    @wrap_check_policy
+    def get_tenants_usage(self, context):
+        """
+        Get storage used and vm's protected by different tenants.
+        """
+        try:
+            total_usage = 0
+            total_capacity = 0
+            total_vms_protected = 0
+            tenants_usage = self.db.get_tenants_usage(
+                context)
+            nova_client = workloadmgr_keystoneclient.KeystoneClientBase(
+                context).nova_client
+            search_opts = {'all_tenants': 1}
+            servers = nova_client.servers.list(search_opts=search_opts)
+            tenant_wise_servers = {}
+            for server in servers:
+                if server.tenant_id not in tenant_wise_servers:
+                    tenant_wise_servers[server.tenant_id] = [server.id]
+                else:
+                    tenant_wise_servers[server.tenant_id].append(server.id)
+            for tenant_id in tenant_wise_servers:
+                if tenant_id in tenants_usage:
+                    protected = len(set(tenants_usage[tenant_id]['vms_protected']).intersection(
+                        set(tenant_wise_servers[tenant_id])))
+                    passively_protected = len(set(tenants_usage[tenant_id]['vms_protected']).difference(
+                        set(tenant_wise_servers[tenant_id])))
+                    tenants_usage[tenant_id]['vms_protected'] = protected
+                    total_vms_protected += protected
+                    tenants_usage[tenant_id]['total_vms'] = len(
+                        tenant_wise_servers[tenant_id])
+                    tenants_usage[tenant_id]['passively_protected'] = passively_protected
+                else:
+                    tenants_usage[tenant_id] = {'vms_protected': 0, 'total_vms': len(
+                        tenant_wise_servers[tenant_id]), 'used_capacity': 0, 'passively_protected': 0}
+
+            # Update tenants_usage for those tenants which doesn't have any workloads
+            clients.initialise()
+            keystoneclient = clients.Clients(context).client("keystone")
+            tenants = keystoneclient.client.projects.list()
+
+            for tenant in tenants:
+                if tenant.id not in tenants_usage:
+                    tenants_usage[tenant.id] = {
+                        'vms_protected': 0, 'total_vms': 0, 'used_capacity': 0, 'passively_protected': 0, 'tenant_name': tenant.name}
+                else:
+                    tenants_usage[tenant.id]['tenant_name'] = tenant.name
+
+            backends_storage_stats = self.get_storage_usage(context)
+
+            for backend in backends_storage_stats['storage_usage']:
+                total_capacity += int(backend['total_capacity'])
+                total_usage += int(backend['total_utilization'])
+            global_usage = {'total_capacity': total_capacity, 'total_usage': total_usage, 'total_vms': len(
+                servers), 'vms_protected': total_vms_protected}
+            return {'tenants_usage': tenants_usage,
+                    'global_usage': global_usage}
         except Exception as ex:
             LOG.exception(ex)
             raise wlm_exceptions.ErrorOccurred(

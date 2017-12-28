@@ -681,3 +681,107 @@ def config_backup_get_all(context, **kwargs):
 def config_backup_delete(context, backup_id, **kwargs):
     """get all backups for OpenStack config"""
     return IMPL.config_backup_delete(context, backup_id, **kwargs)
+
+# Workload Policy API's
+def policy_create(context, values, **kwargs):
+    """create workload policy"""
+    return IMPL.policy_create(context, values, **kwargs)
+
+
+def policy_update(context, policy_id, values, purge_metadata=False, **kwargs):
+    """update workload policy"""
+    return IMPL.policy_update(context, policy_id, values, purge_metadata, **kwargs)
+
+
+def policy_get_all(context, **kwargs):
+    """get all workload policy"""
+    return IMPL.policy_get_all(context, **kwargs)
+
+
+def policy_get(context, policy_id, **kwargs):
+    """get workload policy"""
+    return IMPL.policy_get(context, policy_id, **kwargs)
+
+
+def policy_delete(context, policy_id, **kwargs):
+    """delete workload policy"""
+    return IMPL.policy_delete(context, policy_id, **kwargs)
+
+
+def policy_metadata_create(context, values, **kwargs):
+    """create policy metadata"""
+    return IMPL.policy_metadata_create(context, values, **kwargs)
+
+
+def policy_field_create(context, values, **kwargs):
+    """create policy field"""
+    return IMPL.policy_field_create(context, values, **kwargs)
+
+
+def policy_field_update(context, field_id, values, **kwargs):
+    """update policy field"""
+    return IMPL.policy_field_update(context, field_id, values, **kwargs)
+
+
+def policy_fields_get_all(context, **kwargs):
+    """get all policy fields"""
+    return IMPL.policy_fields_get_all(context, **kwargs)
+
+
+def policy_field_get(context, field_id, **kwargs):
+    """get policy field"""
+    return IMPL.policy_field_get(context, field_id, **kwargs)
+
+
+def policy_field_delete(context, field_id, **kwargs):
+    """delete policy field"""
+    return IMPL.policy_field_delete(context, field_id, **kwargs)
+
+
+def policy_value_create(context, values, **kwargs):
+    """create policy values"""
+    return IMPL.policy_value_create(context, values, **kwargs)
+
+
+def policy_values_get_all(context, **kwargs):
+    """get all policy field values"""
+    return IMPL.policy_values_get_all(context, **kwargs)
+
+
+def policy_value_get(context, value_id, **kwargs):
+    """get policy field value"""
+    return IMPL.policy_value_get(context, value_id, **kwargs)
+
+
+def policy_value_delete(context, value_id, **kwargs):
+    """create policy metadata"""
+    return IMPL.policy_value_delete(context, value_id, **kwargs)
+
+
+def policy_assignment_create(context, values, **kwargs):
+    """create policy assignment"""
+    return IMPL.policy_assignment_create(context, values, **kwargs)
+
+
+def policy_assignment_update(context, assignment_id, values, **kwargs):
+    """update policy assignment"""
+    return IMPL.policy_assignment_update(context, assignment_id, values, **kwargs)
+
+
+def policy_assignments_get_all(context, **kwargs):
+    """get all policy assignment"""
+    return IMPL.policy_assignments_get_all(context, **kwargs)
+
+
+def policy_assignment_get(context, assignment_id, **kwargs):
+    """create policy assignment"""
+    return IMPL.policy_assignment_get(context, assignment_id, **kwargs)
+
+
+def policy_assignment_delete(context, assignment_id, **kwargs):
+    """delete policy assignment"""
+    return IMPL.policy_assignment_delete(context, assignment_id, **kwargs)
+
+def get_tenants_usage(context, **kwargs):
+    """Get storage usage of a tenant."""
+    return IMPL.get_tenants_usage(context, **kwargs)

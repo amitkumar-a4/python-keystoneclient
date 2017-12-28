@@ -249,18 +249,21 @@ class WorkloadMgrsController(wsgi.Controller):
             # Get value of query parameter 'all_workloads'
             page_number = None
             nfs_share = None
+            project_id = None
             if ('QUERY_STRING' in req.environ):
                 var = parse_qs(req.environ['QUERY_STRING'])
                 all_workloads = var.get('all_workloads', [''])[0]
                 all_workloads = bool(escape(all_workloads))
                 page_number = var.get('page_number', [''])[0]
                 nfs_share = var.get('nfs_share', [''])[0]
+                project_id = var.get('project_id', [''])[0]
             workloads_all = self.workload_api.workload_get_all(
                 context,
                 search_opts={
                     'page_number': page_number,
                     'nfs_share': nfs_share,
-                    'all_workloads': all_workloads})
+                    'all_workloads': all_workloads,
+                    'project_id': project_id})
             limited_list = common.limited(workloads_all, req)
             if is_detail:
                 workloads = self._view_builder.detail_list(
@@ -304,6 +307,22 @@ class WorkloadMgrsController(wsgi.Controller):
             source_platform = workload.get(
                 'source_platform', "") or 'openstack'
             source_platform = source_platform.strip() or "openstack"
+
+            metadata = workload.get('metadata', {})
+            if not metadata:
+                metadata = {}
+
+            assignments = self.workload_api.get_assigned_policies(
+                context, context.project_id)
+            available_policies = [
+                assignment.policy_id for assignment in assignments]
+            policy_id = metadata.get('policy_id', None)
+
+            if policy_id is None and len(available_policies) > 0:
+                message = "Please provide policy id from available policies: %s" % (
+                    str(available_policies))
+                raise exception.ErrorOccurred(message)
+
             jobdefaults = {
                 'fullbackup_interval': '-1',
                 'start_time': '09:00 PM',
@@ -342,9 +361,6 @@ class WorkloadMgrsController(wsgi.Controller):
             instances = workload.get('instances', {})
             if not instances:
                 instances = {}
-            metadata = workload.get('metadata', {})
-            if not metadata:
-                metadata = {}
 
             try:
                 new_workload = self.workload_api.workload_create(
@@ -928,8 +944,8 @@ class WorkloadMgrsController(wsgi.Controller):
         try:
             context = req.environ['workloadmgr.context']
 
-            license_text = body['license']
-            license = self.workload_api.license_create(context, license_text)
+            license_data = body['license']
+            license = self.workload_api.license_create(context, license_data)
             return {'license': license}
         except exc.HTTPNotFound as error:
             raise error
@@ -946,6 +962,7 @@ class WorkloadMgrsController(wsgi.Controller):
             context = req.environ['workloadmgr.context']
             license = self.workload_api.license_list(context)
             return {'license': license}
+
         except exc.HTTPNotFound as error:
             LOG.exception(error)
             raise error
@@ -1047,6 +1064,50 @@ class WorkloadMgrsController(wsgi.Controller):
             except exception.InvalidState as error:
                 LOG.exception(error)
                 raise exc.HTTPBadRequest(explanation=unicode(error))
+        except exc.HTTPNotFound as error:
+            LOG.exception(error)
+            raise error
+        except exc.HTTPBadRequest as error:
+            LOG.exception(error)
+            raise error
+        except exc.HTTPServerError as error:
+            LOG.exception(error)
+            raise error
+        except Exception as error:
+            LOG.exception(error)
+            raise exc.HTTPServerError(explanation=unicode(error))
+
+    def get_tenants_usage(self, req):
+        try:
+            context = req.environ['workloadmgr.context']
+            try:
+                tenants_usage = self.workload_api.get_tenants_usage(context)
+                return tenants_usage
+            except Exception as ex:
+                LOG.exception(ex)
+                raise ex
+        except exc.HTTPNotFound as error:
+            LOG.exception(error)
+            raise error
+        except exc.HTTPBadRequest as error:
+            LOG.exception(error)
+            raise error
+        except exc.HTTPServerError as error:
+            LOG.exception(error)
+            raise error
+        except Exception as error:
+            LOG.exception(error)
+            raise exc.HTTPServerError(explanation=unicode(error))
+
+    def get_protected_vms(self, req):
+        try:
+            context = req.environ['workloadmgr.context']
+            try:
+                protected_vms = self.workload_api.workload_vms_get_all(context)
+                return protected_vms
+            except Exception as ex:
+                LOG.exception(ex)
+                raise ex
         except exc.HTTPNotFound as error:
             LOG.exception(error)
             raise error

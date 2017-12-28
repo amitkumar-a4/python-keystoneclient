@@ -853,9 +853,16 @@ class SwiftRepository(ObjectRepository):
             d['st_mode'] = 33261
             if prefix is not None and 'authorized_key' in prefix:
                 d['st_mode'] = 33152
-            d['st_size'] = int(st['headers']['content-length'])
-            if (d['st_size'] == 0 and container == '') or (d['st_size'] ==
-                                                           0 and prefix is None) or (d['st_size'] == 0 and prefix == ''):
+
+            if 'content-length' in st['headers']:
+               d['st_size'] = int(st['headers']['content-length'])
+            elif 'x-container-bytes-used' in st['headers'] and (prefix is None or prefix == '') and st['headers']['x-container-bytes-used'] <= 0:
+                 d['st_size'] = int(st['headers']['x-container-bytes-used'])
+            elif container != '' and  (prefix is None or prefix == ''):
+                 d['st_size'] = 0
+            if (d['st_size'] == 0 and container == '') or (d['st_size'] == 0 and prefix is None) or \
+                (d['st_size'] == 0 and prefix == ''):
+                
                 d['st_nlink'] = 3
                 d['st_size'] = 4096
                 d['st_mode'] = 16893
@@ -942,7 +949,7 @@ class SwiftRepository(ObjectRepository):
                 except BaseException:
                     pass
             if component is not None and component != '' and \
-                    '-segments' in component and not '_segments' not in component:
+                    '-segments' not in component and '_segments' not in component:
                 if component not in dirents:
                     dirents.append(component)
         for r in list(dirents):
