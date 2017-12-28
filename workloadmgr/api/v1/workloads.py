@@ -312,8 +312,10 @@ class WorkloadMgrsController(wsgi.Controller):
             if not metadata:
                 metadata = {}
 
-            available_policies = self.workload_api.get_assigned_policies(
+            assignments = self.workload_api.get_assigned_policies(
                 context, context.project_id)
+            available_policies = [
+                assignment.policy_id for assignment in assignments]
             policy_id = metadata.get('policy_id', None)
 
             if policy_id is None and len(available_policies) > 0:
@@ -1081,6 +1083,28 @@ class WorkloadMgrsController(wsgi.Controller):
             try:
                 tenants_usage = self.workload_api.get_tenants_usage(context)
                 return tenants_usage
+            except Exception as ex:
+                LOG.exception(ex)
+                raise ex
+        except exc.HTTPNotFound as error:
+            LOG.exception(error)
+            raise error
+        except exc.HTTPBadRequest as error:
+            LOG.exception(error)
+            raise error
+        except exc.HTTPServerError as error:
+            LOG.exception(error)
+            raise error
+        except Exception as error:
+            LOG.exception(error)
+            raise exc.HTTPServerError(explanation=unicode(error))
+
+    def get_protected_vms(self, req):
+        try:
+            context = req.environ['workloadmgr.context']
+            try:
+                protected_vms = self.workload_api.workload_vms_get_all(context)
+                return protected_vms
             except Exception as ex:
                 LOG.exception(ex)
                 raise ex

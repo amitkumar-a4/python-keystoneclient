@@ -232,6 +232,13 @@ class APIRouter(workloadmgr.api.APIRouter):
                        action='get_tenants_usage',
                        conditions={"method": ['GET']})
 
+        # get vms protected by tenant
+        mapper.connect("workload_vms_protected",
+                       "/{project_id}/workloads/metrics/vms_protected",
+                       controller=self.resources['workloads'],
+                       action='get_protected_vms',
+                       conditions={"method": ['GET']})
+
         # get recent activities
         mapper.connect("workloads_recentactivities",
                        "/{project_id}/workloads/metrics/recentactivities",

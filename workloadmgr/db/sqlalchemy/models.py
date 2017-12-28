@@ -25,7 +25,7 @@ FLAGS = flags.FLAGS
 BASE = declarative_base()
 
 
-DB_VERSION = '2.6.17'
+DB_VERSION = '2.6.19'
 
 class WorkloadsBase(object):
     """Base class for Workloads Models."""
@@ -845,6 +845,7 @@ class WorkloadPolicyAssignmnets(BASE, WorkloadsBase):
     policy_id = Column(String(255), ForeignKey(
         'workload_policy.id'), nullable=False)
     project_id = Column(String(255), nullable=False)
+    policy_name = Column(String(255), nullable=False)
     policy_assignments = relationship(
         WorkloadPolicy, backref=backref('policy_assignments'))
 
