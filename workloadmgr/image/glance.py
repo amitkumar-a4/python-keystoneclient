@@ -149,7 +149,7 @@ class GlanceClientWrapper(object):
 
     def __init__( self, production, context=None,
                   host=None, port=None, use_ssl=False,
-                  version=CONF.glance_api_version):
+                  version=None):
         if host is not None:
             self.client = self._create_static_client(context,
                                                      host, port,
@@ -159,6 +159,7 @@ class GlanceClientWrapper(object):
 
         self.api_servers = None
         self._production = production
+        self.version = version or CONF.glance_api_version
 
     def _create_static_client(self, context, host, port, use_ssl, version):
         """Create a client that we'll use for every call."""
@@ -409,6 +410,8 @@ class GlanceImageServiceV2(GlanceImageService):
         """Store the image data and return the new image object."""
         sent_service_image_meta = self._translate_to_glance(image_meta)
 
+        sent_service_image_meta.pop('is_public', None)
+        sent_service_image_meta.pop('properties', None)
         try:
             recv_service_image_meta = self._client.call(
                 context, 'create', **sent_service_image_meta)
@@ -430,21 +433,22 @@ class GlanceImageServiceV2(GlanceImageService):
                 data.write(chunk)
 
     def update(self, context, image_id, image_meta, data=None,
-               purge_props=True):
+               purge_props=False):
         """Modify the given image with the new data."""
         image_meta = self._translate_to_glance(image_meta)
-        image_meta['purge_props'] = purge_props
         image_meta.pop('id', None)
 
         if data:
             upload_retvalue = self._client.call(context, 'upload',
-                image_id, image_data)
+                image_id, data)
 
         if upload_retvalue == -1:
             raise Exception("Cannot upload image data for %s" % image_id)
 
         if len(image_meta):
             try:
+                image_meta.pop('is_public', None)
+                image_meta.pop('properties', None)
                 if purge_props == True:
                      image_meta = self._client.call(context, 'update',
                          image_id, remove_props=image_meta)
@@ -597,6 +601,6 @@ def get_remote_image_service(context, image_href, production=True):
 
 def get_default_image_service(production=True):
     if CONF.glance_api_version == 1:
-        return GlanceImageServiceV1(client, production)
+        return GlanceImageServiceV1(production=True)
     else:
-        return GlanceImageServiceV2(client, production)
+        return GlanceImageServiceV2(production=True)
