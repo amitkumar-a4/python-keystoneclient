@@ -445,7 +445,7 @@ class API(base.Base):
             assignments = self.get_assigned_policies(
                 context, context.project_id)
 
-            assigned_policies = [
+            available_policies = [
                 assignment.policy_id for assignment in assignments]
             if len(available_policies) == 0:
                 message = "No policy is assigned to project: %s" % (
@@ -1058,7 +1058,7 @@ class API(base.Base):
                 policy_id = workload['metadata']['policy_id']
                 assignments = self.get_assigned_policies(
                     context, context.project_id)
-                assigned_policies = [
+                available_policies = [
                     assignment.policy_id for assignment in assignments]
                 if policy_id not in available_policies:
                     message = "Policy %s is not assigned to project %s" % (
