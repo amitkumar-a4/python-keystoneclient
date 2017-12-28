@@ -304,14 +304,28 @@ class GlanceImageService(object):
         return _images
 
     def show(self, context, image_id):
-        """Returns a dict with image data for the given opaque image id."""
-        try:
-            image = self._client.call(context, 'get', image_id)
-        except Exception:
-            _reraise_translated_image_exception(image_id)
+        """Returns a dict with image data for the given opaque 
+           image id or image name."""
 
-        if not self._is_image_available(context, image):
-            raise exception.ImageNotFound(image_id=image_id)
+        try:
+            # see if the image_id is image name
+            uuid.UUID(encodeutils.safe_decode(image_id))
+        except (ValueError, exc.NotFound):
+            # try to find the image by name
+            matches = self.detail(context, filters={'name': image_id})
+            num_matches = len(matches)
+            if num_matches == 0:
+                raise exception.ImageNotFound(image_id=image_id)
+            else:
+                image = matches[0]
+        else:
+            try:
+                image = self._client.call(context, 'get', image_id)
+            except Exception:
+                _reraise_translated_image_exception(image_id)
+
+            if not self._is_image_available(context, image):
+                raise exception.ImageNotFound(image_id=image_id)
 
         base_image_meta = self._translate_from_glance(image)
         return base_image_meta
