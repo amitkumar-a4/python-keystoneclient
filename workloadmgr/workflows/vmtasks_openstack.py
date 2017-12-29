@@ -1393,7 +1393,7 @@ def restore_vm_security_groups(cntx, db, restore):
         else:
             return None
 
-    def build_secgrp_graph(secgrp):
+    def _build_secgrp_graph(secgrps):
         secgraph = Graph(directed=True)
         # add vertices
         for sec1 in secgrps:
@@ -1410,8 +1410,7 @@ def restore_vm_security_groups(cntx, db, restore):
 
     def build_graph_from_existing_secgrps():
         existing_secgroups = network_service.security_group_list(cntx)
-        for secgrp in existing_secgroups['security_groups']:
-            existing_secgroups_graph.append(build_secgrp_graph(secgrp))
+        return build_secgrp_graph(existing_secgroups['security_groups'])
 
     def build_graph_from_backup_secgrps():
         snapshot_secgraphs = {}
@@ -1463,11 +1462,20 @@ def restore_vm_security_groups(cntx, db, restore):
     cntx = nova._get_tenant_context(cntx)
 
     network_service = neutron.API(production=restore['restore_type'] != 'test')
-    restored_security_groups = {}
-    existing_secgroups_graph = []
 
-    #build_graph_from_existing_secgrps()
-    build_graph_from_backup_secgrps()
+    # one graph for all security groups in the tenant
+    ngraph = build_graph_from_existing_secgrps()
+    
+    # list of graphs, one per instance in the backup
+    tgraphs = build_graph_from_backup_secgrps()
+
+    for vm_id, tgraph in tgraphs.iteritems():
+        tvno = tvmseccluster.subgraphs()[0].es[0].source
+        tv = tvmseccluster.subgraphs()[0].vs[tvno]
+        for ng in seccluster.subgraphs():
+            nvno = seccluster.subgraphs()[0].es[0].source
+            nv = seccluster.subgraphs()[0].vs[nvno]
+            print compare_secgrp_graphs_by_dfs(tg, ng, tv, nv)
 
     snapshot_vm_resources = db.snapshot_resources_get(
         cntx, restore['snapshot_id'])
