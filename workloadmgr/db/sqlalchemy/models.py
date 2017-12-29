@@ -845,6 +845,8 @@ class WorkloadPolicyAssignmnets(BASE, WorkloadsBase):
     policy_id = Column(String(255), ForeignKey(
         'workload_policy.id'), nullable=False)
     project_id = Column(String(255), nullable=False)
+    policy_name = Column(String(255), nullable=False)
+    project_name = Column(String(255), nullable=False)
     policy_assignments = relationship(
         WorkloadPolicy, backref=backref('policy_assignments'))
 

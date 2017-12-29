@@ -1188,6 +1188,8 @@ CREATE TABLE `workload_policy_assignments` (
   `id` varchar(255) NOT NULL,
   `policy_id` varchar(255) NOT NULL,
   `project_id` varchar(255) NOT NULL,
+  `policy_name` varchar(255) NOT NULL,
+  `project_name` varchar(255) NOT NULL,
   PRIMARY KEY (`id`),
   KEY `workload_policy_assignments_workload_policy` (`policy_id`),
   CONSTRAINT `workload_policy_assignmnents_workload_policy` FOREIGN KEY (`policy_id`) REFERENCES `workload_policy` (`id`)

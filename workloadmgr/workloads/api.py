@@ -442,9 +442,11 @@ class API(base.Base):
     def _apply_workload_policy(self, context, policy_id, jobschedule):
         try:
             policy = self.policy_get(context, policy_id)
-            available_policies = self.get_assigned_policies(
+            assignments = self.get_assigned_policies(
                 context, context.project_id)
 
+            available_policies = [
+                assignment.policy_id for assignment in assignments]
             if len(available_policies) == 0:
                 message = "No policy is assigned to project: %s" % (
                     context.project_id)
@@ -1061,9 +1063,10 @@ class API(base.Base):
             options['metadata'] = workload['metadata']
             if 'policy_id' in workload['metadata'] and workload['metadata']['policy_id'] is not None:
                 policy_id = workload['metadata']['policy_id']
-                available_policies = self.get_assigned_policies(
+                assignments = self.get_assigned_policies(
                     context, context.project_id)
-
+                available_policies = [
+                    assignment.policy_id for assignment in assignments]
                 if policy_id not in available_policies:
                     message = "Policy %s is not assigned to project %s" % (
                         policy_id, context.project_id)
@@ -4014,11 +4017,19 @@ class API(base.Base):
             AUDITLOG.log(context, 'Policy \'' +
                          policy['display_name'] + '\' Delete Requested', None)
 
-            policy_assignments = self.db.policy_assignments_get_all(
+            #Check policy is not assigned to any workload
+            workload_assignments = self.db.policy_assignments_get_all(
                 context, policy_id=policy_id, workloads=True)
-            if len(policy_assignments) > 0:
+            if len(workload_assignments) > 0:
                 raise wlm_exceptions.ErrorOccurred(
                     reason="Can not delete policy: %s. It's assigned to workloads." % (policy_id))
+
+            #Remove policy assignments from projects.
+            policy_assignments = self.db.policy_assignments_get_all(
+                context, policy_id=policy_id)
+
+            for pa in policy_assignments:
+                self.db.policy_assignment_delete(context, pa.id)
 
             self.db.policy_delete(context, policy_id)
             workload_utils.policy_delete(context, policy_id)
@@ -4035,6 +4046,7 @@ class API(base.Base):
         """
         try:
             failed_project_ids = []
+            project_to_add = {}
             # Remove those project id's which are wrong.
             try:
                 for project_id in add_projects[:]:
@@ -4043,9 +4055,9 @@ class API(base.Base):
                     keystoneclient = clients.Clients(
                         context).client("keystone")
                     project = keystoneclient.client.projects.get(project_id)
+                    project_to_add[project_id] = project.name
             except Exception as ex:
                 failed_project_ids.append(project_id)
-                add_projects.remove(project_id)
 
             # Validate policy_id
             policy = self.db.policy_get(context, policy_id)
@@ -4057,16 +4069,17 @@ class API(base.Base):
                 if pa.project_id in remove_projects:
                     self.db.policy_assignment_delete(context, pa.id)
                     remove_projects.remove(pa.project_id)
-                elif pa.project_id in add_projects:
-                    add_projects.remove(pa.project_id)
+                elif pa.project_id in project_to_add.keys():
+                    project_to_add.pop(pa.project_id)
 
             if len(remove_projects) > 0:
                 failed_project_ids.extend(remove_projects)
 
-            for proj_id in add_projects:
-                values = {'policy_id': policy_id, 'project_id': proj_id}
+            for proj_id, proj_name in project_to_add.iteritems():
+                values = {'policy_id': policy_id, 'project_id': proj_id, 'policy_name': policy.display_name, 'project_name': proj_name}
                 self.db.policy_assignment_create(context, values)
 
+            workload_utils.upload_policy_db_entry(context, policy_id)
             policy = self.db.policy_get(context, policy_id)
             return (policy, failed_project_ids)
         except Exception as ex:
@@ -4079,10 +4092,8 @@ class API(base.Base):
         list the policies which are assigned to given project
         """
         try:
-            assignments = self.db.policy_assignments_get_all(
+            assigned_policies = self.db.policy_assignments_get_all(
                 context, project_id=project_id)
-            assigned_policies = [
-                assignment.policy_id for assignment in assignments]
             return assigned_policies
         except Exception as ex:
             LOG.exception(ex)

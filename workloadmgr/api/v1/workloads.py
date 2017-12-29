@@ -312,8 +312,10 @@ class WorkloadMgrsController(wsgi.Controller):
             if not metadata:
                 metadata = {}
 
-            available_policies = self.workload_api.get_assigned_policies(
+            assignments = self.workload_api.get_assigned_policies(
                 context, context.project_id)
+            available_policies = [
+                assignment.policy_id for assignment in assignments]
             policy_id = metadata.get('policy_id', None)
 
             if policy_id is None and len(available_policies) > 0:
