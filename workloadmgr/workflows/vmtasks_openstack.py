@@ -1291,6 +1291,9 @@ def restore_vm_security_groups(cntx, db, restore):
     def match_rule_values(rule1, rule2):
         # Removing id, security_group_id, tenant_id and remote_group_id,
         # from rules as values for this will not match
+        if len(rules1) != len(rules2):
+            return False
+
         local_rule1 = copy.deepcopy(rule1)
         local_rule2 = copy.deepcopy(rule2)
         for key in ['id', 'name', 'tenant_id',
@@ -1298,8 +1301,7 @@ def restore_vm_security_groups(cntx, db, restore):
             local_rule1.pop(key, None)
             local_rule2.pop(key, None)
 
-        matched_items = set(local_rule1.items()) & set(local_rule2.items())
-        return len(matched_items) == len(local_rule1)
+        return all(r in local_rule2 for r in local_rule1)
 
     def compare_secgrp_graphs_by_dfs(graph1, graph2, v1, v2):
         v1['visited'] = True
@@ -1333,19 +1335,10 @@ def restore_vm_security_groups(cntx, db, restore):
                 # compare the rules
                 vs1 = graph1.vs[w1.index]
                 vs2 = graph2.vs[w2.index]
-                rules1 = copy.deepcopy(json.loads(vs1['json'])['security_group_rules'])
-                rules2 = copy.deepcopy(json.loads(vs2['json'])['security_group_rules'])
+                rules1 = json.loads(vs1['json'])['security_group_rules']
+                rules2 = json.loads(vs2['json'])['security_group_rules']
 
-                if len(rules1) != len(rules2):
-                    break
-
-                for rules in [rules1, rules2]:
-                    for r in rules:
-                        for key in ['id', 'name',
-                                    'remote_group_id',
-                                    'security_group_id']:
-                            r.pop(key, None)
-                found = all(r in rules2 for r in rules1)
+                found = match_rule_values(rules1, rules2)
                 if found:
                     break
 
