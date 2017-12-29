@@ -1341,7 +1341,9 @@ def restore_vm_security_groups(cntx, db, restore):
 
                 for rules in [rules1, rules2]:
                     for r in rules:
-                        for key in ['id', 'name', 'remote_group']:
+                        for key in ['id', 'name',
+                                    'remote_group_id',
+                                    'security_group_id']:
                             r.pop(key, None)
                 found = all(r in rules2 for r in rules1)
                 if found:
