@@ -1291,15 +1291,15 @@ def restore_vm_security_groups(cntx, db, restore):
     def match_rule_values(rule1, rule2):
         # Removing id, security_group_id, tenant_id and remote_group_id,
         # from rules as values for this will not match
-        rules1 = copy.deepcopy(rule1)
-        rules2 = copy.deepcopy(rule2)
+        local_rule1 = copy.deepcopy(rule1)
+        local_rule2 = copy.deepcopy(rule2)
         for key in ['id', 'name', 'tenant_id',
                     'security_group_id', 'remote_group_id']:
-            rule1.pop(key, None)
-            rule2.pop(key, None)
+            local_rule1.pop(key, None)
+            local_rule2.pop(key, None)
 
-        matched_items = set(rule1.items()) & set(rule2.items())
-        return len(matched_items) == len(rule1)
+        matched_items = set(local_rule1.items()) & set(local_rule2.items())
+        return len(matched_items) == len(local_rule1)
 
     def compare_secgrp_graphs_by_dfs(graph1, graph2, v1, v2):
         v1['visited'] = True
