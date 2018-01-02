@@ -987,7 +987,7 @@ def _authenticate_with_keystone():
 
     keystone, tenants = _validate_keystone_client_and_version()
 
-    configure_mysql()
+    #configure_mysql()
     configure_rabbitmq()
     configure_keystone()
     configure_nova()
@@ -1460,7 +1460,7 @@ def _workloads_import():
 
     return {'status': 'Success'}
 
-
+'''
 def configure_mysql():
     if config_data['nodetype'] == 'controller':
         # configure mysql server
@@ -1491,7 +1491,7 @@ def configure_mysql():
             '-c',
             "echo manual > /etc/init/mysql.override"]
         subprocess.call(command, shell=False)
-
+'''
 
 def configure_rabbitmq():
     if config_data['nodetype'] == 'controller':
