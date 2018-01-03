@@ -1189,6 +1189,7 @@ CREATE TABLE `workload_policy_assignments` (
   `policy_id` varchar(255) NOT NULL,
   `project_id` varchar(255) NOT NULL,
   `policy_name` varchar(255) NOT NULL,
+  `project_name` varchar(255) NOT NULL,
   PRIMARY KEY (`id`),
   KEY `workload_policy_assignments_workload_policy` (`policy_id`),
   CONSTRAINT `workload_policy_assignmnents_workload_policy` FOREIGN KEY (`policy_id`) REFERENCES `workload_policy` (`id`)
@@ -1284,6 +1285,6 @@ CREATE TABLE `workload_policy_values` (
 /*!40101 SET CHARACTER_SET_RESULTS=@OLD_CHARACTER_SET_RESULTS */;
 /*!40101 SET COLLATION_CONNECTION=@OLD_COLLATION_CONNECTION */;
 /*!40111 SET SQL_NOTES=@OLD_SQL_NOTES */;
-SET @@sql_mode=""; 
-SET @@GLOBAL.sql_mode=""; 
+/*!40101 SET GLOBAL SQL_MODE="" */;
+/*!40101 SET SESSION SQL_MODE="" */;
 -- Dump completed on 2017-11-02  5:41:36
