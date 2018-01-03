@@ -93,9 +93,11 @@ def get_https_app(app):
         return app(environ, start_response)
     return https_app
 
+
 def get_default_nic():
-   gws = netifaces.gateways()
-   return gws['default'][netifaces.AF_INET]
+    gws = netifaces.gateways()
+    return gws['default'][netifaces.AF_INET]
+
 
 app = get_https_app(bottle.app())
 session_opts = {
@@ -3242,6 +3244,65 @@ def configure_scheduler():
     return {'status': 'Success'}
 
 
+def _configure_s3_parameters():
+    """ Utility routine to set the s3 related parameters.
+    """
+    # Start with the 'common' s3 parameters
+    replace_line(
+        '/etc/workloadmgr/workloadmgr.conf',
+        'vault_storage_type = ',
+        'vault_storage_type = s3')
+    replace_line(
+        '/etc/workloadmgr/workloadmgr.conf',
+        'vault_s3_auth_version = ',
+        'vault_s3_auth_version = DEFAULT')
+    replace_line(
+        '/etc/workloadmgr/workloadmgr.conf',
+        'vault_s3_access_key_id = ',
+        'vault_s3_access_key_id = ' +
+        str(config_data['vault_s3_access_key_id']))
+    replace_line(
+        '/etc/workloadmgr/workloadmgr.conf',
+        'vault_s3_secret_access_key = ',
+        'vault_s3_secret_access_key = ' +
+        str(config_data['vault_s3_secret_access_key']))
+    replace_line(
+        '/etc/workloadmgr/workloadmgr.conf',
+        'vault_s3_region_name = ',
+        'vault_s3_region_name = ' +
+        str(config_data['vault_s3_region_name']))
+    replace_line(
+        '/etc/workloadmgr/workloadmgr.conf',
+        'vault_s3_bucket = ',
+        'vault_s3_bucket = ' +
+        str(config_data['vault_s3_bucket']))
+
+    # S3 ceph based, Suse, RH, etc.
+    if (config_data['vault_s3_endpoint_url'] and
+       len(config_data['vault_s3_endpoint_url']) > 0):
+        replace_line(
+            '/etc/workloadmgr/workloadmgr.conf',
+            'vault_s3_endpoint_url = ',
+            'vault_s3_endpoint_url = ' +
+            str(config_data['vault_s3_endpoint_url']))
+
+    if (config_data['vault_s3_signature_version'] and
+       len(config_data['vault_s3_signature_version']) > 0):
+        replace_line(
+            '/etc/workloadmgr/workloadmgr.conf',
+            'vault_s3_signature_version = ',
+            'vault_s3_signature_version = ' +
+            str(config_data['vault_s3_signature_version']))
+
+    if (config_data['vault_s3_ssl'] and
+       len(config_data['vault_s3_ssl']) > 0):
+        replace_line(
+            '/etc/workloadmgr/workloadmgr.conf',
+            'vault_s3_ssl = ',
+            'vault_s3_ssl = ' +
+            str(config_data['vault_s3_ssl']))
+
+
 @bottle.route('/configure_service')
 @authorize()
 def configure_service():
@@ -3428,6 +3489,11 @@ def configure_service():
                     'vault_swift_domain_id = ',
                     'vault_swift_domain_id = ' +
                     config_data['triliovault_user_domain_id'])
+
+        # All S3 configurations need a vault_s3_access_key_id
+        if (config_data['vault_s3_access_key_id'] and
+           len(config_data['vault_s3_access_key_id']) > 0):
+            _configure_s3_parameters()
 
         replace_line(
             '/etc/workloadmgr/workloadmgr.conf',
@@ -3639,7 +3705,7 @@ def configure_service():
                 subprocess.check_call(command, shell=True)
                 command = 'crm node attribute ' + socket.gethostname() + ' set configured disabled'
                 subprocess.check_call(command, shell=True)
-            except:
+            except Exception as ex:
                 pass
 
         if config_data['nodetype'] == 'controller' and config_data['enable_ha'] == 'on':
@@ -3663,13 +3729,13 @@ def configure_service():
                     command = 'crm node attribute ' + socket.gethostname() + ' set ip ' + \
                         config_data['floating_ipaddress']
                     subprocess.check_call(command, shell=True)
-                except:
+                except Exception as ex:
                     pass
                 try:
                     command = 'crm node attribute ' + socket.gethostname() + ' set virtip ' + \
                         config_data['virtual_ip']
                     subprocess.check_call(command, shell=True)
-                except:
+                except Exception as ex:
                     pass
             except Exception as ex:
                 pass
@@ -4509,7 +4575,7 @@ def validate_s3_credentials():
         elif error.response['ResponseMetadata']['HTTPStatusCode'] == 403:
             return bottle.HTTPResponse(status=403, body='Authorization error. Check keys.')
         else:
-            return bottle.HTTPResponse(status=500, body=body=str(error))
+            return bottle.HTTPResponse(status=500, body=str(error))
 
     return {'status': 'Success'}
 
@@ -4679,27 +4745,27 @@ def main():
             Config.read('/etc/tvault-config/tvault-config.conf')
             config_data = dict(Config._defaults)
             prev_hostname = config_data.get('hostname', 'none')
-            fully_configured = config_data.get('fully_configured', 'false') 
+            fully_configured = config_data.get('fully_configured', 'false')
         except Exception as exception:
             prev_hostname = 'none'
 
         if prev_hostname != socket.gethostname() or \
-            fully_configured == 'false':
+           fully_configured == 'false':
 
             if os.path.exists("/etc/tvault/ssl/%s.crt" % prev_hostname):
-                shutil.move( "/etc/tvault/ssl/%s.crt" % prev_hostname,
-                             "/etc/tvault/ssl/%s_bak.crt" % prev_hostname)
+                shutil.move("/etc/tvault/ssl/%s.crt" % prev_hostname,
+                            "/etc/tvault/ssl/%s_bak.crt" % prev_hostname)
             if os.path.exists("/etc/tvault/ssl/%s.key" % prev_hostname):
-                shutil.move( "/etc/tvault/ssl/%s.key" % prev_hostname,
-                             "/etc/tvault/ssl/%s_bak.key" % prev_hostname)
+                shutil.move("/etc/tvault/ssl/%s.key" % prev_hostname,
+                            "/etc/tvault/ssl/%s_bak.key" % prev_hostname)
 
             shutil.copy2("/opt/stack/workloadmgr/etc/gen-cer",
                          "/etc/tvault/ssl/")
             os.chmod('/etc/tvault/ssl/gen-cer', 0o554)
             command = ['sudo', 'sh', 'gen-cer', socket.gethostname()]
             subprocess.call(command, shell=False, cwd="/etc/tvault/ssl")
-            command = [ 'sudo', 'rm', '-rf', 
-                        os.path.join("/etc/tvault/ssl/",
+            command = ['sudo', 'rm', '-rf',
+                       os.path.join("/etc/tvault/ssl/",
                                      socket.gethostname() + ".csr")]
             subprocess.call(command, shell=False, cwd="/etc/tvault/ssl")
             Config.set(None, 'hostname', socket.gethostname())
@@ -4707,9 +4773,9 @@ def main():
             # create hostkeys
             command = ['sudo', 'rm', "/etc/ssh/ssh_host_rsa_key"]
             subprocess.call(command, shell=False)
-            command = [ 'sudo', 'ssh-keygen', '-f',
-                        "/etc/ssh/ssh_host_rsa_key", '-b', '4096', '-t',
-                        'rsa', '-q', '-N', ""]
+            command = ['sudo', 'ssh-keygen', '-f',
+                       "/etc/ssh/ssh_host_rsa_key", '-b', '4096', '-t',
+                       'rsa', '-q', '-N', ""]
             subprocess.call(command, shell=False)
 
             Config.set(None, 'fully_configured', 'true')
