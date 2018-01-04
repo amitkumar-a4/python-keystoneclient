@@ -916,6 +916,11 @@ class API(base.Base):
                 msg = _('Invalid workload type')
                 raise wlm_exceptions.Invalid(reason=msg)
 
+            if str(jobschedule['enabled']).lower() == 'true' or jobschedule['enabled'] == '1':
+                jobschedule['enabled'] = True
+            elif str(jobschedule['enabled']).lower() == 'false' or jobschedule['enabled'] == '0':
+                jobschedule['enabled'] = False
+
             jobschedule = self.convert_date_time_zone(jobschedule)
 
             if 'hostnames' not in metadata:
@@ -994,7 +999,7 @@ class API(base.Base):
             self, context, jobschedule, workload, is_config_backup=False):
         if self._scheduler.running is True:
             if jobschedule and len(jobschedule):
-                if 'enabled' in jobschedule and jobschedule['enabled']:
+                if 'enabled' in jobschedule and jobschedule['enabled'] is True:
                     if hasattr(context, 'user_domain_id'):
                         if context.user_domain_id is None:
                             user_domain_id = 'default'
