@@ -1468,6 +1468,7 @@ def _workloads_import():
 
     return {'status': 'Success'}
 
+
 '''
 def configure_mysql():
     if config_data['nodetype'] == 'controller':
@@ -1500,6 +1501,7 @@ def configure_mysql():
             "echo manual > /etc/init/mysql.override"]
         subprocess.call(command, shell=False)
 '''
+
 
 def configure_rabbitmq():
     if config_data['nodetype'] == 'controller':
@@ -3491,8 +3493,8 @@ def configure_service():
                     config_data['triliovault_user_domain_id'])
 
         # All S3 configurations need a vault_s3_access_key_id
-        if (config_data['vault_s3_access_key_id'] and
-           len(config_data['vault_s3_access_key_id']) > 0):
+        s3_access_key_id = config_data.get('vault_s3_access_key_id', '')
+        if len(s3_access_key_id) > 0:
             _configure_s3_parameters()
 
         replace_line(
