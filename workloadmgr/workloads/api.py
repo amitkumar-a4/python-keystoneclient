@@ -97,7 +97,8 @@ def _snapshot_create_callback(*args, **kwargs):
         if workload['status'] == 'error':
             LOG.info(
                 _("Workload %s is in error state. Cannot schedule %s operation") %
-                (workload['display_name'] if callback_obj == 'snapshot' else 'config_workload',
+                (workload[
+                    'display_name'] if callback_obj == 'snapshot' else 'config_workload',
                  callback_obj))
             LOG.info(_("_%s_create_callback Exit") % (callback_obj))
             return
@@ -119,7 +120,8 @@ def _snapshot_create_callback(*args, **kwargs):
         if workload['status'] != 'available':
             LOG.info(
                 _("Workload %s is not in available state. Cannot schedule %s operation") %
-                (workload['display_name'] if callback_obj == 'snapshot' else 'config_workload',
+                (workload[
+                    'display_name'] if callback_obj == 'snapshot' else 'config_workload',
                  callback_obj))
             LOG.info(_("_%s_create_callback Exit") % (callback_obj))
             return
@@ -394,6 +396,7 @@ def check_policy(context, action):
 
 
 class API(base.Base):
+
     """API for interacting with the Workload Manager."""
 
     # This singleton implementation is not thread safe
@@ -673,7 +676,8 @@ class API(base.Base):
             if not workload_snapshot.data_deleted:
                 if workload_snapshot.snapshot_type == 'incremental':
                     workload_dict['storage_usage']['incremental']['snap_count'] = \
-                        workload_dict['storage_usage']['incremental']['snap_count'] + 1
+                        workload_dict['storage_usage'][
+                            'incremental']['snap_count'] + 1
                     workload_dict['storage_usage']['incremental']['usage'] = \
                         workload_dict['storage_usage']['incremental']['usage'] + \
                         workload_snapshot.size
@@ -709,7 +713,8 @@ class API(base.Base):
         workload_dict['metadata'] = metadata
         workload_dict['jobschedule'] = pickle.loads(str(workload.jobschedule))
         workload_dict['jobschedule']['enabled'] = False
-        workload_dict['jobschedule']['global_jobscheduler'] = self._scheduler.running
+        workload_dict['jobschedule'][
+            'global_jobscheduler'] = self._scheduler.running
         # find the job object based on workload_id
         jobs = self._scheduler.get_jobs()
         for job in jobs:
@@ -755,7 +760,8 @@ class API(base.Base):
             if not workload_snapshot.data_deleted:
                 if workload_snapshot.snapshot_type == 'incremental':
                     workload_dict['storage_usage']['incremental']['snap_count'] = \
-                        workload_dict['storage_usage']['incremental']['snap_count'] + 1
+                        workload_dict['storage_usage'][
+                            'incremental']['snap_count'] + 1
                     workload_dict['storage_usage']['incremental']['usage'] = \
                         workload_dict['storage_usage']['incremental']['usage'] + \
                         workload_snapshot.size
@@ -810,7 +816,8 @@ class API(base.Base):
         workload_dict['metadata'] = metadata
         workload_dict['jobschedule'] = pickle.loads(str(workload.jobschedule))
         workload_dict['jobschedule']['enabled'] = False
-        workload_dict['jobschedule']['global_jobscheduler'] = self._scheduler.running
+        workload_dict['jobschedule'][
+            'global_jobscheduler'] = self._scheduler.running
         # find the job object based on workload_id
         jobs = self._scheduler.get_jobs()
         for job in jobs:
@@ -818,7 +825,8 @@ class API(base.Base):
                 workload_dict['jobschedule']['enabled'] = True
                 timedelta = job.compute_next_run_time(
                     datetime.now()) - datetime.now()
-                workload_dict['jobschedule']['nextrun'] = timedelta.total_seconds()
+                workload_dict['jobschedule'][
+                    'nextrun'] = timedelta.total_seconds()
                 break
         return workload_dict
 
@@ -1080,25 +1088,32 @@ class API(base.Base):
         if 'jobschedule' in workload and workload['jobschedule'] and self._scheduler.running:
 
             if 'fullbackup_interval' not in workload['jobschedule']:
-                workload['jobschedule']['fullbackup_interval'] = workloadobj['jobschedule']['fullbackup_interval']
+                workload['jobschedule']['fullbackup_interval'] = workloadobj[
+                    'jobschedule']['fullbackup_interval']
 
             if 'start_time' not in workload['jobschedule']:
-                workload['jobschedule']['start_time'] = workloadobj['jobschedule']['start_time']
+                workload['jobschedule']['start_time'] = workloadobj[
+                    'jobschedule']['start_time']
 
             if 'interval' not in workload['jobschedule']:
-                workload['jobschedule']['interval'] = workloadobj['jobschedule']['interval']
+                workload['jobschedule']['interval'] = workloadobj[
+                    'jobschedule']['interval']
 
             if 'enabled' not in workload['jobschedule']:
-                workload['jobschedule']['enabled'] = workloadobj['jobschedule']['enabled']
+                workload['jobschedule']['enabled'] = workloadobj[
+                    'jobschedule']['enabled']
 
             if 'start_date' not in workload['jobschedule']:
-                workload['jobschedule']['start_date'] = workloadobj['jobschedule']['start_date']
+                workload['jobschedule']['start_date'] = workloadobj[
+                    'jobschedule']['start_date']
 
             if 'retention_policy_type' not in workload['jobschedule']:
-                workload['jobschedule']['retention_policy_type'] = workloadobj['jobschedule']['retention_policy_type']
+                workload['jobschedule']['retention_policy_type'] = workloadobj[
+                    'jobschedule']['retention_policy_type']
 
             if 'retention_policy_value' not in workload['jobschedule']:
-                workload['jobschedule']['retention_policy_value'] = workloadobj['jobschedule']['retention_policy_value']
+                workload['jobschedule']['retention_policy_value'] = workloadobj[
+                    'jobschedule']['retention_policy_value']
 
             if workload['jobschedule']['enabled'] == 'True' or workload['jobschedule']['enabled'] == '1'\
                     or workload['jobschedule']['enabled'] == 'true':
@@ -2498,7 +2513,8 @@ class API(base.Base):
             try:
                 workload_lock.acquire()
                 if workload['status'].lower() != 'available':
-                    msg = _("Workload must be in the 'available' state to restore")
+                    msg = _(
+                        "Workload must be in the 'available' state to restore")
                     raise wlm_exceptions.InvalidState(reason=msg)
                 self.db.workload_update(
                     context, workload['id'], {
@@ -3368,7 +3384,8 @@ class API(base.Base):
                     admin_context, None))
         elif ' Backup Capacity' in license_key['Licensed For']:
             storage_usage = self.get_storage_usage(admin_context)
-            total_utilization = storage_usage['storage_usage'][0]['total_utilization']
+            total_utilization = storage_usage[
+                'storage_usage'][0]['total_utilization']
             kwargs['capacity_utilized'] = total_utilization
 
         try:
@@ -3784,7 +3801,8 @@ class API(base.Base):
             config_workload_dict['jobschedule'] = pickle.loads(
                 str(config_workload.jobschedule))
             config_workload_dict['jobschedule']['enabled'] = False
-            config_workload_dict['jobschedule']['global_jobscheduler'] = self._scheduler.running
+            config_workload_dict['jobschedule'][
+                'global_jobscheduler'] = self._scheduler.running
             # find the job object based on config_workload_id
             job = self._scheduler.get_config_backup_job()
             if job is not None:
@@ -4017,14 +4035,14 @@ class API(base.Base):
             AUDITLOG.log(context, 'Policy \'' +
                          policy['display_name'] + '\' Delete Requested', None)
 
-            #Check policy is not assigned to any workload
+            # Check policy is not assigned to any workload
             workload_assignments = self.db.policy_assignments_get_all(
                 context, policy_id=policy_id, workloads=True)
             if len(workload_assignments) > 0:
                 raise wlm_exceptions.ErrorOccurred(
                     reason="Can not delete policy: %s. It's assigned to workloads." % (policy_id))
 
-            #Remove policy assignments from projects.
+            # Remove policy assignments from projects.
             policy_assignments = self.db.policy_assignments_get_all(
                 context, policy_id=policy_id)
 
@@ -4067,6 +4085,12 @@ class API(base.Base):
 
             for pa in policy_assignments:
                 if pa.project_id in remove_projects:
+                    # Check policy is not assigned to any workload
+                    workload_assignments = self.db.policy_assignments_get_all(
+                        context, policy_id=policy_id, project_id=pa.project_id, workloads=True)
+                    if len(workload_assignments) > 0:
+                        raise wlm_exceptions.ErrorOccurred(
+                            reason="Can not remove policy: %s. It's assigned to workloads." % (policy_id))
                     self.db.policy_assignment_delete(context, pa.id)
                     remove_projects.remove(pa.project_id)
                 elif pa.project_id in project_to_add.keys():
@@ -4076,7 +4100,8 @@ class API(base.Base):
                 failed_project_ids.extend(remove_projects)
 
             for proj_id, proj_name in project_to_add.iteritems():
-                values = {'policy_id': policy_id, 'project_id': proj_id, 'policy_name': policy.display_name, 'project_name': proj_name}
+                values = {'policy_id': policy_id, 'project_id': proj_id,
+                          'policy_name': policy.display_name, 'project_name': proj_name}
                 self.db.policy_assignment_create(context, values)
 
             workload_utils.upload_policy_db_entry(context, policy_id)
@@ -4156,12 +4181,14 @@ class API(base.Base):
                     total_vms_protected += protected
                     tenants_usage[tenant_id]['total_vms'] = len(
                         tenant_wise_servers[tenant_id])
-                    tenants_usage[tenant_id]['passively_protected'] = passively_protected
+                    tenants_usage[tenant_id][
+                        'passively_protected'] = passively_protected
                 else:
                     tenants_usage[tenant_id] = {'vms_protected': 0, 'total_vms': len(
                         tenant_wise_servers[tenant_id]), 'used_capacity': 0, 'passively_protected': 0}
 
-            # Update tenants_usage for those tenants which doesn't have any workloads
+            # Update tenants_usage for those tenants which doesn't have any
+            # workloads
             clients.initialise()
             keystoneclient = clients.Clients(context).client("keystone")
             tenants = keystoneclient.client.projects.list()
