@@ -2775,11 +2775,6 @@ def configure_host():
         # configure host
         prev_hostname = socket.gethostname()
         hostname = config_data['guest_name']
-        fh, abs_path = mkstemp()
-        new_file = open(abs_path, 'w')
-        new_file.write(hostname + '\n')
-        new_file.close()
-        close(fh)
         command = [
             'sudo',
             'apt-get',
@@ -2788,13 +2783,7 @@ def configure_host():
             "rabbitmq-server",
             '-y']
         subprocess.call(command, shell=False)
-        command = ['sudo', 'mv', abs_path, "/etc/hostname"]
-        subprocess.call(command, shell=False)
-        os.chmod('/etc/hostname', 0o644)
-        command = ['sudo', 'chown', 'root:root', "/etc/hostname"]
-        command = ['sudo', 'service', 'hostname', 'restart']
-        subprocess.call(command, shell=False)
-        command = ['sudo', 'service', 'networking', 'restart']
+        command = ['sudo', 'hostnamectl', 'set-hostname', hostname]
         subprocess.call(command, shell=False)
 
         fh, abs_path = mkstemp()
