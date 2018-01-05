@@ -2783,7 +2783,7 @@ def configure_host():
             "rabbitmq-server",
             '-y']
         subprocess.call(command, shell=False)
-        command = ['sudo', 'hostnamectl', 'set-hostname', hostname]
+        command = ['hostnamectl', 'set-hostname', hostname]
         subprocess.call(command, shell=False)
 
         fh, abs_path = mkstemp()
