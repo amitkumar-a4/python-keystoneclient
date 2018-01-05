@@ -52,7 +52,7 @@ class WorkloadPolicyController(wsgi.Controller):
 
             if 'fullbackup_interval' in values:
                 message = "Invalid value for fullbackup_interval. Enter Number of incremental snapshots to take Full Backup between 1 to 999, '-1' for 'NEVER' and '0' for 'ALWAYS'"
-                policy_value = values['retention_policy_value']
+                policy_value = values['fullbackup_interval']
                 if (type(int(policy_value)) is not int) or (int(policy_value) < -1) or (int(policy_value) > 999):
                     raise Exception(message)
 
