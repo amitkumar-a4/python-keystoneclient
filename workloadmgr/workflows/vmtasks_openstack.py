@@ -786,10 +786,10 @@ def restore_keypairs(cntx, db, instances):
     cntx = nova._get_tenant_context(cntx)
 
     compute_service = nova.API(production=True)
-    keypairs = [kp.name for kp in compute_service.get_keypairs(cntx)]
+    keypairs = [kp.name.lower() for kp in compute_service.get_keypairs(cntx)]
     for inst in instances:
         if 'keyname' not in inst or not inst['keyname'] or \
-           inst['keyname'] in keypairs:
+           inst['keyname'].lower() in keypairs:
             continue
 
         if 'keydata' not in inst:
