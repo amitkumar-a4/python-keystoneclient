@@ -36,17 +36,6 @@ workload_backup_media_size = {}
 vault_backend = None
 all_cloud_projects = []
 
-def timeit(method):
-    def timed(*args, **kw):
-        ts = time.time()
-        result = method(*args, **kw)
-        te = time.time()
-        msg = 'IMPORT_PERFORMANCE: METHOD: %s  TIME TAKEN: %2.2f ms' % \
-                  (method.__name__, (te - ts) * 1000)
-        LOG.debug(msg)
-        return result
-    return timed
-
 
 import_map = [
     {'file': 'workload_db',
@@ -110,22 +99,7 @@ import_map = [
      'getter_method_params': ['id']
      }, ]
 
-'''
-@timeit
-def project_id_exists(cntx, project_id):
-    """clients.initialise()
-    client_plugin = clients.Clients(context)
-    kclient = client_plugin.client("keystone")
 
-    # TODO: Optimize it without reading project list os many times
-    kclient.client_plugin = kclient"""
-    keystone_client = KeystoneClient(cntx)
-    projects = keystone_client.client.get_project_list_for_import(cntx)
-    for prj in projects:
-        if uuid.UUID(prj.id) == uuid.UUID(project_id):
-            return True
-    return False
-'''
 @timeit
 def project_id_exists(cntx, project_id):
     """
@@ -241,7 +215,6 @@ def import_policy(cntx, new_version, upgrade=True):
     except Exception as ex:
         LOG.exception(ex)
 
-@timeit
 def update_backup_media_target(file_path, backup_endpoint):
     try:
         file_data = vault_backend.get_object(file_path)
@@ -280,7 +253,6 @@ def update_backup_media_target(file_path, backup_endpoint):
     except Exception as ex:
         LOG.exception(ex)
 
-@timeit
 def get_workload_url(context, workload_ids, upgrade):
     '''
     Iterate over all NFS backups mounted for list of workloads available.
@@ -289,7 +261,6 @@ def get_workload_url(context, workload_ids, upgrade):
     workload_ids_to_import = list(workload_ids)
     failed_workloads = []
 
-    @timeit
     def add_config_workload(context, config_workload_path):
         try:
             # If config_workload is not in the database then only import it.
@@ -309,7 +280,6 @@ def get_workload_url(context, workload_ids, upgrade):
                     update_backup_media_target(
                         config_backup_db, backup_endpoint)
 
-    @timeit
     def add_workload(context, workload_id, workload, backup_endpoint, upgrade):
         # Before adding the workload check whether workload is valid or not
         if vault.validate_workload(workload) is False:
@@ -393,7 +363,6 @@ def get_workload_url(context, workload_ids, upgrade):
     return (workload_url_iterate, failed_workloads)
 
 
-@timeit
 def update_workload_metadata(workload_values):
     '''
     Update workload values with "backup_media_target"
@@ -470,7 +439,6 @@ def get_json_files(context, workload_ids, db_dir, upgrade):
 
         # Create list of all files related to a common resource
         # TODO:Find alternate for os.walk
-        t1 = time.time()
         for workload_path in workload_url_iterate:
             for path, subdirs, files in os.walk(workload_path):
                 for name in files:
@@ -505,25 +473,9 @@ def get_json_files(context, workload_ids, db_dir, upgrade):
                         db_files_map['security_group_db'].append(
                             os.path.join(path, name))
 
-        t2 = time.time()
-        msg = 'IMPORT_PERFORMANCE: METHOD: OS_WALK TIME TAKEN: %2.2f ms' % \
-                  ((t2 - t1) * 1000)
-        LOG.debug(msg)
-
-        '''
-        # Creating a map for each workload with workload_backup_media_size.
-        for snap in db_files_map['snapshot_db']:
-            file_data = vault_backend.get_object(snap)
-            if file_data is not None and len(file_data) > 0:
-                snapshot_json = json.loads(file_data)
-                if snapshot_json['snapshot_type'] == 'full':
-                    workload_backup_media_size[snapshot_json['workload_id']
-                                               ] = snapshot_json['size']
-        '''
 
         # Iterate over each file for a resource in all NFS mounts
         # and create a single db file for that.
-        t1 = time.time()
         for db, files in db_files_map.iteritems():
             db_json = []
 
@@ -543,17 +495,7 @@ def get_json_files(context, workload_ids, db_dir, upgrade):
                         json_obj = update_workload_metadata(json_obj)
                     db_json.append(json_obj)
 
-            t3 = time.time()
             pickle.dump(db_json, open(os.path.join(db_dir, db), 'wb'))
-            t4 = time.time()
-            msg = 'IMPORT_PERFORMANCE: METHOD: pickle_dump  TIME TAKEN: %2.2f ms' % \
-              ((t4 - t3) * 1000)
-            LOG.debug(msg)
-        #return failed_workloads
-        t2 = time.time()
-        msg = 'IMPORT_PERFORMANCE: METHOD: file_map  TIME TAKEN: %2.2f ms' % \
-                  ((t2 - t1) * 1000)
-        LOG.debug(msg)
         return failed_workloads
 
     except Exception as ex:
@@ -561,7 +503,6 @@ def get_json_files(context, workload_ids, db_dir, upgrade):
         raise ex
 
 
-@timeit
 def import_resources(tenantcontext, resource_map,
                      new_version, db_dir, upgrade):
     '''
@@ -583,7 +524,6 @@ def import_resources(tenantcontext, resource_map,
     db = WorkloadMgrDB().db
     get_resource_method = getattr(db, getter_method)
 
-    @timeit
     def update_resource_list(cntxt, resource):
         '''
         Update resource list with resource objects need to
@@ -684,7 +624,6 @@ def import_resources(tenantcontext, resource_map,
         LOG.exception(ex)
 
 
-@timeit
 def import_workload(cntx, workload_ids, new_version, upgrade=True):
     '''
     Read all json files for all workloads from all available NFS mounts
