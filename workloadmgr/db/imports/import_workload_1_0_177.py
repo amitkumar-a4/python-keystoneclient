@@ -11,7 +11,6 @@ from operator import itemgetter
 import cPickle as pickle
 import shutil
 import tempfile
-import time
 from collections import OrderedDict
 
 from workloadmgr.db.workloadmgrdb import WorkloadMgrDB
@@ -35,7 +34,6 @@ workload_backup_endpoint = {}
 workload_backup_media_size = {}
 vault_backend = None
 all_cloud_projects = []
-
 
 import_map = [
     {'file': 'workload_db',
