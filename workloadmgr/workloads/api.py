@@ -916,9 +916,9 @@ class API(base.Base):
                 msg = _('Invalid workload type')
                 raise wlm_exceptions.Invalid(reason=msg)
 
-            if str(jobschedule['enabled']).lower() == 'true' or jobschedule['enabled'] == '1':
+            if str(jobschedule['enabled']).lower() in ('true', '1'):
                 jobschedule['enabled'] = True
-            elif str(jobschedule['enabled']).lower() == 'false' or jobschedule['enabled'] == '0':
+            elif str(jobschedule['enabled']).lower() in ('false', '0'):
                 jobschedule['enabled'] = False
 
             jobschedule = self.convert_date_time_zone(jobschedule)
@@ -999,7 +999,7 @@ class API(base.Base):
             self, context, jobschedule, workload, is_config_backup=False):
         if self._scheduler.running is True:
             if jobschedule and len(jobschedule):
-                if 'enabled' in jobschedule and jobschedule['enabled'] is True:
+                if jobschedule.get('enabled', False) is True:
                     if hasattr(context, 'user_domain_id'):
                         if context.user_domain_id is None:
                             user_domain_id = 'default'
@@ -1105,11 +1105,9 @@ class API(base.Base):
             if 'retention_policy_value' not in workload['jobschedule']:
                 workload['jobschedule']['retention_policy_value'] = workloadobj['jobschedule']['retention_policy_value']
 
-            if workload['jobschedule']['enabled'] == 'True' or workload['jobschedule']['enabled'] == '1'\
-                    or workload['jobschedule']['enabled'] == 'true':
+            if str(workload['jobschedule']['enabled']).lower() in ('true', '1'):
                 workload['jobschedule']['enabled'] = True
-            elif workload['jobschedule']['enabled'] == 'False' or workload['jobschedule']['enabled'] == '0'\
-                    or workload['jobschedule']['enabled'] == 'false':
+            elif str(workload['jobschedule']['enabled']).lower() in ('false', '0'):
                 workload['jobschedule']['enabled'] = False
 
             if workloadobj['jobschedule']['enabled'] != workload['jobschedule'][
