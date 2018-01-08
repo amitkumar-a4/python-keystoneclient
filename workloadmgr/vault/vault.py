@@ -162,6 +162,18 @@ def run_async(func):
 
     return async_func
 
+def timeit(method):
+    def timed(*args, **kw):
+        ts = time.time()
+        result = method(*args, **kw)
+        te = time.time()
+        msg = 'IMPORT_PERFORMANCE: METHOD: %s  TIME TAKEN: %2.2f ms' % \
+                  (method.__name__, (te - ts) * 1000)
+        LOG.debug(msg)
+        return result
+    return timed
+
+
 class TrilioVaultBackupTarget(object):
 
     __metaclass__ = abc.ABCMeta
@@ -756,6 +768,7 @@ class NfsTrilioVaultBackupTarget(TrilioVaultBackupTarget):
 
     @autolog.log_method(logger=Logger)     
     @to_abs()
+    @timeit
     def get_object(self, path):
         with open(path, 'r') as json_file:
             return json_file.read()
