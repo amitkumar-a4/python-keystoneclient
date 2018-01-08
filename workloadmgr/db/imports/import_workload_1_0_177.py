@@ -100,7 +100,6 @@ import_map = [
      }, ]
 
 
-@timeit
 def project_id_exists(cntx, project_id):
     """
     Check whether given project id exist in current cloud.
@@ -120,8 +119,6 @@ def project_id_exists(cntx, project_id):
         raise ex
 
 
-
-@timeit
 def check_tenant(cntx, workload_path, upgrade):
     '''
     Check for given worlkoad tenant whether it exist with-in the cloud or not.
@@ -143,7 +140,7 @@ def check_tenant(cntx, workload_path, upgrade):
     except Exception as ex:
         LOG.exception(ex)
 
-@timeit
+
 def get_context(values):
     try:
         tenant_id = values.get('tenant_id', None)
@@ -156,7 +153,7 @@ def get_context(values):
     except Exception as ex:
         LOG.exception(ex)
 
-@timeit
+
 def _adjust_values(cntx, new_version, values, upgrade):
     values['version'] = new_version
     if not upgrade:
@@ -171,7 +168,7 @@ def _adjust_values(cntx, new_version, values, upgrade):
         values['host'] = socket.gethostname()
     return values
 
-@timeit
+
 def import_settings(cntx, new_version, upgrade=True):
     try:
         db = WorkloadMgrDB().db
@@ -215,6 +212,7 @@ def import_policy(cntx, new_version, upgrade=True):
     except Exception as ex:
         LOG.exception(ex)
 
+
 def update_backup_media_target(file_path, backup_endpoint):
     try:
         file_data = vault_backend.get_object(file_path)
@@ -252,6 +250,7 @@ def update_backup_media_target(file_path, backup_endpoint):
 
     except Exception as ex:
         LOG.exception(ex)
+
 
 def get_workload_url(context, workload_ids, upgrade):
     '''
@@ -404,7 +403,6 @@ def update_workload_metadata(workload_values):
         LOG.exception(ex)
 
 
-@timeit
 def get_json_files(context, workload_ids, db_dir, upgrade):
 
     # Map to store all path of all JSON files for a  resource
@@ -423,12 +421,8 @@ def get_json_files(context, workload_ids, db_dir, upgrade):
             ])
     
     try:
-        t1 = time.time()
         workload_url_iterate, failed_workloads = get_workload_url(
             context, workload_ids, upgrade)
-        t2 = time.time()  
-        msg = 'IMPORT_PERFORMANCE: METHOD: AFTER_GET_WORKLOAD_URL  TIME TAKEN: %2.2f ms' % ((t2 - t1) * 1000)
-        LOG.debug(msg)
 
         if len(failed_workloads) == len(workload_url_iterate) == 0:
             raise exception.WorkloadsNotFound()

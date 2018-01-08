@@ -27,18 +27,21 @@ LOG = logging.getLogger(__name__)
 
 FLAGS = flags.FLAGS
 
+
 def make_testbubble(elem):
     elem.set('id')
     elem.set('status')
     elem.set('created_at')
     elem.set('name')
     elem.set('description')
-  
+
+
 class TestbubbleTemplate(xmlutil.TemplateBuilder):
     def construct(self):
         root = xmlutil.TemplateElement('testbubble', selector='testbubble')
         make_testbubble(root)
         return xmlutil.MasterTemplate(root, 1)
+
 
 class TestbubblesTemplate(xmlutil.TemplateBuilder):
     def construct(self):
@@ -47,6 +50,7 @@ class TestbubblesTemplate(xmlutil.TemplateBuilder):
                                           selector='testbubbles')
         make_testbubble(elem)
         return xmlutil.MasterTemplate(root, 1)
+
 
 class TestbubbleDeserializer(wsgi.MetadataXMLDeserializer):
     def default(self, string):
@@ -58,7 +62,8 @@ class TestbubbleDeserializer(wsgi.MetadataXMLDeserializer):
         testbubble = {}
         testbubble_node = self.find_first_child_named(node, 'testbubble')
         if testbubble_node.getAttribute('testbubble_id'):
-            testbubble['testbubble_id'] = testbubble_node.getAttribute('testbubble_id')
+            testbubble['testbubble_id'] = testbubble_node.getAttribute(
+                'testbubble_id')
         return testbubble
 
 
@@ -66,7 +71,7 @@ class TestbubblesController(wsgi.Controller):
     """The testbubbles API controller for the OpenStack API."""
 
     _view_builder_class = testbubble_views.ViewBuilder
-    
+
     def __init__(self, ext_mgr=None):
         self.workload_api = workloadAPI.API()
         self.ext_mgr = ext_mgr
@@ -93,8 +98,8 @@ class TestbubblesController(wsgi.Controller):
             raise error
         except Exception as error:
             LOG.exception(error)
-            raise exc.HTTPServerError(explanation=unicode(error)) 
-        
+            raise exc.HTTPServerError(explanation=unicode(error))
+
     def delete(self, req, id, workload_id=None, snapshot_id=None):
         """Delete a testbubble."""
         try:
@@ -115,8 +120,8 @@ class TestbubblesController(wsgi.Controller):
             raise error
         except Exception as error:
             LOG.exception(error)
-            raise exc.HTTPServerError(explanation=unicode(error)) 
-        
+            raise exc.HTTPServerError(explanation=unicode(error))
+
     @wsgi.serializers(xml=TestbubblesTemplate)
     def index(self, req, workload_id=None, snapshot_id=None):
         """Returns a summary list of testbubbles."""
@@ -133,8 +138,8 @@ class TestbubblesController(wsgi.Controller):
             raise error
         except Exception as error:
             LOG.exception(error)
-            raise exc.HTTPServerError(explanation=unicode(error)) 
-        
+            raise exc.HTTPServerError(explanation=unicode(error))
+
     @wsgi.serializers(xml=TestbubblesTemplate)
     def detail(self, req, workload_id=None, snapshot_id=None):
         """Returns a detailed list of testbubbles."""
@@ -151,31 +156,34 @@ class TestbubblesController(wsgi.Controller):
             raise error
         except Exception as error:
             LOG.exception(error)
-            raise exc.HTTPServerError(explanation=unicode(error)) 
-        
+            raise exc.HTTPServerError(explanation=unicode(error))
+
     def _get_testbubbles(self, req, snapshot_id, is_detail):
         """Returns a list of testbubbles, transformed through view builder."""
         context = req.environ['workloadmgr.context']
         if not snapshot_id:
             snapshot_id = req.GET.get('snapshot_id', None)
         if snapshot_id:
-            testbubbles_all = self.workload_api.restore_get_all(context, snapshot_id)
+            testbubbles_all = self.workload_api.restore_get_all(
+                context, snapshot_id)
         else:
             testbubbles_all = self.workload_api.restore_get_all(context)
-   
+
         limited_list = common.limited(testbubbles_all, req)
-        
-        #TODO(giri): implement the search_opts to specify the filters
+
+        # TODO(giri): implement the search_opts to specify the filters
         testbubbles = []
         for testbubble in limited_list:
-            if (testbubble['deleted'] == False) and (testbubble['restore_type'] == 'test'):
-                testbubbles.append(testbubble)        
+            if (testbubble['deleted'] == False) and (
+                    testbubble['restore_type'] == 'test'):
+                testbubbles.append(testbubble)
 
         if is_detail:
             testbubbles = self._view_builder.detail_list(req, testbubbles)
         else:
             testbubbles = self._view_builder.summary_list(req, testbubbles)
         return testbubbles
-    
+
+
 def create_resource(ext_mgr):
     return wsgi.Resource(TestbubblesController(ext_mgr))

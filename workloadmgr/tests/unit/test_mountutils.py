@@ -69,7 +69,7 @@ def getfdisk_output(mountpath=None):
                                bufsize= -1,
                                close_fds=True,
                                shell=False)
-                
+
     stdout_value, stderr_value = process.communicate()
     parse = False
     for line in stdout_value.split("\n"):
@@ -111,25 +111,25 @@ def getfdisk_output(mountpath=None):
 # the mounted disk
 #
 # Fdisk shows gpt partition as follows:
-# stack@openstack01:~/gptsupport$ fdisk -l 1t.img 
-# 
+# stack@openstack01:~/gptsupport$ fdisk -l 1t.img
+#
 # WARNING: GPT (GUID Partition Table) detected on '1t.img'! The util fdisk doesn't support GPT. Use GNU Parted.
-# 
-# 
+#
+#
 # Disk 1t.img: 1099.5 GB, 1099511627776 bytes
 # 256 heads, 63 sectors/track, 133152 cylinders, total 2147483648 sectors
 # Units = sectors of 1 * 512 = 512 bytes
 # Sector size (logical/physical): 512 bytes / 512 bytes
 # I/O size (minimum/optimal): 512 bytes / 512 bytes
 # Disk identifier: 0x00000000
-# 
+#
 # Device Boot      Start         End      Blocks   Id  System
 # 1t.img1               1  2147483647  1073741823+  ee  GPT
 #
 #
 # A typical partition to support would be:
 #
-# stack@openstack01:~/gptsupport$ sgdisk -p 1t.img 
+# stack@openstack01:~/gptsupport$ sgdisk -p 1t.img
 # Disk 1t.img: 2147483648 sectors, 1024.0 GiB
 # Logical sector size: 512 bytes
 # Disk identifier (GUID): 006BE6CD-B6F1-4DBE-9CD5-8207D66A7BEE
@@ -137,10 +137,10 @@ def getfdisk_output(mountpath=None):
 # First usable sector is 34, last usable sector is 2147483614
 # Partitions will be aligned on 2048-sector boundaries
 # Total free space is 900013290 sectors (429.2 GiB)
-# 
+#
 # Number  Start (sector)    End (sector)  Size       Code  Name
 #   1            2048       147483614   70.3 GiB    8300  First
-#   2       147484672       157483614   4.8 GiB     8300  
+#   2       147484672       157483614   4.8 GiB     8300
 #   3       157485056       247483614   42.9 GiB    8300  Second
 #   4       247484416       347483614   47.7 GiB    8300  Third
 #   5       347484160       447483614   47.7 GiB    8300  Forth
@@ -148,11 +148,11 @@ def getfdisk_output(mountpath=None):
 #   7       547483648       647483614   47.7 GiB    8300  Sixth
 #   8       647485440       747483614   47.7 GiB    8300  Seventh
 #   9       747485184       847483614   47.7 GiB    8300  Eighth
-#  10       847484928       947483614   47.7 GiB    8300  
+#  10       847484928       947483614   47.7 GiB    8300
 #  11       947484672      1047483614   47.7 GiB    8300  Ninth
 #  12      1047484416      1147483614   47.7 GiB    8300  Tenth
 #  13      1147484160      1247483614   47.7 GiB    8300  Eleventh
-# 
+#
 ##
 def getgptdisk_output(mountpath=None):
     partitions = []
@@ -168,7 +168,7 @@ def getgptdisk_output(mountpath=None):
                                bufsize= -1,
                                close_fds=True,
                                shell=False)
-                
+
     stdout_value, stderr_value = process.communicate()
     parse = False
     for line in stdout_value.split("\n"):
@@ -346,7 +346,7 @@ def getpvs(vgs):
     for pv in pvlist:
         if not pv['LVM2_VG_NAME'] in incompletevgs:
             purgedpvlist.append(pv)
-      
+
     return purgedpvlist
 
 def deactivatevgs(vgname):
@@ -362,7 +362,7 @@ def read_partition_table(mountpath=None):
 
     return partitions
 
-def mount_local_vmdk(diskslist, mntlist, diskonly=False): 
+def mount_local_vmdk(diskslist, mntlist, diskonly=False):
     vix_disk_lib_env = os.environ.copy()
     vix_disk_lib_env['LD_LIBRARY_PATH'] = '/usr/lib/vmware-vix-disklib/lib64'
 
@@ -396,11 +396,11 @@ def mount_local_vmdk(diskslist, mntlist, diskonly=False):
                                            env=vix_disk_lib_env,
                                            close_fds=True,
                                            shell=False)
-                
+
                 queue = Queue()
                 read_thread = Thread(target=enqueue_output, args=(process.stdout, queue))
                 read_thread.daemon = True # thread dies with the program
-                read_thread.start()            
+                read_thread.start()
 
                 mountpath = None
                 while process.poll() is None:
@@ -409,10 +409,10 @@ def mount_local_vmdk(diskslist, mntlist, diskonly=False):
                             output = queue.get(timeout=5)
                             LOG.info(_( output ))
                         except Empty:
-                            continue 
+                            continue
                         except Exception as ex:
                             LOG.exception(ex)
-    
+
                         if output.startswith("Pausing the process until it is resumed"):
                             break
                     except Exception as ex:
@@ -430,7 +430,7 @@ def mount_local_vmdk(diskslist, mntlist, diskonly=False):
                     for line in f:
                         line = line.strip("\n")
                         mountpoints[line.split(":")[0]] = line.split(":")[1].split(";")
-    
+
                 LOG.info(_( mountpoints ))
                 process.stdin.close()
                 processes.append(process)
@@ -455,7 +455,7 @@ def mount_local_vmdk(diskslist, mntlist, diskonly=False):
 ##
 # unmounts a vmdk by sending signal 18 to the process that as suspended during mount process
 ##
-def umount_local_vmdk(processes): 
+def umount_local_vmdk(processes):
     for process in processes:
         process.send_signal(18)
         process.wait()
@@ -475,7 +475,7 @@ def mountlvmvgs(mountinfo):
     try:
         # explore VGs and volumes on the disk
         vgs = getvgs()
-               
+
         if len(vgs):
             lvs = getlvs(vgs)
             if len(lvs):
@@ -484,7 +484,7 @@ def mountlvmvgs(mountinfo):
                     for key, mount in mountinfo.iteritems():
                         if mount in pv['LVM2_PV_NAME']:
                             pvs[index]['filename'] = key
-            
+
         # purge vms based on pvlist
         purgedvgs = []
         # if pv list does not have any reference to vg, purge the vg
@@ -493,14 +493,14 @@ def mountlvmvgs(mountinfo):
                 if vg['LVM2_VG_NAME'] == pv['LVM2_VG_NAME']:
                     purgedvgs.append(vg)
                     break
- 
+
         purgedlvs = []
         for lv in lvs:
             found = False
             for vg in purgedvgs:
                 if lv['LVM2_VG_NAME'] == vg['LVM2_VG_NAME']:
                     found = True
-                    break               
+                    break
             if found:
                 purgedlvs.append(lv)
 
@@ -524,7 +524,7 @@ def discover_lvs_and_partitions(devicepaths, partitions):
     lvmresources = {}
     # create separate list of disks and partitions used by LVM
     # and non lvm
-    # 
+    #
     lvmdisks = []
     lvmpartitions = []
     regularpartitions = []
@@ -599,7 +599,7 @@ def assignloopdevices(mountpaths):
     for key, mountpath in mountpaths.iteritems():
         try:
             devpath = mountdevice(mountpath.pop().strip().rstrip())
-        
+
             devicepaths[key] = devpath
             # Add partition mappings here
             try:

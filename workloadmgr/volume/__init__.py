@@ -11,9 +11,9 @@ import workloadmgr.openstack.common.importutils
 
 _volume_opts = [
     oslo.config.cfg.StrOpt('volume_api_class',
-                            default='workloadmgr.volume.cinder.API',
-                            help='The full class name of the '
-                            'volume API class to use'),
+                           default='workloadmgr.volume.cinder.API',
+                           help='The full class name of the '
+                           'volume API class to use'),
 ]
 
 oslo.config.cfg.CONF.register_opts(_volume_opts)

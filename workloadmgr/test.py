@@ -40,7 +40,7 @@ import sqlalchemy as sa
 from taskflow.persistence.backends import impl_sqlalchemy
 from oslo.config import cfg
 
-#from workloadmgr.common import config  # Need to register global_opts
+# from workloadmgr.common import config  # Need to register global_opts
 from workloadmgr.db import migration
 from workloadmgr.openstack.common.db.sqlalchemy import session
 from workloadmgr.openstack.common import log as logging
@@ -55,7 +55,10 @@ test_opts = [
                help='File name of clean sqlite db'),
     cfg.BoolOpt('fake_tests',
                 default=True,
-                help='should we use everything for testing'), ]
+                help='should we use everything for testing'),
+    cfg.StrOpt('policy_file',
+               default='workloadmgr/tests/unit/policy.json',
+               help='location for policy file')]
 
 CONF = cfg.CONF
 CONF.register_opts(test_opts)
@@ -81,7 +84,7 @@ class Database(fixtures.Fixture):
         self.engine.dispose()
         conn = self.engine.connect()
         if sql_connection == "sqlite://":
-            if db_migrate.db_version() > 1: #db_migrate.INIT_VERSION:
+            if db_migrate.db_version() > 1:  # db_migrate.INIT_VERSION:
                 return
         else:
             testdb = os.path.join(CONF.state_path, sqlite_db)
@@ -186,6 +189,16 @@ class TestCase(testtools.TestCase):
         CONF.set_override('fatal_exception_format_errors', True)
         # This will be cleaned up by the NestedTempfile fixture
         CONF.set_override('lock_path', tempfile.mkdtemp())
+        CONF.set_override('policy_file',
+                          os.path.join(
+                              os.path.abspath(
+                                  os.path.join(
+                                      os.path.dirname(__file__),
+                                      '..',
+                                  )
+                              ),
+                              CONF.policy_file),
+                          group='oslo_policy')
 
     def tearDown(self):
         """Runs after each test method to tear down test environment."""

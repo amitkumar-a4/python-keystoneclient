@@ -35,9 +35,9 @@ from nova.virt import event as virtevent
 driver_opts = [
     cfg.StrOpt('compute_driver',
                help='Driver to use for controlling virtualization. Options '
-                   'include: libvirt.LibvirtDriver, xenapi.XenAPIDriver, '
-                   'fake.FakeDriver, baremetal.BareMetalDriver, '
-                   'vmwareapi.VMwareESXDriver, vmwareapi.VMwareVCDriver'),
+               'include: libvirt.LibvirtDriver, xenapi.XenAPIDriver, '
+               'fake.FakeDriver, baremetal.BareMetalDriver, '
+               'vmwareapi.VMwareESXDriver, vmwareapi.VMwareVCDriver'),
     cfg.StrOpt('default_ephemeral_format',
                help='The default format an ephemeral_volume will be '
                     'formatted with on creation.'),
@@ -128,7 +128,7 @@ class ComputeDriver(object):
     capabilities = {
         "has_imagecache": False,
         "supports_recreate": False,
-        }
+    }
 
     def __init__(self, virtapi):
         self.virtapi = virtapi
@@ -225,25 +225,25 @@ class ComputeDriver(object):
 
     def list_vmfolders(self, vmfolderref):
         """
-        Return information about the vmfolder given its reference 
+        Return information about the vmfolder given its reference
         """
         raise NotImplementedError()
 
     def list_resourcepools(self, resourcepoolref):
         """
-        Return information about the resourcepool given its reference 
+        Return information about the resourcepool given its reference
         """
         raise NotImplementedError()
 
     def list_datastores(self, datastoreref):
         """
-        Return information about the resourcepool given its reference 
+        Return information about the resourcepool given its reference
         """
         raise NotImplementedError()
 
     def list_vmnetworks(self, vmnetworkref):
         """
-        Return information about the networks given its reference 
+        Return information about the networks given its reference
         """
         raise NotImplementedError()
 
@@ -965,7 +965,7 @@ class ComputeDriver(object):
 
     def add_to_aggregate(self, context, aggregate, host, **kwargs):
         """Add a compute host to an aggregate."""
-        #NOTE(jogo) Currently only used for XenAPI-Pool
+        # NOTE(jogo) Currently only used for XenAPI-Pool
         raise NotImplementedError()
 
     def remove_from_aggregate(self, context, aggregate, host, **kwargs):
@@ -973,7 +973,7 @@ class ComputeDriver(object):
         raise NotImplementedError()
 
     def undo_aggregate_operation(self, context, op, aggregate,
-                                  host, set_error=True):
+                                 host, set_error=True):
         """Undo for Resource Pools."""
         raise NotImplementedError()
 

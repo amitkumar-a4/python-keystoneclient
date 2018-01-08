@@ -22,6 +22,7 @@ CONF = cfg.CONF
 
 authorize_show = extensions.extension_authorizer('compute', 'vmnetwork:show')
 
+
 def make_vmnetwork(elem):
     elem.set('name', 'vmnetwork')
 
@@ -34,7 +35,7 @@ def make_vmnetwork(elem):
 
     dcsElem = xmlutil.SubTemplateElement(elem, 'vmnetworks', selector=1)
     dcElem = xmlutil.SubTemplateElement(elem, 'vmnetwork',
-                                         selector=xmlutil.get_items)
+                                        selector=xmlutil.get_items)
     dcElem.set('name', 0)
 
     networksElem = xmlutil.SubTemplateElement(elem, 'networks', selector=1)
@@ -46,14 +47,15 @@ def make_vmnetwork(elem):
     svcStateElem.set('active')
     svcStateElem.set('updated_at')
 
+
 class vmnetworkTemplate(xmlutil.TemplateBuilder):
     def construct(self):
         root = xmlutil.TemplateElement('vmnetwork')
         vmnetworkElem = xmlutil.SubTemplateElement(root, 'vmnetwork',
-                                                    selector='vmnetworkInfo')
+                                                   selector='vmnetworkInfo')
         make_vmnetwork(vmnetworkElem)
         return xmlutil.MasterTemplate(root, 1, nsmap={
-                                       vmnetwork.alias: vmnetwork.namespace})
+            vmnetwork.alias: vmnetwork.namespace})
 
 
 class vmnetworkController(wsgi.Controller):
@@ -98,7 +100,7 @@ class Vmnetwork(extensions.ExtensionDescriptor):
         resources = []
 
         res = extensions.ResourceExtension('os-vmnetwork',
-                                       vmnetworkController())
+                                           vmnetworkController())
         resources.append(res)
 
         return resources
