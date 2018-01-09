@@ -673,8 +673,6 @@ def get_lan_ip():
 def _restart_wlm_services():
     for service in ['wlm-api', 'wlm-scheduler', 'wlm-workloads']:
         try:
-	    command = ['sudo', 'systemctl', 'enable', service]
-            subprocess.call(command, shell=False)
             command = ['sudo', 'service', service, 'restart']
             subprocess.call(command, shell=False)
         except BaseException:
