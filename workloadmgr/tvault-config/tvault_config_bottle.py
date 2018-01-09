@@ -27,6 +27,7 @@ import shutil
 import datetime
 from threading  import Thread
 import uuid
+import json
     
 import bottle
 from bottle import static_file, ServerAdapter
@@ -705,7 +706,14 @@ def _authenticate_with_keystone():
     config_data['glance_production_host'] = parse_result.hostname
     config_data['glance_production_port'] = parse_result.port
     
-    
+    #Get Image API version
+    versions = json.loads(urllib.urlopen(image_public_url).read()) 
+    current_version = filter(lambda x: x['status'].lower() == 'current', versions['versions'])
+    if 'v2' in current_version[0]['id']:
+       config_data['glance_api_version'] = 2
+    else:
+       config_data['glance_api_version'] = 1
+
     #network
     try:
         if keystone.version == 'v3':
@@ -2287,7 +2295,9 @@ def configure_service():
         replace_line('/etc/workloadmgr/workloadmgr.conf', 'glance_production_host = ', 'glance_production_host = ' + config_data['glance_production_host'])
         replace_line('/etc/workloadmgr/workloadmgr.conf', 'glance_production_port = ', 'glance_production_port = ' + str(config_data['glance_production_port']))
         replace_line('/etc/workloadmgr/workloadmgr.conf', 'glance_production_api_servers = ', 'glance_production_api_servers = ' + str(config_data['glance_production_api_servers']))
-        
+      
+        replace_line('/etc/workloadmgr/workloadmgr.conf', 'glance_api_version = ', 'glance_api_version = ' + str(config_data['glance_api_version']))
+ 
         replace_line('/etc/workloadmgr/workloadmgr.conf', 'neutron_admin_auth_url = ', 'neutron_admin_auth_url = ' + config_data['neutron_admin_auth_url'])
         replace_line('/etc/workloadmgr/workloadmgr.conf', 'neutron_production_url = ', 'neutron_production_url = ' + config_data['neutron_production_url'])
         replace_line('/etc/workloadmgr/workloadmgr.conf', 'neutron_admin_username = ', 'neutron_admin_username = ' + config_data['neutron_admin_username'])

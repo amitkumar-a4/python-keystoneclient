@@ -61,7 +61,11 @@ glance_opts = [
                 help='A list of url scheme that can be downloaded directly '
                      'via the direct_url.  Currently supported schemes: '
                      '[file].'),
+    cfg.IntOpt('glance_api_version',
+                default=2,
+                help='Default glance API version.'),
     ]
+
 
 LOG = logging.getLogger(__name__)
 CONF = cfg.CONF
@@ -145,7 +149,7 @@ class GlanceClientWrapper(object):
     """Glance client wrapper class that implements retries."""
 
     def __init__(self, production, context=None, host=None, port=None, use_ssl=False,
-                 version=1):
+                 version=2):
         if host is not None:
             self.client = self._create_static_client(context,
                                                      host, port,
@@ -214,7 +218,7 @@ class GlanceImageService(object):
         """Calls out to Glance for a list of detailed image information."""
         params = self._extract_query_params(kwargs)
         try:
-            images = self._client.call(context, 1, 'list', **params)
+            images = self._client.call(context, CONF.glance_api_version, 'list', **params)
         except Exception:
             _reraise_translated_exception()
 
@@ -243,7 +247,7 @@ class GlanceImageService(object):
     def show(self, context, image_id):
         """Returns a dict with image data for the given opaque image id."""
         try:
-            image = self._client.call(context, 1, 'get', image_id)
+            image = self._client.call(context, CONF.glance_api_version, 'get', image_id)
         except Exception:
             _reraise_translated_image_exception(image_id)
 
@@ -258,7 +262,7 @@ class GlanceImageService(object):
         or None if this attribute is not shown by Glance."""
         try:
             client = GlanceClientWrapper()
-            image_meta = client.call(context, 2, 'get', image_id)
+            image_meta = client.call(context, CONF.glance_api_version, 'get', image_id)
         except Exception:
             _reraise_translated_image_exception(image_id)
 
@@ -282,7 +286,7 @@ class GlanceImageService(object):
                 return
 
         try:
-            image_chunks = self._client.call(context, 1, 'data', image_id)
+            image_chunks = self._client.call(context, CONF.glance_api_version, 'data', image_id)
         except Exception:
             _reraise_translated_image_exception(image_id)
 
@@ -301,7 +305,7 @@ class GlanceImageService(object):
 
         try:
             recv_service_image_meta = self._client.call(
-                context, 1, 'create', **sent_service_image_meta)
+                context, CONF.glance_api_version, 'create', **sent_service_image_meta)
         except glanceclient.exc.HTTPException:
             _reraise_translated_exception()
 
@@ -318,7 +322,7 @@ class GlanceImageService(object):
         if data:
             image_meta['data'] = data
         try:
-            image_meta = self._client.call(context, 1, 'update',
+            image_meta = self._client.call(context, CONF.glance_api_version, 'update',
                                            image_id, **image_meta)
         except Exception:
             _reraise_translated_image_exception(image_id)
@@ -334,7 +338,7 @@ class GlanceImageService(object):
 
         """
         try:
-            self._client.call(context, 1, 'delete', image_id)
+            self._client.call(context, CONF.glance_api_version, 'delete', image_id)
         except glanceclient.exc.NotFound:
             raise exception.ImageNotFound(image_id=image_id)
         except glanceclient.exc.HTTPForbidden:
