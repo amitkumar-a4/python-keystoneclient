@@ -22,7 +22,7 @@ from tempfile import mkstemp
 
 from contego import utils
 from swiftclient.service import (
-   get_conn
+    get_conn
 )
 
 from swiftclient.utils import (
@@ -107,8 +107,8 @@ generic_log_opts = [
                 default=True,
                 help='Log output to standard error'),
     cfg.IntOpt('rate_limit_burst',
-                default=1,
-                help='Burst limit')
+               default=1,
+               help='Burst limit')
 ]
 
 log_opts = [
@@ -189,8 +189,8 @@ contego_vault_opts = [
                default='password',
                help='Swift password'),
     cfg.StrOpt('region_name_for_services',
-                default='RegionOne',
-                help='Swift Region Name'),
+               default='RegionOne',
+               help='Swift Region Name'),
     cfg.StrOpt('vault_swift_domain_id',
                default='default',
                help='Swift domain id'),
@@ -201,7 +201,7 @@ contego_vault_opts = [
                default='TrilioVault',
                help='Swift Container Prefix'),
     cfg.StrOpt('vault_swift_segment_size',
-               default='33554432', 
+               default='33554432',
                help='Default segment size 34MB'),
     cfg.IntOpt('vault_retry_count',
                default=2,
@@ -235,10 +235,10 @@ LOG = logging.getLogger(__name__)
 logging.setup(cfg.CONF, 'swift')
 try:
     LOG.logger.setLevel(logging.ERROR)
-except:
+except BaseException:
     LOG.logger.setLevel(logging.logging.ERROR)
 
-options = {'sync_to': None,'verbose': 1,'header': [],'auth_version': u'1.0',
+options = {'sync_to': None, 'verbose': 1, 'header': [], 'auth_version': u'1.0',
            'os_options': {u'project_name': None,
                           u'region_name': None,
                           u'user_domain_name': None,
@@ -252,7 +252,7 @@ options = {'sync_to': None,'verbose': 1,'header': [],'auth_version': u'1.0',
                           u'project_id': None,
                           u'auth_token': None,
                           u'project_domain_name': None
-                         },
+                          },
            'ssl_compression': True,
            'os_storage_url': None,
            'os_username': '',
@@ -265,13 +265,13 @@ options = {'sync_to': None,'verbose': 1,'header': [],'auth_version': u'1.0',
            'os_auth_url': '',
            'os_auth_token': None,
            'insecure': True,
-           'snet': False,'sync_key': None,'auth': '','user': '','key': '',
-           'read_acl': None,'info': False,'retries': 5,'write_acl': None,'meta': [],
-           'debug': False,'use_slo': False,'checksum': True, 'changed': False, 
-           'leave_segments': False,'skip_identical': True,'segment_threads': 10,
-           'object_dd_threads': 10,'object_uu_threads': 10,'container_threads': 10,
-           'yes_all': False,'object_name': None,
-          }
+           'snet': False, 'sync_key': None, 'auth': '', 'user': '', 'key': '',
+           'read_acl': None, 'info': False, 'retries': 5, 'write_acl': None, 'meta': [],
+           'debug': False, 'use_slo': False, 'checksum': True, 'changed': False,
+           'leave_segments': False, 'skip_identical': True, 'segment_threads': 10,
+           'object_dd_threads': 10, 'object_uu_threads': 10, 'container_threads': 10,
+           'yes_all': False, 'object_name': None,
+           }
 
 if CONF.vault_swift_auth_version == 'TEMPAUTH':
     options['auth_version'] = '1.0'
@@ -281,10 +281,10 @@ if CONF.vault_swift_auth_version == 'TEMPAUTH':
 else:
     options['auth_version'] = CONF.keystone_auth_version
     if options['auth_version'] == '3':
-       if CONF.vault_swift_domain_id != "":
-          options['os_options']['user_domain_id'] = CONF.vault_swift_domain_id
-          options['os_options']['domain_id'] = CONF.vault_swift_domain_id
-       elif CONF.vault_swift_domain_name != "":
+        if CONF.vault_swift_domain_id != "":
+            options['os_options']['user_domain_id'] = CONF.vault_swift_domain_id
+            options['os_options']['domain_id'] = CONF.vault_swift_domain_id
+        elif CONF.vault_swift_domain_name != "":
             options['os_options']['user_domain_name'] = CONF.vault_swift_domain_name
             options['os_options']['domain_name'] = CONF.vault_swift_domain_name
 
@@ -314,16 +314,16 @@ lrucache = {}
 
 def disable_logging(func):
     @functools.wraps(func)
-    def wrapper(*args,**kwargs):
+    def wrapper(*args, **kwargs):
         try:
             logging.logging.disable(logging.ERROR)
-        except:
-               logging.logging.disable(logging.logging.ERROR)
-        result = func(*args,**kwargs)
+        except BaseException:
+            logging.logging.disable(logging.logging.ERROR)
+        result = func(*args, **kwargs)
         try:
             logging.logging.disable(logging.NOTSET)
-        except:
-               logging.logging.disable(logging.logging.NOTSET)
+        except BaseException:
+            logging.logging.disable(logging.logging.NOTSET)
         return result
     return wrapper
 
@@ -333,12 +333,13 @@ def split_head_tail(path):
     prefix = ''
     while head not in ('', '/'):
         if prefix != '':
-           prefix = os.path.join(tail, prefix)
+            prefix = os.path.join(tail, prefix)
         else:
-             prefix = tail
+            prefix = tail
         head, tail = os.path.split(head)
 
     return tail, prefix
+
 
 def get_head(path):
     head, tail = os.path.split(path)
@@ -420,9 +421,9 @@ class SwiftRepository(ObjectRepository):
         prefix = ''
         while head not in ('', '/'):
             if prefix != '':
-               prefix = os.path.join(tail, prefix)
+                prefix = os.path.join(tail, prefix)
             else:
-                 prefix = tail
+                prefix = tail
             head, tail = os.path.split(head)
 
         return tail, prefix
@@ -435,21 +436,21 @@ class SwiftRepository(ObjectRepository):
         if partial.startswith("/"):
             partial = partial[1:]
         if not os.path.isdir(self.root):
-           try:
-               command = ['sudo', 'mkdir', self.root]
-               subprocess.call(command, shell=False)
-               command = ['sudo', 'chown',
-                          str(self.user_id)+':'+str(self.group_id),
-                          self.root]
-               subprocess.call(command, shell=False)
-           except:
-               pass
-        else:
-             stat_info = os.stat(self.root)
-             if stat_info.st_uid != self.user_id or \
-                 stat_info.st_gid != self.group_id:
+            try:
+                command = ['sudo', 'mkdir', self.root]
+                subprocess.call(command, shell=False)
                 command = ['sudo', 'chown',
-                           str(self.user_id)+':'+str(self.group_id),
+                           str(self.user_id) + ':' + str(self.group_id),
+                           self.root]
+                subprocess.call(command, shell=False)
+            except BaseException:
+                pass
+        else:
+            stat_info = os.stat(self.root)
+            if stat_info.st_uid != self.user_id or \
+                    stat_info.st_gid != self.group_id:
+                command = ['sudo', 'chown',
+                           str(self.user_id) + ':' + str(self.group_id),
                            CONF.vault_data_directory_old]
                 subprocess.call(command, shell=False)
 
@@ -465,7 +466,7 @@ class SwiftRepository(ObjectRepository):
                            '-t', 'tmpfs', '-o', 'size=200M,mode=0777',
                            "tmpfs", tmpfs_mountpath]
                 subprocess.check_call(command, shell=False)
-        except:
+        except BaseException:
             pass
 
         path = os.path.join(self.root, partial)
@@ -482,11 +483,11 @@ class SwiftRepository(ObjectRepository):
         conn = get_conn(_opts)
         conn.get_auth()
         rsp = conn.get_object(
-                  container, prefix,
-                  headers=put_headers,
-                  query_string='multipart-manifest=get',
-                  response_dict=mr
-                  )
+            container, prefix,
+            headers=put_headers,
+            query_string='multipart-manifest=get',
+            response_dict=mr
+        )
 
         manifest = rsp[1]
 
@@ -502,7 +503,7 @@ class SwiftRepository(ObjectRepository):
         _opts = options.copy()
         _opts['object_name'] = prefix
         for key, value in metadata.iteritems():
-            put_headers['X-Object-Meta-'+key] = value
+            put_headers['X-Object-Meta-' + key] = value
         _opts = bunchify(_opts)
         conn = get_conn(_opts)
         conn.put_object(
@@ -510,7 +511,7 @@ class SwiftRepository(ObjectRepository):
             headers=put_headers,
             query_string='multipart-manifest=put',
             response_dict=mr
-            )
+        )
 
         return
 
@@ -523,7 +524,7 @@ class SwiftRepository(ObjectRepository):
         else:
             args = [container]
 
-        _opts['delimiter'] =  None
+        _opts['delimiter'] = None
         _opts['human'] = False
         _opts['totals'] = False
         _opts['long'] = False
@@ -550,8 +551,9 @@ class SwiftRepository(ObjectRepository):
         full_path = self._full_path(object_name)
 
         self.manifest[object_name] = {}
-        self.manifest[object_name]['readonly'] = flags == os.O_RDONLY or flags in (int('8000', 16), int('8800', 16))
- 
+        self.manifest[object_name]['readonly'] = flags == os.O_RDONLY or flags in (
+            int('8000', 16), int('8800', 16))
+
         if flags == os.O_RDONLY or flags in (int('8000', 16), int('8800', 16)) or \
            flags == int('8401', 16) or \
            flags == os.O_RDWR or flags in (int('8002', 16), int('8802', 16)):
@@ -570,9 +572,10 @@ class SwiftRepository(ObjectRepository):
                 metadata['segments-dir']
 
             try:
-                segment_dir = self._full_path(self.manifest[object_name]['segments-dir'])
+                segment_dir = self._full_path(
+                    self.manifest[object_name]['segments-dir'])
                 os.makedirs(segment_dir)
-            except:
+            except BaseException:
                 pass
 
             with open(full_path, "w") as f:
@@ -583,7 +586,7 @@ class SwiftRepository(ObjectRepository):
             if flags in (int('8001', 16), int('8801', 16), int('0001', 16)):
                 try:
                     self.object_unlink(object_name)
-                except:
+                except BaseException:
                     pass
 
             if flags & os.O_WRONLY:
@@ -593,7 +596,7 @@ class SwiftRepository(ObjectRepository):
             try:
                 segment_dir = self._full_path(object_name + "-segments")
                 os.makedirs(segment_dir)
-            except:
+            except BaseException:
                 pass
 
         return os.open(full_path, flags)
@@ -601,12 +604,12 @@ class SwiftRepository(ObjectRepository):
     def object_close(self, object_name, fh):
 
         try:
-            segments_dir = self.manifest[object_name].get('segments-dir',
-                                            object_name + "-segments")
+            segments_dir = self.manifest[object_name].get(
+                'segments-dir', object_name + "-segments")
             container, prefix = self.split_head_tail(segments_dir)
             object_manifest = []
             segments_list = {}
- 
+
             if not self.manifest[object_name]['readonly']:
                 offset = 0
                 while True:
@@ -614,21 +617,29 @@ class SwiftRepository(ObjectRepository):
                         break
                     if self.manifest[object_name][offset]['modified']:
 
-                        st = self.object_getattr(self.manifest[object_name][offset]['name'], fh)
+                        st = self.object_getattr(
+                            self.manifest[object_name][offset]['name'], fh)
                         stat = bunchify(st)
-                        object_manifest.append({"path": self.manifest[object_name][offset]['name'],
-                                                "etag": stat.etag,
-                                                "size_bytes": min(stat.st_size, CONF.vault_segment_size)})
+                        object_manifest.append(
+                            {
+                                "path": self.manifest[object_name][offset]['name'],
+                                "etag": stat.etag,
+                                "size_bytes": min(
+                                    stat.st_size,
+                                    CONF.vault_segment_size)})
                     else:
-                        object_manifest.append({"path": self.manifest[object_name][offset]['name'],
-                                                "etag": self.manifest[object_name][offset]['hash'],
-                                                "size_bytes": self.manifest[object_name][offset]['bytes']})
+                        object_manifest.append(
+                            {
+                                "path": self.manifest[object_name][offset]['name'],
+                                "etag": self.manifest[object_name][offset]['hash'],
+                                "size_bytes": self.manifest[object_name][offset]['bytes']})
 
-                    offset += CONF.vault_segment_size 
+                    offset += CONF.vault_segment_size
 
                 object_manifest = json.dumps(object_manifest)
-                self._write_object_manifest(object_name, object_manifest,
-                                            metadata={'segments-dir': segments_dir})
+                self._write_object_manifest(
+                    object_name, object_manifest, metadata={
+                        'segments-dir': segments_dir})
 
                 offset = 0
                 while True:
@@ -637,24 +648,25 @@ class SwiftRepository(ObjectRepository):
                         break
 
                     objects = sorted(objects)
-                    c, p = self.split_head_tail(self.manifest[object_name][offset]['name'])
+                    c, p = self.split_head_tail(
+                        self.manifest[object_name][offset]['name'])
                     for obj in list(set(objects) - set([p])):
                         self.object_delete(os.path.join(container, obj))
 
-                    offset += CONF.vault_segment_size 
+                    offset += CONF.vault_segment_size
             try:
                 os.close(fh)
-            except:
+            except BaseException:
                 pass
 
             try:
                 os.remove(self._full_path(object_name))
-            except:
+            except BaseException:
                 pass
 
             try:
                 shutil.rmtree(self._full_path(segments_dir))
-            except:
+            except BaseException:
                 pass
 
             return
@@ -668,8 +680,8 @@ class SwiftRepository(ObjectRepository):
             seg_fullname = self.manifest[object_name][offset]['name']
         else:
             segname = self.next_segname_from_offset(object_name, offset)
-            segments_dir = self.manifest[object_name].get('segments-dir',
-                                             object_name + "-segments")
+            segments_dir = self.manifest[object_name].get(
+                'segments-dir', object_name + "-segments")
 
             seg_fullname = os.path.join(segments_dir, segname)
 
@@ -699,8 +711,13 @@ class SwiftRepository(ObjectRepository):
     @disable_logging
     def object_download(self, object_name, offset):
         if offset not in self.manifest[object_name]:
-            raise Exception('object %s not found' % object_name + SEGMENT_FORMAT % (int(offset), int(0)))
- 
+            raise Exception(
+                'object %s not found' %
+                object_name +
+                SEGMENT_FORMAT %
+                (int(offset),
+                 int(0)))
+
         seg_fullname = self.manifest[object_name][offset]['name']
 
         container, obj = self.split_head_tail(seg_fullname.rstrip('/'))
@@ -708,8 +725,8 @@ class SwiftRepository(ObjectRepository):
         cache_path = self._get_cache(seg_fullname)
 
         try:
-            os.makedirs(self._full_path(segments_dir),  mode=0751)
-        except:
+            os.makedirs(self._full_path(segments_dir), mode=0o751)
+        except BaseException:
             pass
 
         with tmpfsfile(remove=True) as tempfs:
@@ -749,7 +766,7 @@ class SwiftRepository(ObjectRepository):
 
     def segment_list(self, container, segments_dir, offset):
         _opts = options.copy()
-        _opts['delimiter'] =  None
+        _opts['delimiter'] = None
         _opts['human'] = False
         _opts['totals'] = False
         _opts['long'] = False
@@ -775,15 +792,15 @@ class SwiftRepository(ObjectRepository):
         if len(files) == 0:
             return SEGMENT_FORMAT % (int(offset), int(0))
 
-        return SEGMENT_FORMAT % (int(offset),
-            int(sorted(files)[-1].split(segments_dir)[1].split('.')[1], 16) + 1)
+        return SEGMENT_FORMAT % (int(offset), int(
+            sorted(files)[-1].split(segments_dir)[1].split('.')[1], 16) + 1)
         pass
 
     def curr_segname_from_offset(self, path, offset):
         container, prefix = self.split_head_tail(path)
 
         if self.manifest.get(path, None) and \
-            offset in self.manifest[path]:
+                offset in self.manifest[path]:
             seg = self.manifest[path][offset]['name']
             return seg.split('-segments/')[1]
 
@@ -798,8 +815,8 @@ class SwiftRepository(ObjectRepository):
         if len(files) == 0:
             return SEGMENT_FORMAT % (int(offset), int(0))
 
-        return SEGMENT_FORMAT % (int(offset),
-            int(sorted(files)[-1].split(segments_dir)[1].split('.')[1], 16))
+        return SEGMENT_FORMAT % (int(offset), int(
+            sorted(files)[-1].split(segments_dir)[1].split('.')[1], 16))
 
     def object_getattr(self, object_name, fh=None):
         full_path = self._full_path(object_name)
@@ -811,7 +828,7 @@ class SwiftRepository(ObjectRepository):
         else:
             args = [container]
 
-        _opts['delimiter'] =  None
+        _opts['delimiter'] = None
         _opts['human'] = False
         _opts['totals'] = False
         _opts['long'] = False
@@ -836,15 +853,22 @@ class SwiftRepository(ObjectRepository):
             d['st_mode'] = 33261
             if prefix is not None and 'authorized_key' in prefix:
                 d['st_mode'] = 33152
-            d['st_size'] = int(st['headers']['content-length'])
+
+            if 'content-length' in st['headers']:
+               d['st_size'] = int(st['headers']['content-length'])
+            elif 'x-container-bytes-used' in st['headers'] and (prefix is None or prefix == '') and st['headers']['x-container-bytes-used'] <= 0:
+                 d['st_size'] = int(st['headers']['x-container-bytes-used'])
+            elif container != '' and  (prefix is None or prefix == ''):
+                 d['st_size'] = 0
             if (d['st_size'] == 0 and container == '') or (d['st_size'] == 0 and prefix is None) or \
                 (d['st_size'] == 0 and prefix == ''):
+                
                 d['st_nlink'] = 3
                 d['st_size'] = 4096
                 d['st_mode'] = 16893
                 if not os.path.exists(self._get_cache(container)):
                     container_path = self._get_cache(container)
-                    os.mkdir(container_path, 0751)
+                    os.mkdir(container_path, 0o751)
         except Exception as ex:
             if prefix is None:
                 prefix = container
@@ -852,7 +876,7 @@ class SwiftRepository(ObjectRepository):
             mkdirs = self._get_head(prefix)
             try:
                 st = os.lstat(full_path)
-            except:
+            except BaseException:
                 args1 = args
                 if len(args1) > 1:
                     args1.pop()
@@ -860,16 +884,28 @@ class SwiftRepository(ObjectRepository):
                     _opts['prefix'] = os.path.join(_opts['prefix'], '')
                     st = vaultswift.st_list(args1, _opts)
                     if len(st) > 0:
-                        os.mkdir(full_path, 0751)
+                        os.mkdir(full_path, 0o751)
                     else:
-                        os.mkdir(container, 0751)
-                except:
+                        os.mkdir(container, 0o751)
+                except BaseException:
                     pass
             if prefix == '4913' or prefix[:-1].endswith('~'):
-                return 
+                return
             st = os.lstat(full_path)
-            d = dict((key, getattr(st, key)) for key in ('st_atime', 'st_ctime',
-                     'st_gid', 'st_mode', 'st_mtime', 'st_nlink', 'st_size', 'st_uid',))
+            d = dict(
+                (key,
+                 getattr(
+                     st,
+                     key)) for key in (
+                    'st_atime',
+                    'st_ctime',
+                    'st_gid',
+                    'st_mode',
+                    'st_mtime',
+                    'st_nlink',
+                    'st_size',
+                    'st_uid',
+                ))
 
         # st_blksize and st_blocks are import for qemu-img info command to
         # display disk size attribute correctly. Without this information
@@ -882,7 +918,7 @@ class SwiftRepository(ObjectRepository):
         listing = []
         container, prefix = self.split_head_tail(object_name)
         _opts = options.copy()
-        _opts['delimiter'] =  None
+        _opts['delimiter'] = None
         _opts['human'] = False
         _opts['totals'] = False
         _opts['long'] = False
@@ -894,7 +930,7 @@ class SwiftRepository(ObjectRepository):
             args = [container]
             #_opts['delimiter'] =  '/'
             if prefix != '' and prefix is not None:
-                _opts['prefix'] = prefix+'/'
+                _opts['prefix'] = prefix + '/'
 
         dirents = []
         _opts = bunchify(_opts)
@@ -909,13 +945,13 @@ class SwiftRepository(ObjectRepository):
             if component != '' or rest != '':
                 mkdirs = os.path.join(container, self._get_head(lst))
                 try:
-                    os.makedirs(mkdirs, mode=0751)
-                except:
+                    os.makedirs(mkdirs, mode=0o751)
+                except BaseException:
                     pass
             if component is not None and component != '' and \
-                not '-segments' in component and not '_segments' in component:
-               if component not in dirents:
-                   dirents.append(component) 
+                    '-segments' not in component and '_segments' not in component:
+                if component not in dirents:
+                    dirents.append(component)
         for r in list(dirents):
             yield r
 
@@ -943,7 +979,8 @@ class SwiftRepository(ObjectRepository):
         stv = vaultswift.st_stat(args1, _opts)
         if 'x-account-meta-quota-bytes' in stv['headers']:
             f_blocks = int(stv['headers']['x-account-meta-quota-bytes'])
-            f_bavail = int(stv['headers']['x-account-meta-quota-bytes']) - int(stv['headers']['x-account-bytes-used'])
+            f_bavail = int(stv['headers']['x-account-meta-quota-bytes']
+                           ) - int(stv['headers']['x-account-bytes-used'])
         else:
             f_blocks = -1
             f_bavail = int(stv['headers']['x-account-bytes-used'])
@@ -960,19 +997,19 @@ class SwiftRepository(ObjectRepository):
         LOG.debug(("mkdir, %s" % path))
         container, obj = self.split_head_tail(path)
         if (obj == '' or obj == '/') and ist is False:
-           _opts = options.copy()
-           _opts = bunchify(_opts)
-           args1 = [container]
-           try:
-               vaultswift.st_post(args1, _opts)
-           except Exception as ex:
-               LOG.exception(ex)
-               return 0
-           return 0
+            _opts = options.copy()
+            _opts = bunchify(_opts)
+            args1 = [container]
+            try:
+                vaultswift.st_post(args1, _opts)
+            except Exception as ex:
+                LOG.exception(ex)
+                return 0
+            return 0
 
         cache_path = self._get_cache(path)
         if ist is False:
-           cache_path = self._get_cache(os.path.join(container, obj))
+            cache_path = self._get_cache(os.path.join(container, obj))
 
         try:
             os.makedirs(cache_path, mode)
@@ -987,7 +1024,7 @@ class SwiftRepository(ObjectRepository):
         _opts = bunchify(_opts)
         args1 = [container]
         if obj != '' and obj != '/':
-           args1.append(obj)
+            args1.append(obj)
         try:
             vaultswift.st_delete(args1, _opts)
         except Exception as ex:
@@ -1003,7 +1040,7 @@ class SwiftRepository(ObjectRepository):
             container, prefix = self.split_head_tail(path)
             cache_path = self._get_cache(os.path.join(container, prefix))
             return os.chmod(cache_path, mode)
-        except:
+        except BaseException:
             pass
 
     def chown(self, path, uid, gid):
@@ -1012,20 +1049,20 @@ class SwiftRepository(ObjectRepository):
             container, prefix = self.split_head_tail(path)
             cache_path = self._get_cache(os.path.join(container, prefix))
             return os.chown(cache_path, uid, gid)
-        except:
+        except BaseException:
             pass
 
     def symlink(self, name, target):
         raise Exception("Not Applicable")
 
     def rename(self, old, new):
-        LOG.debug(( "rename, %s -> %s" % (old, new)))
-        #make a copy of the manifest
+        LOG.debug(("rename, %s -> %s" % (old, new)))
+        # make a copy of the manifest
         try:
             manifest = self._read_object_manifest(old)
             metadata = self._get_object_metadata(old)
             segments_dir = metadata.get('segments-dir', old + '-segments')
- 
+
             manifest = json.loads(manifest)
             new_manifest = []
             for man in manifest:
@@ -1033,16 +1070,17 @@ class SwiftRepository(ObjectRepository):
                                      "etag": man['hash'],
                                      "size_bytes": man['bytes']})
             new_manifest = json.dumps(new_manifest)
-            self._write_object_manifest(new, new_manifest,
-                                        metadata={'segments-dir': segments_dir})
+            self._write_object_manifest(
+                new, new_manifest, metadata={
+                    'segments-dir': segments_dir})
             self.object_unlink(old, leave_segments=True)
-        except:
+        except BaseException:
             self.object_unlink(new, leave_segments=True)
 
         return 0
 
     def link(self, target, name):
-        LOG.debug(( "link, %s" % target))
+        LOG.debug(("link, %s" % target))
         container, prefix = split_head_tail(target)
         cache_path_target = self._get_cache(os.path.join(container, prefix))
         container, prefix = split_head_tail(name)
@@ -1050,13 +1088,13 @@ class SwiftRepository(ObjectRepository):
         return os.link(cache_path_target, cache_path_name)
 
     def utimens(self, path, times=None):
-        LOG.debug(( "utimens, %s" % path))
+        LOG.debug(("utimens, %s" % path))
         container, prefix = split_head_tail(path)
         cache_path = self._get_cache(path)
         """ This file won't be existing until not downloaded for writing/reading"""
         try:
             os.utime(cache_path, times)
-        except:
+        except BaseException:
             return 0
 
         return 0
@@ -1070,18 +1108,26 @@ class SwiftRepository(ObjectRepository):
                 command = ['timeout', '-sKILL', '30', 'sudo', 'umount',
                            tmpfs_mountpath]
                 subprocess.check_call(command, shell=False)
-        except:
+        except BaseException:
             pass
 
-        if vaultswift.swift_list: vaultswift.swift_list.__exit__(None, None, None)
-        if vaultswift.swift_stat: vaultswift.swift_stat.__exit__(None, None, None)
-        if vaultswift.swift_upload: vaultswift.swift_upload.__exit__(None, None, None)
-        if vaultswift.swift_download: vaultswift.swift_download.__exit__(None, None, None)
-        if vaultswift.swift_delete: vaultswift.swift_delete.__exit__(None, None, None)
-        if vaultswift.swift_post: vaultswift.swift_post.__exit__(None, None, None)
-        if vaultswift.swift_cap: vaultswift.swift_cap.__exit__(None, None, None) 
+        if vaultswift.swift_list:
+            vaultswift.swift_list.__exit__(None, None, None)
+        if vaultswift.swift_stat:
+            vaultswift.swift_stat.__exit__(None, None, None)
+        if vaultswift.swift_upload:
+            vaultswift.swift_upload.__exit__(None, None, None)
+        if vaultswift.swift_download:
+            vaultswift.swift_download.__exit__(None, None, None)
+        if vaultswift.swift_delete:
+            vaultswift.swift_delete.__exit__(None, None, None)
+        if vaultswift.swift_post:
+            vaultswift.swift_post.__exit__(None, None, None)
+        if vaultswift.swift_cap:
+            vaultswift.swift_cap.__exit__(None, None, None)
         shutil.rmtree(self.root)
         return 0
+
 
 class FileRepository(ObjectRepository):
     def __init__(self, root, **kwargs):
@@ -1093,7 +1139,7 @@ class FileRepository(ObjectRepository):
         try:
             segment_dir = self._full_path(object_name) + "-segments"
             os.makedirs(segment_dir)
-        except:
+        except BaseException:
             pass
 
         full_path = self._full_path(object_name)
@@ -1117,9 +1163,10 @@ class FileRepository(ObjectRepository):
     def object_delete(self, object_name):
         manifest_filename = self._full_path(object_name) + ".manifest"
         try:
-            shutil.rmtree(manifest_filename.split(".manifest")[0] + "-segments")
+            shutil.rmtree(manifest_filename.split(
+                ".manifest")[0] + "-segments")
             os.remove(manifest_filename)
-        except:
+        except BaseException:
             pass
 
     def object_close(self, object_name, fh):
@@ -1130,7 +1177,8 @@ class FileRepository(ObjectRepository):
         segments_list = {}
         offset = 0
         while True:
-            segments_list[offset] = objects = self.segment_list(segment_dir, offset)
+            segments_list[offset] = objects = self.segment_list(
+                segment_dir, offset)
             if len(objects) == 0:
                 break
 
@@ -1138,8 +1186,9 @@ class FileRepository(ObjectRepository):
             stat = os.stat(objects[-1])
             object_manifest.append({"path": objects[-1],
                                     "etag": "etagoftheobjectsegment1",
-                                    "size_bytes": min(stat.st_size, CONF.vault_segment_size)})
-            offset += CONF.vault_segment_size 
+                                    "size_bytes": min(stat.st_size,
+                                                      CONF.vault_segment_size)})
+            offset += CONF.vault_segment_size
 
         with open(manifest, "w") as manf:
             manf.write(json.dumps(object_manifest))
@@ -1152,9 +1201,9 @@ class FileRepository(ObjectRepository):
 
             objects = sorted(objects)
             for obj in list(set(objects) - set([objects[-1]])):
-                os.remove(obj) 
+                os.remove(obj)
 
-            offset += CONF.vault_segment_size 
+            offset += CONF.vault_segment_size
 
         os.close(fh)
         return
@@ -1165,7 +1214,8 @@ class FileRepository(ObjectRepository):
             f.truncate(length)
 
     def segment_list(self, segment_dir, offset):
-        return glob.glob(os.path.join(segment_dir, '%016x.[0-9a-f]*' % int(offset)))
+        return glob.glob(os.path.join(
+            segment_dir, '%016x.[0-9a-f]*' % int(offset)))
 
     def next_segname_from_offset(self, path, offset):
         segment_dir = self._full_path(path) + "-segments"
@@ -1183,7 +1233,8 @@ class FileRepository(ObjectRepository):
                         version = int(segname.split('.')[1], 16) + 1
                         return SEGMENT_FORMAT % (int(offset), int(version))
 
-        return SEGMENT_FORMAT % (int(offset), int(sorted(files)[-1].split(segment_dir)[1].split('.')[1], 16) + 1)
+        return SEGMENT_FORMAT % (int(offset), int(
+            sorted(files)[-1].split(segment_dir)[1].split('.')[1], 16) + 1)
 
     def curr_segname_from_offset(self, path, offset, forread=False):
         segment_dir = self._full_path(path) + "-segments"
@@ -1203,20 +1254,32 @@ class FileRepository(ObjectRepository):
                         version = int(segname.split('.')[1], 16)
                         return SEGMENT_FORMAT % (int(offset), int(version))
 
-        return SEGMENT_FORMAT % (int(offset), int(sorted(files)[-1].split(segment_dir)[1].split('.')[1], 16))
+        return SEGMENT_FORMAT % (int(offset), int(
+            sorted(files)[-1].split(segment_dir)[1].split('.')[1], 16))
 
     def object_getattr(self, object_name, fh=None):
         full_path = self._full_path(object_name)
         st = os.lstat(full_path)
-        attrs = dict((key, getattr(st, key)) for key in ('st_atime', 'st_ctime',
-                     'st_gid', 'st_mode', 'st_mtime', 'st_nlink', 'st_size', 'st_uid'))
+        attrs = dict(
+            (key,
+             getattr(
+                 st,
+                 key)) for key in (
+                'st_atime',
+                'st_ctime',
+                'st_gid',
+                'st_mode',
+                'st_mtime',
+                'st_nlink',
+                'st_size',
+                'st_uid'))
 
         try:
             with open(full_path + ".manifest") as manf:
                 attrs['st_size'] = 0
                 for seg in json.load(manf):
                     attrs['st_size'] += seg['size_bytes']
-        except:
+        except BaseException:
             pass
         return attrs
 
@@ -1243,9 +1306,21 @@ class FileRepository(ObjectRepository):
     def object_statfs(self, path):
         full_path = self._full_path(path)
         stv = os.statvfs(full_path)
-        return dict((key, getattr(stv, key)) for key in ('f_bavail', 'f_bfree',
-            'f_blocks', 'f_bsize', 'f_favail', 'f_ffree', 'f_files', 'f_flag',
-            'f_frsize', 'f_namemax'))
+        return dict(
+            (key,
+             getattr(
+                 stv,
+                 key)) for key in (
+                'f_bavail',
+                'f_bfree',
+                'f_blocks',
+                'f_bsize',
+                'f_favail',
+                'f_ffree',
+                'f_files',
+                'f_flag',
+                'f_frsize',
+                'f_namemax'))
 
     def destroy(self, path):
         shutil.rmtree(self.root)
@@ -1264,10 +1339,12 @@ class FuseCache(object):
         if self.lrucache.get(fh, None):
             self.lrucache.pop(fh)
 
-        self.lrucache[fh] = {'lrucache': LRUCache(maxsize=CONF.vault_cache_size),
-                             'object_name': object_name}
+        self.lrucache[fh] = {
+            'lrucache': LRUCache(
+                maxsize=CONF.vault_cache_size),
+            'object_name': object_name}
         return fh
-     
+
     def object_flush(self, object_name, fh):
         item = self.lrucache[fh]
         assert item['object_name'] == object_name
@@ -1275,9 +1352,10 @@ class FuseCache(object):
         try:
             while True:
                 off, item = cache.popitem()
-                if item['modified'] == True:
-                    self.repository.object_upload(object_name, off, item['data'])
-        except:
+                if item['modified']:
+                    self.repository.object_upload(
+                        object_name, off, item['data'])
+        except BaseException:
             pass
 
     def object_close(self, object_name, fh):
@@ -1291,7 +1369,7 @@ class FuseCache(object):
 
     def _walk_segments(self, offset, length):
         while length != 0:
-            seg_offset = offset/CONF.vault_segment_size * CONF.vault_segment_size
+            seg_offset = offset / CONF.vault_segment_size * CONF.vault_segment_size
             base = offset - seg_offset
             seg_len = min(length, CONF.vault_segment_size - base)
             yield seg_offset, base, seg_len
@@ -1299,11 +1377,11 @@ class FuseCache(object):
             length -= seg_len
 
     def object_read(self, object_name, length, offset, fh):
-        #if len(cache) == CONF.vault_cache_size:
+        # if len(cache) == CONF.vault_cache_size:
             #off, item = cache.popitem()
             #segname = next_segname_from_offset(off)
             #object_name = os.path.join(SEGMENT_DIR, segname)
-            # if modified upload to object store. We assume 
+            # if modified upload to object store. We assume
             # it is not modified for now
             #object_upload(object_name, item)
         assert self.lrucache[fh]['object_name'] == object_name
@@ -1311,29 +1389,32 @@ class FuseCache(object):
         for segoffset, base, seg_len in self._walk_segments(offset, length):
             try:
                 segdata = self.lrucache[fh]['lrucache'][segoffset]['data']
-            except:
+            except BaseException:
                 try:
-                    # cache miss. free up a cache slot 
+                    # cache miss. free up a cache slot
                     cache = self.lrucache[fh]['lrucache']
                     if len(cache) == CONF.vault_cache_size:
                         # cache overflow
                         # kick an item so we can accomodate new one
                         off, item = cache.popitem()
-                        if item['modified'] == True:
-                            self.repository.object_upload(object_name, off, item['data'])
-  
-                    segdata = self.repository.object_download(object_name, segoffset)
-                    self.lrucache[fh]['lrucache'][segoffset] = {'modified': False, 'data': segdata }
-                except:
+                        if item['modified']:
+                            self.repository.object_upload(
+                                object_name, off, item['data'])
+
+                    segdata = self.repository.object_download(
+                        object_name, segoffset)
+                    self.lrucache[fh]['lrucache'][segoffset] = {
+                        'modified': False, 'data': segdata}
+                except BaseException:
                     # end of file
                     return 0
 
-            output_buf += segdata[base:base+seg_len]
+            output_buf += segdata[base:base + seg_len]
 
         return str(output_buf)
 
     def object_write(self, object_name, buf, offset, fh):
- 
+
         length = len(buf)
         assert self.lrucache[fh]['object_name'] == object_name
         bufptr = 0
@@ -1345,19 +1426,21 @@ class FuseCache(object):
                     # cache overflow
                     # kick an item so we can accomodate new one
                     off, item = cache.popitem()
-                    if item['modified'] == True:
-                        self.repository.object_upload(object_name, off, item['data'])
-  
+                    if item['modified']:
+                        self.repository.object_upload(
+                            object_name, off, item['data'])
+
                 # we need to handle offset that is not object segment boundary
                 # read the segment before modifying it
                 try:
                     # populate cache
-                    segdata = self.repository.object_download(object_name, segoffset)
+                    segdata = self.repository.object_download(
+                        object_name, segoffset)
                     if segdata is None:
                         raise Exception("Object not found")
 
                     cache[segoffset] = {'modified': False, 'data': segdata}
-                except:
+                except BaseException:
                     # we have not written the segment to the repository yet
                     segdata = bytearray(1)
                     cache[segoffset] = {'modified': True, 'data': segdata}
@@ -1365,8 +1448,8 @@ class FuseCache(object):
                 segdata = cache[segoffset]['data']
 
             if len(segdata) < base:
-                segdata.extend('\0' * (base+seg_len - len(segdata)))
-            segdata[base:base+seg_len] = buf[bufptr:bufptr+seg_len]
+                segdata.extend('\0' * (base + seg_len - len(segdata)))
+            segdata[base:base + seg_len] = buf[bufptr:bufptr + seg_len]
 
             cache[segoffset]['modified'] = True
             bufptr += seg_len
@@ -1482,48 +1565,62 @@ class TrilioVault(Operations):
         return self.cache.object_flush(path, fh)
 
     def destroy(self, path):
-          LOG.debug( "destroy, %s" % path)
-          return self.repository.destroy(path)
+        LOG.debug("destroy, %s" % path)
+        return self.repository.destroy(path)
 
 
 def fuse_conf():
     with open('/etc/fuse.conf', 'r') as f:
-         found = 0
-         for line in f:
-             if 'user_allow_other' in line and '#user_allow_other' not in line:
+        found = 0
+        for line in f:
+            if 'user_allow_other' in line and '#user_allow_other' not in line:
                 found = 1
                 break
     if found == 0:
-       with open('/etc/fuse.conf', 'rt') as f:
+        with open('/etc/fuse.conf', 'rt') as f:
             s = f.read() + '\n' + 'user_allow_other \n'
-       with open('/tmp/fuse.conf.tmp', 'wt') as outf:
+        with open('/tmp/fuse.conf.tmp', 'wt') as outf:
             outf.write(s)
-       os.system('sudo mv /tmp/fuse.conf.tmp /etc/fuse.conf')
-       os.system('sudo chown root:root /etc/fuse.conf')
-      
+        os.system('sudo mv /tmp/fuse.conf.tmp /etc/fuse.conf')
+        os.system('sudo chown root:root /etc/fuse.conf')
+
+
 def main(mountpoint, cacheroot):
     try:
         try:
             command = ['sudo', 'umount', '-l', mountpoint]
             subprocess.call(command, shell=False)
-        except:
-               pass
+        except BaseException:
+            pass
         if os.path.isdir(mountpoint):
-           os.system('sudo chown -R '+ FUSE_USER+':'+FUSE_USER+' '+ mountpoint)
+            os.system(
+                'sudo chown -R ' +
+                FUSE_USER +
+                ':' +
+                FUSE_USER +
+                ' ' +
+                mountpoint)
         else:
-             command = ['sudo', 'mkdir', mountpoint]
-             subprocess.call(command, shell=False)
-             command = ['sudo', 'chown', FUSE_USER+':'+FUSE_USER, mountpoint]
-             subprocess.call(command, shell=False)
+            command = ['sudo', 'mkdir', mountpoint]
+            subprocess.call(command, shell=False)
+            command = [
+                'sudo',
+                'chown',
+                FUSE_USER +
+                ':' +
+                FUSE_USER,
+                mountpoint]
+            subprocess.call(command, shell=False)
     except Exception as ex:
-           pass
+        pass
 
-    tvaultplugin =  TrilioVault(cacheroot,
-                      repository=SwiftRepository(cacheroot))
+    tvaultplugin = TrilioVault(cacheroot,
+                               repository=SwiftRepository(cacheroot))
     FUSE(tvaultplugin, mountpoint,
          nothreads=True, foreground=True, nonempty=True,
          big_writes=True, direct_io=True, allow_other=True)
 
+
 if __name__ == '__main__':
     fuse_conf()
-    main(CONF.vault_data_directory, CONF.vault_data_directory_old )
+    main(CONF.vault_data_directory, CONF.vault_data_directory_old)

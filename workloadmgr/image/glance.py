@@ -30,13 +30,13 @@ glance_opts = [
                help='default glance hostname or ip of production'),
     cfg.StrOpt('glance_tvault_host',
                default='$my_ip',
-               help='default glance hostname or ip of tvault'),               
+               help='default glance hostname or ip of tvault'),
     cfg.IntOpt('glance_production_port',
                default=9292,
                help='default glance port of production'),
     cfg.IntOpt('glance_tvault_port',
                default=9292,
-               help='default glance port of tvault'),               
+               help='default glance port of tvault'),
     cfg.ListOpt('glance_production_api_servers',
                 default=['$glance_production_host:$glance_production_port'],
                 help='A list of the glance api servers available to workloadmgr '
@@ -44,11 +44,11 @@ glance_opts = [
     cfg.ListOpt('glance_tvault_api_servers',
                 default=['$glance_tvault_host:$glance_tvault_port'],
                 help='A list of the glance api servers available to workloadmgr '
-                     '([hostname|ip]:port)'),               
+                     '([hostname|ip]:port)'),
     cfg.StrOpt('glance_protocol',
-                default='http',
-                help='Default protocol to use when connecting to glance. '
-                     'Set to https for SSL.'),
+               default='http',
+               help='Default protocol to use when connecting to glance. '
+               'Set to https for SSL.'),
     cfg.BoolOpt('glance_api_insecure',
                 default=True,
                 help='Allow to perform insecure SSL (https) requests to '
@@ -74,15 +74,14 @@ CONF.register_opts(glance_opts)
 
 def generate_glance_url(production):
     """Generate the URL to glance."""
-    if production == True:
-        return "%s://%s:%d" % (CONF.glance_protocol, 
+    if production:
+        return "%s://%s:%d" % (CONF.glance_protocol,
                                CONF.glance_production_host,
-                               CONF.glance_production_port)        
+                               CONF.glance_production_port)
     else:
-        return "%s://%s:%d" % (CONF.glance_protocol, 
+        return "%s://%s:%d" % (CONF.glance_protocol,
                                CONF.glance_tvault_host,
-                               CONF.glance_tvault_port)                   
-
+                               CONF.glance_tvault_port)
 
 
 def generate_image_url(image_ref, production):
@@ -127,12 +126,12 @@ def get_api_servers(production):
     if necessary.
     """
     api_servers = []
-    
-    if production == True:
+
+    if production:
         glance_api_servers = CONF.glance_production_api_servers
     else:
         glance_api_servers = CONF.glance_tvault_api_servers
-            
+
     for api_server in glance_api_servers:
         if '//' not in api_server:
             api_server = 'http://' + api_server
@@ -148,8 +147,14 @@ def get_api_servers(production):
 class GlanceClientWrapper(object):
     """Glance client wrapper class that implements retries."""
 
-    def __init__(self, production, context=None, host=None, port=None, use_ssl=False,
-                 version=2):
+    def __init__(
+            self,
+            production,
+            context=None,
+            host=None,
+            port=None,
+            use_ssl=False,
+            version=2):
         if host is not None:
             self.client = self._create_static_client(context,
                                                      host, port,
@@ -184,8 +189,8 @@ class GlanceClientWrapper(object):
         retry the request according to CONF.glance_num_retries.
         """
         retry_excs = (glanceclient.exc.ServiceUnavailable,
-                glanceclient.exc.InvalidEndpoint,
-                glanceclient.exc.CommunicationError)
+                      glanceclient.exc.InvalidEndpoint,
+                      glanceclient.exc.CommunicationError)
         num_attempts = 1 + CONF.glance_num_retries
 
         for attempt in xrange(1, num_attempts + 1):
@@ -197,13 +202,14 @@ class GlanceClientWrapper(object):
                 host = self.host
                 port = self.port
                 extra = "retrying"
-                error_msg = _("Error contacting glance server "
-                        "'%(host)s:%(port)s' for '%(method)s', %(extra)s.")
+                error_msg = _(
+                    "Error contacting glance server "
+                    "'%(host)s:%(port)s' for '%(method)s', %(extra)s.")
                 if attempt == num_attempts:
                     extra = 'done trying'
                     LOG.exception(error_msg, locals())
                     raise exception.GlanceConnectionFailed(
-                            host=host, port=port, reason=str(e))
+                        host=host, port=port, reason=str(e))
                 LOG.exception(error_msg, locals())
                 time.sleep(1)
 
@@ -312,11 +318,11 @@ class GlanceImageService(object):
         return self._translate_from_glance(recv_service_image_meta)
 
     def update(self, context, image_id, image_meta, data=None,
-            purge_props=True):
+               purge_props=True):
         """Modify the given image with the new data."""
         image_meta = self._translate_to_glance(image_meta)
         image_meta['purge_props'] = purge_props
-        #NOTE(bcwaldon): id is not an editable field, but it is likely to be
+        # NOTE(bcwaldon): id is not an editable field, but it is likely to be
         # passed in by calling code. Let's be nice and ignore it.
         image_meta.pop('id', None)
         if data:
@@ -472,7 +478,7 @@ def _reraise_translated_exception():
 
 def _translate_image_exception(image_id, exc_value):
     if isinstance(exc_value, (glanceclient.exc.Forbidden,
-                    glanceclient.exc.Unauthorized)):
+                              glanceclient.exc.Unauthorized)):
         return exception.ImageNotAuthorized(image_id=image_id)
     if isinstance(exc_value, glanceclient.exc.NotFound):
         return exception.ImageNotFound(image_id=image_id)
@@ -483,7 +489,7 @@ def _translate_image_exception(image_id, exc_value):
 
 def _translate_plain_exception(exc_value):
     if isinstance(exc_value, (glanceclient.exc.Forbidden,
-                    glanceclient.exc.Unauthorized)):
+                              glanceclient.exc.Unauthorized)):
         return exception.NotAuthorized(exc_value)
     if isinstance(exc_value, glanceclient.exc.NotFound):
         return exception.NotFound(exc_value)
@@ -506,7 +512,7 @@ def get_remote_image_service(context, image_href, production=True):
     """
     # Calling out to another service may take a while, so lets log this
     LOG.debug(_("fetching image %s from glance") % image_href)
-    #NOTE(bcwaldon): If image_href doesn't look like a URI, assume its a
+    # NOTE(bcwaldon): If image_href doesn't look like a URI, assume its a
     # standalone image ID
     if '/' not in str(image_href):
         image_service = get_default_image_service(production)
@@ -515,12 +521,16 @@ def get_remote_image_service(context, image_href, production=True):
     try:
         (image_id, glance_host, glance_port, use_ssl) = \
             _parse_image_ref(image_href)
-        glance_client = GlanceClientWrapper(context=context,
-                host=glance_host, port=glance_port, use_ssl=use_ssl)
+        glance_client = GlanceClientWrapper(
+            context=context,
+            host=glance_host,
+            port=glance_port,
+            use_ssl=use_ssl)
     except ValueError:
         raise exception.InvalidImageRef(image_href=image_href)
 
-    image_service = GlanceImageService(client=glance_client, production = production)
+    image_service = GlanceImageService(
+        client=glance_client, production=production)
     return image_service, image_id
 
 

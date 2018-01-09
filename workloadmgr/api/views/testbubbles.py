@@ -42,14 +42,13 @@ class ViewBuilder(common.ViewBuilder):
         if 'subnets' in testbubble:
             d['subnets'] = testbubble['subnets']
         if 'routers' in testbubble:
-            d['routers'] = testbubble['routers'] 
+            d['routers'] = testbubble['routers']
         if 'flavors' in testbubble:
-            d['flavors'] = testbubble['flavors']             
+            d['flavors'] = testbubble['flavors']
         d['links'] = self._get_links(request, testbubble['id'])
         d['name'] = testbubble['display_name']
-        d['description'] =  testbubble['display_description']         
-        return {'testbubble': d}        
-
+        d['description'] = testbubble['display_description']
+        return {'testbubble': d}
 
     def detail(self, request, testbubble):
         """Detailed view of a single testbubble."""
@@ -72,23 +71,24 @@ class ViewBuilder(common.ViewBuilder):
         if 'routers' in testbubble:
             d['routers'] = testbubble['routers']
         if 'flavors' in testbubble:
-            d['flavors'] = testbubble['flavors']                                            
+            d['flavors'] = testbubble['flavors']
         d['links'] = self._get_links(request, testbubble['id'])
         d['name'] = testbubble['display_name']
-        d['description'] =  testbubble['display_description']
-        d['progress_percent'] =  testbubble['progress_percent']          
-        d['progress_msg'] =  testbubble['progress_msg'] 
-        d['warning_msg'] =  testbubble['warning_msg']
-        d['error_msg'] =  testbubble['error_msg'] 
+        d['description'] = testbubble['display_description']
+        d['progress_percent'] = testbubble['progress_percent']
+        d['progress_msg'] = testbubble['progress_msg']
+        d['warning_msg'] = testbubble['warning_msg']
+        d['error_msg'] = testbubble['error_msg']
 
-        return {'testbubble': d}        
+        return {'testbubble': d}
 
     def _list_view(self, func, request, testbubbles):
         """Provide a view for a list of testbubbles."""
-        testbubbles_list = [func(request, testbubble)['testbubble'] for testbubble in testbubbles]
+        testbubbles_list = [func(request, testbubble)['testbubble']
+                            for testbubble in testbubbles]
         testbubbles_links = self._get_collection_links(request,
-                                                   testbubbles,
-                                                   self._collection_name)
+                                                       testbubbles,
+                                                       self._collection_name)
         testbubbles_dict = dict(testbubbles=testbubbles_list)
 
         if testbubbles_links:

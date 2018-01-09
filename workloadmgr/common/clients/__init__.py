@@ -35,7 +35,7 @@ workloadmgr_clients = {
     'cinder': 'workloadmgr.common.clients.os.cinder:CinderClientPlugin',
     'glance': 'workloadmgr.common.clients.os.glance:GlanceClientPlugin',
     'swift': 'workloadmgr.common.clients.os.swift:SwiftClientPlugin',
-    'neutron': 'workloadmgr.common.clients.os.neutron:NeutronClientPlugin' }
+    'neutron': 'workloadmgr.common.clients.os.neutron:NeutronClientPlugin'}
 
 
 class OpenStackClients(object):
@@ -67,7 +67,8 @@ class OpenStackClients(object):
             return client_plugin
 
     def client(self, name):
-        client_plugin = importutils.import_object(self.client_plugin(name), self.context)
+        client_plugin = importutils.import_object(
+            self.client_plugin(name), self.context)
         if client_plugin:
             return client_plugin.client()
 

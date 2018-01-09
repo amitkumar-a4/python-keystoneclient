@@ -255,5 +255,6 @@ class Workload_transfer(extensions.ExtensionDescriptor):
         resources.append(res)
         return resources
 
+
 def create_resource(ext_mgr):
     return wsgi.Resource(WorkloadmgrTransferController(ext_mgr))

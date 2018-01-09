@@ -59,6 +59,7 @@ def wrap_create_trust(func):
 
     return trust_create_wrapper
 
+
 def wrap_check_policy(func):
     """Check policy corresponding to the wrapped methods prior to execution
 
@@ -82,6 +83,7 @@ def check_policy(context, action):
 
     _action = 'workload:%s' % action
     policy.enforce(context, _action, target)
+
 
 class API(base.Base):
     """API for interacting workload transfers."""
@@ -117,7 +119,7 @@ class API(base.Base):
             transfer_rec = [trans_rec for trans_rec in self.get_all(context)
                             if trans_rec['id'] == transfer_id]
             return transfer_rec[0]
-        except:
+        except BaseException:
             raise exception.TransferNotFound(transfer_id=transfer_id)
 
     @wrap_check_policy
@@ -126,7 +128,11 @@ class API(base.Base):
         transfer_rec = self.get(context, transfer_id)
 
         workload_id = transfer_rec['workload_id']
-        AUDITLOG.log(context, 'Transfer \'' + transfer_id + '\' Delete  Requested')
+        AUDITLOG.log(
+            context,
+            'Transfer \'' +
+            transfer_id +
+            '\' Delete  Requested')
         workload_ref = self.db.workload_get(context, workload_id)
         if workload_ref['status'] != 'transfer-in-progress':
             LOG.error(_LE("Workload in unexpected state"))
@@ -179,15 +185,23 @@ class API(base.Base):
     @wrap_check_policy
     def create(self, context, workload_id, display_name):
         """Creates an entry in the transfers table."""
-        LOG.info(_LI("Generating transfer record for workload %s"), workload_id)
+        LOG.info(
+            _LI("Generating transfer record for workload %s"),
+            workload_id)
         workload_ref = self.db.workload_get(context, workload_id)
 
-        AUDITLOG.log(context, 'Transfer for workload \'' + workload_id + '\' Create  Requested')
+        AUDITLOG.log(
+            context,
+            'Transfer for workload \'' +
+            workload_id +
+            '\' Create  Requested')
         if context.project_id != workload_ref.project_id:
-            raise exception.InvalidWorkload(reason=_("workload does not belong to the tenant"))
+            raise exception.InvalidWorkload(
+                reason=_("workload does not belong to the tenant"))
 
         if workload_ref['status'] != "available":
-            raise exception.InvalidState(reason=_("Workload is not in 'available' state"))
+            raise exception.InvalidState(
+                reason=_("Workload is not in 'available' state"))
 
         # The salt is just a short random string.
         salt = self._get_random_string(CONF.workload_transfer_salt_length)
@@ -213,9 +227,12 @@ class API(base.Base):
         #
         try:
 
-            backup_target = self._backup_target_for_workload(context, workload_id)
-            transfer_rec_path = backup_target.get_workload_transfers_path(transfer_rec)
-            backup_target.put_object(transfer_rec_path, json.dumps(transfer_rec))
+            backup_target = self._backup_target_for_workload(
+                context, workload_id)
+            transfer_rec_path = backup_target.get_workload_transfers_path(
+                transfer_rec)
+            backup_target.put_object(
+                transfer_rec_path, json.dumps(transfer_rec))
         except Exception:
             LOG.error(_LE("Failed to create transfer record "
                           "for %s"), workload_id)
@@ -246,7 +263,11 @@ class API(base.Base):
         self._create_trust(context, transfer_id, auth_key)
         transfer = self.get(context, transfer_id)
 
-        AUDITLOG.log(context, 'Transfer \'' + transfer_id + '\' Accept  Requested')
+        AUDITLOG.log(
+            context,
+            'Transfer \'' +
+            transfer_id +
+            '\' Accept  Requested')
         crypt_hash = self._get_crypt_hash(transfer['salt'], auth_key)
         if crypt_hash != transfer['crypt_hash']:
             msg = (_("Attempt to transfer %s with invalid auth key.") %
@@ -264,7 +285,7 @@ class API(base.Base):
             raise exception.TransferNotAllowed(workload_id=workload_id)
         except exception.TransferNotAllowed:
             raise
-        except:
+        except BaseException:
             pass
 
         try:
@@ -300,7 +321,8 @@ class API(base.Base):
 
         try:
             workload_ref = self.db.workload_get(context, workload_id)
-            transfer_rec_path = backup_target.get_workload_transfers_path(transfer)
+            transfer_rec_path = backup_target.get_workload_transfers_path(
+                transfer)
             transfer['status'] = "transfer-completed"
             backup_target.put_object(transfer_rec_path, json.dumps(transfer))
 
@@ -315,7 +337,11 @@ class API(base.Base):
     @wrap_check_policy
     # complete is executed on the cloud that transfer is initiated
     def complete(self, context, transfer_id):
-        AUDITLOG.log(context, 'Transfer \'' + transfer_id + '\' Complete  Requested')
+        AUDITLOG.log(
+            context,
+            'Transfer \'' +
+            transfer_id +
+            '\' Complete  Requested')
 
         transfer = self.get(context, transfer_id)
 
@@ -334,10 +360,18 @@ class API(base.Base):
         # the transfer
         backup_target = self._backup_target_for_workload(context, workload_id)
 
-        wl_path = os.path.join(backup_target.mount_path, "workload_" + workload_id)
-        wl_json = backup_target.get_object(os.path.join(wl_path, "workload_db"))
+        wl_path = os.path.join(
+            backup_target.mount_path,
+            "workload_" + workload_id)
+        wl_json = backup_target.get_object(
+            os.path.join(wl_path, "workload_db"))
         wl_rec = json.loads(wl_json)
-        wl_tenant_id = uuid.UUID(wl_rec.get('project_id', wl_rec.get('tenant_id', None)))
+        wl_tenant_id = uuid.UUID(
+            wl_rec.get(
+                'project_id',
+                wl_rec.get(
+                    'tenant_id',
+                    None)))
         if wl_tenant_id == uuid.UUID(context.project_id):
             msg = _LE("Workload is not transferred. "
                       "Please abort the transfer instead of complete")
