@@ -114,6 +114,7 @@ def project_id_exists(cntx, project_id):
         else:
             return False
     except Exception as ex:
+        LOG.exception(ex)
         raise ex
 
 
