@@ -673,6 +673,8 @@ def get_lan_ip():
 def _restart_wlm_services():
     for service in ['wlm-api', 'wlm-scheduler', 'wlm-workloads']:
         try:
+	    command = ['sudo', 'systemctl', 'enable', service]
+            subprocess.call(command, shell=False)
             command = ['sudo', 'service', service, 'restart']
             subprocess.call(command, shell=False)
         except BaseException:
@@ -3671,6 +3673,8 @@ def start_api():
     # Python code to configure api service
     try:
         if config_data['nodetype'] == 'controller':
+	    command = ['sudo', 'systemctl', 'enable', 'wlm-api']
+            subprocess.call(command, shell=False)
             command = ['sudo', 'service', 'wlm-api', 'restart']
             subprocess.call(command, shell=False)
 
@@ -3700,6 +3704,8 @@ def start_scheduler():
     # Python code here to configure scheduler
     try:
         if config_data['nodetype'] == 'controller':
+	    command = ['sudo', 'systemctl', 'enable', 'wlm-scheduler']
+            subprocess.call(command, shell=False)
             command = ['sudo', 'service', 'wlm-scheduler', 'restart']
             # shell=FALSE for sudo to work.
             subprocess.call(command, shell=False)
@@ -3716,6 +3722,8 @@ def start_scheduler():
 def start_service():
     # Python code here to configure workloadmgr
     try:
+	command = ['sudo', 'systemctl', 'enable', 'wlm-workloads']
+        subprocess.call(command, shell=False)
         command = ['sudo', 'service', 'wlm-workloads', 'restart']
         # shell=FALSE for sudo to work.
         subprocess.call(command, shell=False)
