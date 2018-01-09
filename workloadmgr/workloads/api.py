@@ -1141,6 +1141,11 @@ class API(base.Base):
             workload['jobschedule'] = self.convert_date_time_zone(
                 workload['jobschedule'])
             options['jobschedule'] = pickle.dumps(workload['jobschedule'], 0)
+        else:
+            msg = "Cannot update scheduler related fields when global jobscheduler is disabled."
+            raise wlm_exceptions.ErrorOccurred(
+                reason=_(msg))
+
         if 'instances' in workload and workload['instances']:
             compute_service = nova.API(production=True)
             instances = workload['instances']
