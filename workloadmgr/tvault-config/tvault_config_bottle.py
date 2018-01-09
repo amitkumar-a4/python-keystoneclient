@@ -27,6 +27,7 @@ import shutil
 import datetime
 from threading import Thread
 import uuid
+import json
 import netifaces
 
 import bottle
@@ -1011,6 +1012,14 @@ def _authenticate_with_keystone():
     config_data['glance_production_api_servers'] = image_public_url
     config_data['glance_production_host'] = parse_result.hostname
     config_data['glance_production_port'] = parse_result.port
+
+    #Get Image API version
+    versions = json.loads(urllib.urlopen(image_public_url).read()) 
+    current_version = filter(lambda x: x['status'].lower() == 'current', versions['versions'])
+    if 'v2' in current_version[0]['id']:
+       config_data['glance_api_version'] = 2
+    else:
+       config_data['glance_api_version'] = 1
 
     # network
     try:
@@ -3254,6 +3263,11 @@ def configure_service():
             'glance_production_api_servers = ' + str(
                 config_data['glance_production_api_servers']))
 
+        replace_line('/etc/workloadmgr/workloadmgr.conf',
+                     'glance_api_version = ', 
+                     'glance_api_version = ' + str(
+                       config_data['glance_api_version']))
+        
         replace_line(
             '/etc/workloadmgr/workloadmgr.conf',
             'neutron_admin_auth_url = ',
@@ -3369,6 +3383,7 @@ def configure_service():
                 'vault_swift_auth_url = ',
                 'vault_swift_auth_url = ' +
                 config_data['swift_auth_url'])
+
             if config_data['swift_auth_version'] == 'TEMPAUTH':
                 replace_line(
                     '/etc/workloadmgr/workloadmgr.conf',
