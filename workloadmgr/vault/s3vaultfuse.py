@@ -261,6 +261,9 @@ contego_vault_opts = [
     cfg.StrOpt('vault_s3_signature_version',
                default='default',
                help='S3 signature version to use'),
+    cfg.StrOpt('vault_s3_support_empty_dir',
+               default='False',
+               help='S3 backend needs empty directory work around'),
     cfg.StrOpt('vault_enable_threadpool',
                default='True',
                help='Enable backend thread pool'),
@@ -344,6 +347,10 @@ if CONF.vault_storage_type.lower() == 's3':
         options['key'] = CONF.vault_s3_secret_access_key
         options['bucket'] = CONF.vault_s3_bucket
         options['s3_signature'] = CONF.vault_s3_signature_version
+        if CONF.vault_s3_support_empty_dir.lower() == 'true':
+            options['support_empty_dir'] = True
+        else:
+            options['support_empty_dir'] = False
         if CONF.vault_s3_ssl.lower() == 'true':
             options['s3_ssl'] = True
         else:
@@ -545,7 +552,8 @@ class BackendRepository(ObjectRepository):
                 try:
                     func(self.__backend, *args, **kargs)
                 except Exception as e:
-                    print(e)
+                    LOG.exception(e)
+                    pass
                 finally:
                     # Call task_done() in order to inform the queue that this task
                     # is complete.
@@ -1268,6 +1276,7 @@ class BackendRepository(ObjectRepository):
         if obj != '' and obj != '/':
             args1.append(obj)
         try:
+            # import pdb; pdb.set_trace()
             self.__backend.rmdir_object(args1, _opts)
         except Exception as ex:
             LOG.exception(ex)

@@ -271,6 +271,15 @@ class S3Backend(object):
                     split_token = prefix + '/'
                     for item in objects['Contents']:
                         path, object_name = os.path.split(item['Key'].rstrip('/'))
+
+                        # If this a S3 backend that does not support empty directory
+                        # objects we need to hide the "hidden" file and return the
+                        # directory that it is in.
+                        if object_name == 'x.hidden':
+                            root_path, sub_dir = os.path.split(path)
+                            if len(sub_dir) > 0 and root_path != '' and path != prefix:
+                                object_set.add(sub_dir)
+                            continue
                         root_path, _ = os.path.split(prefix)
                         if ((root_path != path and path != prefix) or object_name == '' or
                                 item['Key'] == split_token):
@@ -343,14 +352,10 @@ class S3Backend(object):
         # Prevent retries from being set to less than 1.
         retries = max(1, retries)
         try:
-            if '-segments' not in object_name:
-                file_name = object_name + '.manifest'
-            else:
-                file_name = object_name
             for retry in range(0, retries):
                 try:
                     obj_headers = self.__client.head_object(Bucket=self.__bucket_name,
-                                                            Key=file_name)
+                                                            Key=object_name)
                     return obj_headers
                 except ClientError as error:
                     if error.response['ResponseMetadata']['HTTPStatusCode'] == 404:
@@ -359,10 +364,21 @@ class S3Backend(object):
                                                                     Key=object_name + '/')
                             return obj_headers
                         except ClientError as error:
-                            if (error.response['ResponseMetadata']['HTTPStatusCode'] == 404 and
-                                    retry + 1 != retries):
-                                time.sleep(1)
-                                continue
+                            if error.response['ResponseMetadata']['HTTPStatusCode'] == 404:
+                                if '-segments' not in object_name:
+                                    try:
+                                        obj_headers = self.__client.head_object(Bucket=self.__bucket_name,
+                                                                                Key=object_name + '.manifest')
+                                        return obj_headers
+                                    except ClientError as error:
+                                        if (error.response['ResponseMetadata']['HTTPStatusCode'] == 404 and
+                                                retry + 1 != retries):
+                                            time.sleep(1)
+                                            continue
+                                        raise
+                                if retry + 1 != retries:
+                                    time.sleep(1)
+                                    continue
                             raise
                     raise
         except ClientError:
@@ -390,7 +406,8 @@ class S3Backend(object):
                 obj_header = self.__get_object_headers(object_name)
                 stat_data['timestamp'] = _make_timestamp(obj_header['LastModified'])
                 stat_data['headers'] = obj_header
-                if obj_header['ContentType'] == 'application/x-directory':
+                if (obj_header['ContentType'] == 'application/x-directory' or
+                        obj_header['ContentLength'] == 0):
                     stat_data['directory'] = True
 
                 # Copy the Metadata sub values into the stat structure in order to conform
@@ -481,9 +498,17 @@ class S3Backend(object):
                         self.__client.head_object(Bucket=self.__bucket_name, Key=new_path)
                     except ClientError as error:
                         if error.response['ResponseMetadata']['HTTPStatusCode'] == 404:
-                            self.__client.put_object(Bucket=self.__bucket_name, Key=new_path,
-                                                     Body='',
-                                                     ContentType='application/x-directory')
+                            if options['support_empty_dir'] is True:
+                                # For S3 backends (Minio) that do not return a directory
+                                # if it is empty, we need to actually create an object that
+                                # we will keep hidden.
+                                self.__client.put_object(Bucket=self.__bucket_name,
+                                                         Key=new_path + 'x.hidden',
+                                                         Body='Do Not Remove')
+                            else:
+                                self.__client.put_object(Bucket=self.__bucket_name, Key=new_path,
+                                                         Body='',
+                                                         ContentType='application/x-directory')
                         continue
 
     def upload_object(self, args, options):
