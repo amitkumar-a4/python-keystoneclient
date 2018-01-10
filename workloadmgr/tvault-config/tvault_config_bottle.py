@@ -2891,7 +2891,7 @@ def configure_host():
                 pass
 
             try:
-                command = ['sudo', 'service', 'tvault-swift', 'stop']
+                command = ['sudo', 'service', 'tvault-object-store', 'stop']
                 subprocess.call(command, shell=False)
             except BaseException:
                 pass
@@ -3812,12 +3812,12 @@ def start_service():
     return {'status': 'Success'}
 
 
-@bottle.route('/start_swift_service')
+@bottle.route('/start_object_store_service')
 @authorize()
-def start_swift_service():
+def start_object_store_service():
     try:
         try:
-            command = ['sudo', 'service', 'tvault-swift', 'stop']
+            command = ['sudo', 'service', 'tvault-object-store', 'stop']
             subprocess.call(command, shell=False)
         except BaseException:
             pass
@@ -3857,7 +3857,7 @@ def start_swift_service():
             WLM_USER,
             '/etc/fuse.conf']
         subprocess.call(command, shell=False)
-        command = ['sudo', 'service', 'tvault-swift', 'restart']
+        command = ['sudo', 'service', 'tvault-object-store', 'restart']
         subprocess.call(command, shell=False)
     except Exception as exception:
         bottle.request.environ['beaker.session']['error_message'] = "Error: %(exception)s" % {
