@@ -205,7 +205,8 @@ def import_policy(cntx, new_version, upgrade=True):
             db.policy_create(cntx, policy_json)
             if len(policy_assignments) > 0:
                 for pa in policy_assignments:
-                    values = {'policy_id': pa['policy_id'], 'project_id': pa['project_id']}
+                    values = {'policy_id': pa['policy_id'], 'project_id': pa['project_id'],\
+                             'project_name': pa['project_name'], 'policy_name': pa['policy_name']}
                     db.policy_assignment_create(cntx, values)
     except Exception as ex:
         LOG.exception(ex)
