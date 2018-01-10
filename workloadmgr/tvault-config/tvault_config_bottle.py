@@ -27,6 +27,7 @@ import shutil
 import datetime
 from threading import Thread
 import uuid
+import json
 import netifaces
 
 import bottle
@@ -1019,6 +1020,14 @@ def _authenticate_with_keystone():
     config_data['glance_production_api_servers'] = image_public_url
     config_data['glance_production_host'] = parse_result.hostname
     config_data['glance_production_port'] = parse_result.port
+
+    #Get Image API version
+    versions = json.loads(urllib.urlopen(image_public_url).read()) 
+    current_version = filter(lambda x: x['status'].lower() == 'current', versions['versions'])
+    if 'v2' in current_version[0]['id']:
+       config_data['glance_api_version'] = 2
+    else:
+       config_data['glance_api_version'] = 1
 
     # network
     try:
@@ -2785,11 +2794,6 @@ def configure_host():
         # configure host
         prev_hostname = socket.gethostname()
         hostname = config_data['guest_name']
-        fh, abs_path = mkstemp()
-        new_file = open(abs_path, 'w')
-        new_file.write(hostname + '\n')
-        new_file.close()
-        close(fh)
         command = [
             'sudo',
             'apt-get',
@@ -2798,13 +2802,7 @@ def configure_host():
             "rabbitmq-server",
             '-y']
         subprocess.call(command, shell=False)
-        command = ['sudo', 'mv', abs_path, "/etc/hostname"]
-        subprocess.call(command, shell=False)
-        os.chmod('/etc/hostname', 0o644)
-        command = ['sudo', 'chown', 'root:root', "/etc/hostname"]
-        command = ['sudo', 'service', 'hostname', 'restart']
-        subprocess.call(command, shell=False)
-        command = ['sudo', 'service', 'networking', 'restart']
+        command = ['hostnamectl', 'set-hostname', hostname]
         subprocess.call(command, shell=False)
 
         fh, abs_path = mkstemp()
@@ -3334,6 +3332,11 @@ def configure_service():
             'glance_production_api_servers = ' + str(
                 config_data['glance_production_api_servers']))
 
+        replace_line('/etc/workloadmgr/workloadmgr.conf',
+                     'glance_api_version = ', 
+                     'glance_api_version = ' + str(
+                       config_data['glance_api_version']))
+        
         replace_line(
             '/etc/workloadmgr/workloadmgr.conf',
             'neutron_admin_auth_url = ',
@@ -3449,6 +3452,7 @@ def configure_service():
                 'vault_swift_auth_url = ',
                 'vault_swift_auth_url = ' +
                 config_data['swift_auth_url'])
+
             if config_data['swift_auth_version'] == 'TEMPAUTH':
                 replace_line(
                     '/etc/workloadmgr/workloadmgr.conf',
@@ -3756,6 +3760,8 @@ def start_api():
     # Python code to configure api service
     try:
         if config_data['nodetype'] == 'controller':
+	    command = ['sudo', 'systemctl', 'enable', 'wlm-api']
+            subprocess.call(command, shell=False)
             command = ['sudo', 'service', 'wlm-api', 'restart']
             subprocess.call(command, shell=False)
 
@@ -3785,6 +3791,8 @@ def start_scheduler():
     # Python code here to configure scheduler
     try:
         if config_data['nodetype'] == 'controller':
+	    command = ['sudo', 'systemctl', 'enable', 'wlm-scheduler']
+            subprocess.call(command, shell=False)
             command = ['sudo', 'service', 'wlm-scheduler', 'restart']
             # shell=FALSE for sudo to work.
             subprocess.call(command, shell=False)
@@ -3801,6 +3809,8 @@ def start_scheduler():
 def start_service():
     # Python code here to configure workloadmgr
     try:
+	command = ['sudo', 'systemctl', 'enable', 'wlm-workloads']
+        subprocess.call(command, shell=False)
         command = ['sudo', 'service', 'wlm-workloads', 'restart']
         # shell=FALSE for sudo to work.
         subprocess.call(command, shell=False)

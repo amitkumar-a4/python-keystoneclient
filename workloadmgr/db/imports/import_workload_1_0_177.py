@@ -11,6 +11,7 @@ from operator import itemgetter
 import cPickle as pickle
 import shutil
 import tempfile
+from collections import OrderedDict
 
 from workloadmgr.db.workloadmgrdb import WorkloadMgrDB
 from workloadmgr import workloads as workloadAPI
@@ -32,6 +33,7 @@ workloads = []
 workload_backup_endpoint = {}
 workload_backup_media_size = {}
 vault_backend = None
+all_cloud_projects = []
 
 import_map = [
     {'file': 'workload_db',
@@ -97,18 +99,23 @@ import_map = [
 
 
 def project_id_exists(cntx, project_id):
-    """clients.initialise()
-    client_plugin = clients.Clients(context)
-    kclient = client_plugin.client("keystone")
+    """
+    Check whether given project id exist in current cloud.
+    """
+    try:
+        global all_cloud_projects
+        if len(all_cloud_projects) == 0:
+            keystone_client = KeystoneClient(cntx)
+            projects = keystone_client.client.get_project_list_for_import(cntx)
+            all_cloud_projects = {prj.id for prj in projects}
 
-    # TODO: Optimize it without reading project list os many times
-    kclient.client_plugin = kclient"""
-    keystone_client = KeystoneClient(cntx)
-    projects = keystone_client.client.get_project_list_for_import(cntx)
-    for prj in projects:
-        if uuid.UUID(prj.id) == uuid.UUID(project_id):
+        if project_id in all_cloud_projects:
             return True
-    return False
+        else:
+            return False
+    except Exception as ex:
+        LOG.exception(ex)
+        raise ex
 
 
 def check_tenant(cntx, workload_path, upgrade):
@@ -398,19 +405,20 @@ def update_workload_metadata(workload_values):
 def get_json_files(context, workload_ids, db_dir, upgrade):
 
     # Map to store all path of all JSON files for a  resource
-    db_files_map = {
-        'workload_db': [],
-        'workload_vms_db': [],
-        'snapshot_db': [],
-        'snapshot_vms_db': [],
-        'resources_db': [],
-        'network_db': [],
-        'disk_db': [],
-        'security_group_db': [],
-        'config_workload_db': [],
-        'config_backup_db': [],
-    }
-
+    db_files_map = OrderedDict(
+            [
+                ('snapshot_db', []),
+                ('workload_db', []),
+                ('workload_vms_db', []),
+                ('snapshot_vms_db', []),
+                ('resources_db', []),
+                ('network_db', []),
+                ('disk_db', []),
+                ('security_group_db', []),
+                ('config_workload_db', []),
+                ('config_backup_db', []),
+            ])
+    
     try:
         workload_url_iterate, failed_workloads = get_workload_url(
             context, workload_ids, upgrade)
@@ -458,14 +466,6 @@ def get_json_files(context, workload_ids, db_dir, upgrade):
                         db_files_map['security_group_db'].append(
                             os.path.join(path, name))
 
-        # Creating a map for each workload with workload_backup_media_size.
-        for snap in db_files_map['snapshot_db']:
-            file_data = vault_backend.get_object(snap)
-            if file_data is not None and len(file_data) > 0:
-                snapshot_json = json.loads(file_data)
-                if snapshot_json['snapshot_type'] == 'full':
-                    workload_backup_media_size[snapshot_json['workload_id']
-                                               ] = snapshot_json['size']
 
         # Iterate over each file for a resource in all NFS mounts
         # and create a single db file for that.
@@ -477,14 +477,20 @@ def get_json_files(context, workload_ids, db_dir, upgrade):
                 if file_data is not None and len(file_data) > 0:
                     json_obj = json.loads(file_data)
 
-                    if db == 'workload_db':
+                    if db == 'snapshot_db':
+                        # Creating a map for each workload with workload_backup_media_size.
+                        if json_obj['snapshot_type'] == 'full':
+                            workload_backup_media_size[json_obj['workload_id']
+                                               ] = json_obj['size']
+                    elif db == 'workload_db':
                         # In case of workload updating each object with
                         # "workload_backup_media_size" and "backup_media_target"
                         json_obj = update_workload_metadata(json_obj)
                     db_json.append(json_obj)
 
-                pickle.dump(db_json, open(os.path.join(db_dir, db), 'wb'))
+            pickle.dump(db_json, open(os.path.join(db_dir, db), 'wb'))
         return failed_workloads
+
     except Exception as ex:
         LOG.exception(ex)
         raise ex
