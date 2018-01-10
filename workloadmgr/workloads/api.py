@@ -2136,6 +2136,11 @@ class API(base.Base):
                        'status': 'creating',
                        'metadata': metadata, }
             snapshot = self.db.snapshot_create(context, options)
+
+            # Upload snapshot metadata to the vault
+            workload_utils.upload_snapshot_db_entry(
+                context, snapshot.id)
+
             if hasattr(context, 'trust_failed'):
                 raise wlm_exceptions.Invalid(
                     reason=_('Trust broken: Cannot perform backups operations'))
