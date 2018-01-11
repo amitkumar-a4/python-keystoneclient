@@ -1283,7 +1283,10 @@ class BackendRepository(ObjectRepository):
             pass
 
         cache_path = self._get_cache(path)
-        return os.rmdir(cache_path)
+        # Check to make sure that the directory exists, otherwise
+        # skip the removal.
+        if os.path.isdir(cache_path):
+            return os.rmdir(cache_path)
 
     def chmod(self, path, mode):
         LOG.debug(("chmod, %s" % path))
