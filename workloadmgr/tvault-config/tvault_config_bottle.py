@@ -1,7 +1,7 @@
 #!/usr/bin/env python
 # vim: tabstop=4 shiftwidth=4 softtabstop=4
 #
-# Copyright (c) 2017 Trilio Data, Inc.
+# Copyright (c) 2018 Trilio Data, Inc.
 # All Rights Reserved.
 #
 # The following users are already available:
@@ -1022,12 +1022,12 @@ def _authenticate_with_keystone():
     config_data['glance_production_port'] = parse_result.port
 
     #Get Image API version
-    versions = json.loads(urllib.urlopen(image_public_url).read()) 
+    versions = json.loads(urllib.urlopen(image_public_url).read())
     current_version = filter(lambda x: x['status'].lower() == 'current', versions['versions'])
     if 'v2' in current_version[0]['id']:
-       config_data['glance_api_version'] = 2
+        config_data['glance_api_version'] = 2
     else:
-       config_data['glance_api_version'] = 1
+        config_data['glance_api_version'] = 1
 
     # network
     try:
@@ -3302,6 +3302,30 @@ def _configure_s3_parameters():
             'vault_s3_ssl = ' +
             str(config_data['vault_s3_ssl']))
 
+    if (config_data['vault_s3_support_empty_dir'] and
+       len(config_data['vault_s3_support_empty_dir']) > 0):
+        replace_line(
+            '/etc/workloadmgr/workloadmgr.conf',
+            'vault_s3_support_empty_dir = ',
+            'vault_s3_support_empty_dir = ' +
+            str(config_data['vault_s3_support_empty_dir']))
+
+    # Replace the object store service line with the S3 version.
+    # TODO - This should be removed post 2.6 once vaultfuse.py is modified to
+    # support both Swift and S3. -cjk
+    replace_line(
+        '/etc/systemd/system/tvault-object-store.service',
+        'ExecStart=/usr/bin/python',
+        'ExecStart=/usr/bin/python /opt/stack/workloadmgr/workloadmgr/vault/s3vaultfuse.py --config-file=/etc/workloadmgr/workloadmgr.conf'
+    )
+    # We need to reload the system manager configuration even though we only changed
+    # the ExecStart line.
+    try:
+        command = ['sudo', 'systemctl', 'daemon-reload']
+        subprocess.call(command, shell=False)
+    except BaseException:
+        pass
+
 
 @bottle.route('/configure_service')
 @authorize()
@@ -3333,10 +3357,10 @@ def configure_service():
                 config_data['glance_production_api_servers']))
 
         replace_line('/etc/workloadmgr/workloadmgr.conf',
-                     'glance_api_version = ', 
+                     'glance_api_version = ',
                      'glance_api_version = ' + str(
-                       config_data['glance_api_version']))
-        
+                     config_data['glance_api_version']))
+
         replace_line(
             '/etc/workloadmgr/workloadmgr.conf',
             'neutron_admin_auth_url = ',
@@ -3760,7 +3784,7 @@ def start_api():
     # Python code to configure api service
     try:
         if config_data['nodetype'] == 'controller':
-	    command = ['sudo', 'systemctl', 'enable', 'wlm-api']
+            command = ['sudo', 'systemctl', 'enable', 'wlm-api']
             subprocess.call(command, shell=False)
             command = ['sudo', 'service', 'wlm-api', 'restart']
             subprocess.call(command, shell=False)
@@ -3791,7 +3815,7 @@ def start_scheduler():
     # Python code here to configure scheduler
     try:
         if config_data['nodetype'] == 'controller':
-	    command = ['sudo', 'systemctl', 'enable', 'wlm-scheduler']
+            command = ['sudo', 'systemctl', 'enable', 'wlm-scheduler']
             subprocess.call(command, shell=False)
             command = ['sudo', 'service', 'wlm-scheduler', 'restart']
             # shell=FALSE for sudo to work.
@@ -3809,7 +3833,7 @@ def start_scheduler():
 def start_service():
     # Python code here to configure workloadmgr
     try:
-	command = ['sudo', 'systemctl', 'enable', 'wlm-workloads']
+        command = ['sudo', 'systemctl', 'enable', 'wlm-workloads']
         subprocess.call(command, shell=False)
         command = ['sudo', 'service', 'wlm-workloads', 'restart']
         # shell=FALSE for sudo to work.
