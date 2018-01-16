@@ -4685,6 +4685,8 @@ def get_tenants_usage(context, **kwargs):
             models.WorkloadVMs).filter_by(deleted=False)
         result = qry.all()
         for proj_id, vm_protected in result:
+            if proj_id not in tenant_chargeback:
+                tenant_chargeback[proj_id] = {'vms_protected': [], 'used_capacity': 0}
             tenant_chargeback[proj_id]['vms_protected'].append(vm_protected)
 
         return tenant_chargeback
