@@ -4614,7 +4614,7 @@ def policy_assignment_update(context, id, values, **kwargs):
     return _policy_assignment_update(context, values, id, session)
 
 
-@require_admin_context
+@require_context
 def policy_assignments_get_all(context, **kwargs):
     session = get_session()
     query = session.query(models.WorkloadPolicyAssignmnets)
