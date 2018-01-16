@@ -4410,7 +4410,7 @@ def _policy_get(context, id, session, **kwargs):
     return policy
 
 
-@require_admin_context
+@require_context
 def policy_get(context, id, **kwargs):
     session = get_session()
     return _policy_get(context, id, session, **kwargs)
