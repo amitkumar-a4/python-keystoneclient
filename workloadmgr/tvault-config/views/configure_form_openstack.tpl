@@ -262,7 +262,7 @@ function setSwiftRequired(checked, val) {
                                             </a>
                                         </li>
                                     </ul>
-                                </div>
+                                </div><br>
                                 <div class="tab-content">
                                     <div class="tab-pane" id="triliovault">
                                         <div class="row">
@@ -302,17 +302,6 @@ function setSwiftRequired(checked, val) {
                                                 <div class="form-group" >
 	                                            <label class="control-label">Domain Search Order</label>
 	                                            <input name="domain-search-order" {{'value=' + domain_search_order if (defined('domain_search_order') and len(domain_search_order)) else ''}} type="text" placeholder="example.com example.net" class="form-control">
-                                                 </div>
-                                            </div>
-                                            <div class="row">
-                                                 <div class="col-sm-12">
-                                                      <div class="form-group">
-                                                           %if 'enable_ha' in locals() and enable_ha == 'on':
-               <input name="enable_ha" checked id="enable_ha" checked type="checkbox"> Enable HA <span style="font-size:11px;">Choose this option if you are setting up High Availability, Minimum 3 controller nodes required</span>
-%else:
-      <input name="enable_ha" id="enable_ha" type="checkbox"> Enable HA <span style="font-size:11px;">Choose this option if you are setting up High Availability, Minimum 3 controller nodes required</span>
-%end
-                                                      </div>
                                                  </div>
                                             </div>
                                         </div>
