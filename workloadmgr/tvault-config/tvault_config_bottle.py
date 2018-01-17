@@ -2498,32 +2498,23 @@ def services_vmware():
         config_status = config_data.get('config_status', 'not_configured')
         nodetype = config_data.get('nodetype', 'not_configured')
 
-        command = ['sudo', 'initctl', 'list']
-        output = subprocess.check_output(command, shell=False)
-    except Exception as exception:
-        output = ''
+        for service_display_name, service_name in services.iteritems():
+            if nodetype != 'controller' and service_display_name in [
+                    'api_service', 'scheduler_service', 'inventory_service', ]:
+                services[service_display_name] = 'Not Applicable'
+                continue
 
-    output_lines = output.split('\n')
-    for service_display_name, service_name in services.iteritems():
-        if config_status == 'not_configured':
-            services[service_display_name] = 'Not Configured'
-            continue
-        if nodetype != 'controller' and service_display_name in [
-                'api_service', 'scheduler_service', 'inventory_service', ]:
-            services[service_display_name] = 'Not Applicable'
-            continue
-        for line in output_lines:
-            if service_name in line:
-                if 'running' in line:
-                    services[service_display_name] = 'Running'
-                elif 'stop' in line:
-                    services[service_display_name] = 'Stopped'
-                else:
-                    services[service_display_name] = 'Unknown'
-                break
-        if services[service_display_name] not in [
-                'Running', 'Stopped', 'Unknown']:
-            services[service_display_name] = 'Not Applicable'
+        for service_display_name, service_name in services.iteritems():
+            command = ['systemctl', 'show', service_name]
+            output = subprocess.check_output(command, shell=False)
+            for s in output.split('\n'):
+                if 'substate' in s.lower():
+                    if 'running' in s.lower():
+                        services[service_display_name] = 'Running'
+                    else:
+                        services[service_display_name] = 'Stopped'
+    except Exception as exception:
+        pass
 
     services['error_message'] = bottle.request.environ['beaker.session']['error_message']
     return services

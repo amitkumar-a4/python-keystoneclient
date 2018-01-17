@@ -907,9 +907,9 @@ class WorkloadMgrsController(wsgi.Controller):
                         s.starttls()
                         s.ehlo
                         s.login(
-                            settings_module.get_settings(
-                                context).get('smtp_server_username'),
-                            settings_module.get_settings(context).get('smtp_server_password'))
+                            str(settings_module.get_settings(
+                                context).get('smtp_server_username')),
+                            str(settings_module.get_settings(context).get('smtp_server_password')))
                     s.sendmail(msg['From'], msg['To'], msg.as_string())
                     s.quit()
                 except smtplib.SMTPException as ex:
