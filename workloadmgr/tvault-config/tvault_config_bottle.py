@@ -2864,6 +2864,12 @@ def configure_host():
                     'prepend domain-name-servers ' +
                     config_data['name_server'] +
                     ';')
+
+                # change dhcp timeout to 30 seconds.
+                replace_line(
+                    '/etc/dhcp/dhclient.conf',
+                    'timeout 300;',
+                    'timeout 30;')
                 command = ['sudo', 'dhclient']
                 subprocess.call(command, shell=False)
             except BaseException:
@@ -3250,65 +3256,62 @@ def _configure_s3_parameters():
     # Start with the 'common' s3 parameters
     replace_line(
         '/etc/workloadmgr/workloadmgr.conf',
-        'vault_storage_type = ',
+        'vault_storage_nfs_export =',
+        'vault_storage_nfs_export = TrilioVault')
+    replace_line(
+        '/etc/workloadmgr/workloadmgr.conf',
+        'vault_storage_type =',
         'vault_storage_type = s3')
     replace_line(
         '/etc/workloadmgr/workloadmgr.conf',
-        'vault_s3_auth_version = ',
+        'vault_s3_auth_version =',
         'vault_s3_auth_version = DEFAULT')
     replace_line(
         '/etc/workloadmgr/workloadmgr.conf',
-        'vault_s3_access_key_id = ',
+        'vault_s3_access_key_id =',
         'vault_s3_access_key_id = ' +
         str(config_data['vault_s3_access_key_id']))
     replace_line(
         '/etc/workloadmgr/workloadmgr.conf',
-        'vault_s3_secret_access_key = ',
+        'vault_s3_secret_access_key =',
         'vault_s3_secret_access_key = ' +
         str(config_data['vault_s3_secret_access_key']))
     replace_line(
         '/etc/workloadmgr/workloadmgr.conf',
-        'vault_s3_region_name = ',
+        'vault_s3_region_name =',
         'vault_s3_region_name = ' +
         str(config_data['vault_s3_region_name']))
     replace_line(
         '/etc/workloadmgr/workloadmgr.conf',
-        'vault_s3_bucket = ',
+        'vault_s3_bucket =',
         'vault_s3_bucket = ' +
         str(config_data['vault_s3_bucket']))
 
     # S3 ceph based, Suse, RH, etc.
-    if (config_data['vault_s3_endpoint_url'] and
-       len(config_data['vault_s3_endpoint_url']) > 0):
-        replace_line(
-            '/etc/workloadmgr/workloadmgr.conf',
-            'vault_s3_endpoint_url = ',
-            'vault_s3_endpoint_url = ' +
-            str(config_data['vault_s3_endpoint_url']))
+    # For Amazon, this should be empty.
+    replace_line(
+        '/etc/workloadmgr/workloadmgr.conf',
+        'vault_s3_endpoint_url =',
+        'vault_s3_endpoint_url = ' +
+        str(config_data['vault_s3_endpoint_url']))
 
-    if (config_data['vault_s3_signature_version'] and
-       len(config_data['vault_s3_signature_version']) > 0):
-        replace_line(
-            '/etc/workloadmgr/workloadmgr.conf',
-            'vault_s3_signature_version = ',
-            'vault_s3_signature_version = ' +
-            str(config_data['vault_s3_signature_version']))
+    replace_line(
+        '/etc/workloadmgr/workloadmgr.conf',
+        'vault_s3_signature_version =',
+        'vault_s3_signature_version = ' +
+        str(config_data['vault_s3_signature_version']))
 
-    if (config_data['vault_s3_ssl'] and
-       len(config_data['vault_s3_ssl']) > 0):
-        replace_line(
-            '/etc/workloadmgr/workloadmgr.conf',
-            'vault_s3_ssl = ',
-            'vault_s3_ssl = ' +
-            str(config_data['vault_s3_ssl']))
+    replace_line(
+        '/etc/workloadmgr/workloadmgr.conf',
+        'vault_s3_ssl =',
+        'vault_s3_ssl = ' +
+        str(config_data['vault_s3_ssl']))
 
-    if (config_data['vault_s3_support_empty_dir'] and
-       len(config_data['vault_s3_support_empty_dir']) > 0):
-        replace_line(
-            '/etc/workloadmgr/workloadmgr.conf',
-            'vault_s3_support_empty_dir = ',
-            'vault_s3_support_empty_dir = ' +
-            str(config_data['vault_s3_support_empty_dir']))
+    replace_line(
+        '/etc/workloadmgr/workloadmgr.conf',
+        'vault_s3_support_empty_dir =',
+        'vault_s3_support_empty_dir = ' +
+        str(config_data['vault_s3_support_empty_dir']))
 
     # Replace the object store service line with the S3 version.
     # TODO - This should be removed post 2.6 once vaultfuse.py is modified to
@@ -4319,7 +4322,7 @@ def configure_openstack():
             if 'storage-nfs-options' in config_inputs:
                 config_data['storage_nfs_options'] = config_inputs['storage-nfs-options'].strip()
 
-        else:
+        elif config_data['backup_target_type'].lower() == 'swift':
             config_data['swift_auth_version'] = config_inputs['swift-auth-version']
 
             if config_data['swift_auth_version'] == 'TEMPAUTH':
@@ -4334,6 +4337,30 @@ def configure_openstack():
                 config_data['swift_password'] = config_data['admin_password']
                 config_data['swift_tenantname'] = config_data['admin_tenant_name']
                 config_data['swift_domain_id'] = config_data['domain_name']
+
+        elif config_data['backup_target_type'].lower() == 's3':
+            config_data['s3_backend_type'] = config_inputs['s3-backend-type'].lower()
+            config_data['vault_s3_access_key_id'] = config_inputs['s3-access-key']
+            config_data['vault_s3_secret_access_key'] = config_inputs['s3-secret-key']
+            config_data['vault_s3_region_name'] = config_inputs['s3-region']
+            config_data['vault_s3_bucket'] = config_inputs['s3-bucket']
+
+            # Set the "default" settings to ones that work with amazon
+            config_data['vault_s3_ssl'] = 'True'
+            config_data['vault_s3_signature_version'] = 'default'
+            config_data['vault_s3_support_empty_dir'] = 'False'
+            config_data['vault_s3_endpoint_url'] = ''
+
+            if config_data['s3_backend_type'].lower() != 'amazon':
+                config_data['vault_s3_endpoint_url'] = config_inputs['s3-endpoint-url']
+
+            if config_data['s3_backend_type'].lower() == 'minio':
+                config_data['vault_s3_ssl'] = config_inputs['s3-use-ssl']
+                config_data['vault_s3_signature_version'] = 's3v4'
+                config_data['vault_s3_support_empty_dir'] = 'True'
+
+        else:
+            raise Exception("Unsupported backend storage selected.")
 
         config_data['workloads_import'] = config_inputs.get(
             'workloads-import', "off").strip().rstrip() == 'on'
@@ -4585,8 +4612,13 @@ def validate_s3_credentials():
     """
 
     s3_access_key_id = bottle.request.query['s3_access_key_id']
-    s3_secret_access_key = bottle.request.query['s3_secret_access_key']
+    s3_secret_access_key = urllib.unquote(bottle.request.query['s3_secret_access_key'])
     s3_endpoint = bottle.request.query['s3_endpoint']
+    # If the endpoint is empty, set it to None because amazon defaults to an endpoint
+    # from the region and bucket values. - cjk
+    if s3_endpoint == '':
+        s3_endpoint = None
+
     s3_ssl = bottle.request.query['s3_ssl']
     s3_region = bottle.request.query['s3_region']
     s3_bucket = bottle.request.query['s3_bucket']
@@ -4609,7 +4641,7 @@ def validate_s3_credentials():
         if error.response['ResponseMetadata']['HTTPStatusCode'] == 404:
             return bottle.HTTPResponse(status=404, body='S3 bucket not found.')
         elif error.response['ResponseMetadata']['HTTPStatusCode'] == 403:
-            return bottle.HTTPResponse(status=403, body='Authorization error. Check keys.')
+            return bottle.HTTPResponse(status=403, body='Authorization error. Check keys and bucket values.')
         else:
             return bottle.HTTPResponse(status=500, body=str(error))
 

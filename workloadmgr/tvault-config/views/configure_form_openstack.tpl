@@ -84,6 +84,57 @@ function validate_swift_credentials(inputelement) {
 }
 
 
+function validate_s3_credentials(inputelement) {
+    s3_access_key_id = $('[name="s3-access-key"]')[0].value
+    s3_secret_access_key = encodeURIComponent($('[name="s3-secret-key"]')[0].value)
+    s3_region = $('[name="s3-region"]')[0].value
+    s3_bucket = $('[name="s3-bucket"]')[0].value
+    if (($('[name="s3-backend-type"]')[0].value == 'Amazon') && ($('[name="s3-backend-type"]')[0].checked == false)) {
+      s3_endpoint = $('[name="s3-endpoint-url"]')[0].value
+      s3_ssl = $('[name="s3-use-ssl"]')[0].value
+      s3_signature_version = $('[name="s3-signature-version"]')[0].value
+    }
+    else {
+      s3_endpoint = ''
+      s3_ssl = 'True'
+      s3_signature_version = 'default'
+    }
+    obj = $("#configure_openstack input[name='s3-backend-type']:checked")
+    inputelement = obj
+    $.ajax({
+        url: "validate_s3_credentials?s3_access_key_id="+s3_access_key_id+
+             "&s3_secret_access_key="+s3_secret_access_key+
+             "&s3_endpoint="+s3_endpoint+
+             "&s3_ssl="+s3_ssl+
+             "&s3_region="+s3_region+
+             "&s3_bucket="+s3_bucket+
+             "&s3_signature="+s3_signature_version,
+        beforeSend: function() {
+           spinelement = $($($(inputelement).parent()[0])[0]).find(".fa-spinner")
+           $(spinelement[0]).removeClass("hidden")
+           $($($($(inputelement).parent()[0]).find(".help-block")[0])[0]).addClass("hidden")
+           $($(inputelement).parent()[0]).removeClass("has-error")
+           $($(inputelement).parent()[0]).removeClass("has-success")
+        },
+        complete: function(result) {
+           spinelement = $($($(inputelement).parent()[0])[0]).find(".fa-spinner")
+           $(spinelement[0]).addClass("hidden")
+        },
+        error: function(result) {
+           $($(inputelement).parent()[0]).addClass("has-error")
+           $($($($(inputelement).parent()[0]).find(".help-block")[0])[0]).removeClass("hidden")
+           $($($(inputelement).parent()[0]).find(".help-block")[0])[0].innerHTML = result.responseText
+        },
+        success: function(result) {
+           $($(inputelement).parent()[0]).addClass("has-success")
+           options = ""
+           Invalid = false
+           $('[name="next"]').trigger( "click" );
+        }
+    });
+}
+
+
 function setRequired() {
     if(IsV3) {
        $('[name="domain-name"]').attr("required", "true");
@@ -92,27 +143,44 @@ function setRequired() {
          $('[name="domain-name"]').removeAttr('required')
     }
 }
+
+
 function findForm() {
   hideshowstorages()
 }
+
 
 function hideshowstorages() {
   backup_target_type = $('[name="backup_target_type"]:checked').val()
   if (typeof backup_target_type == "undefined") {
      $($('#swiftstorage-panel')[0]).addClass('hidden');
+     $($('#s3storage-panel')[0]).addClass('hidden');
      $($('#nfsstorage-panel')[0]).addClass('hidden');
   }
   if (backup_target_type == 'NFS') {
-     $($('#swiftstorage-panel')[0]).addClass('hidden');$($('#nfsstorage-panel')[0]).removeClass('hidden');
+     $($('#s3storage-panel')[0]).addClass('hidden');
+     $($('#swiftstorage-panel')[0]).addClass('hidden');
+     $($('#nfsstorage-panel')[0]).removeClass('hidden');
      setSwiftRequired(true, 'NFS')
   }
   if (backup_target_type == 'SWIFT') {
-     $($('#nfsstorage-panel')[0]).addClass('hidden');$($('#swiftstorage-panel')[0]).removeClass('hidden');
+     $($('#s3storage-panel')[0]).addClass('hidden');
+     $($('#nfsstorage-panel')[0]).addClass('hidden');
+     $($('#swiftstorage-panel')[0]).removeClass('hidden');
      obj = $("#configure_openstack input[name='swift-auth-version']:checked")
      setSwiftRequired(obj.attr('checked'), obj.val())
      //validate_swift_credentials('custom')
   }
+  if (backup_target_type == 'S3') {
+     $($('#swiftstorage-panel')[0]).addClass('hidden');
+     $($('#nfsstorage-panel')[0]).addClass('hidden');
+     $($('#s3storage-panel')[0]).removeClass('hidden');
+     obj = $("#configure_openstack input[name='s3-backend-type']:checked")
+     setS3Required(obj.attr('checked'), obj.val())
+     //validate_swift_credentials('custom')
+  }
 }
+
 
 function setSwiftRequired(checked, val) {
      storage_nfs_export  = $('#storage-nfs-export').val()
@@ -148,6 +216,49 @@ function setSwiftRequired(checked, val) {
        if(storage_nfs_export == "")
          $('[placeholder="server:/var/nfs"]').first().attr("required", "true");
      }
+}
+
+
+function setS3Required(checked, val) {
+     storage_nfs_export  = $('#storage-nfs-export').val()
+     val_length = storage_nfs_export.split(",").length
+     if (val == "decide") {
+         obj = $("#configure_openstack input[name='s3-backend-type']:checked")
+         if (typeof obj == "undefined") {
+             $('[placeholder="server:/var/nfs"]').first().removeAttr('required')
+             return
+         }
+         val = obj.val()
+     }
+     if((checked==true || checked=='checked') && (val=='Minio' || val=='Ceph')) {
+        $('[name="s3-access-key"]').attr("required", "true");
+        $('[name="s3-secret-key"]').attr("required", "true");
+        $('[name="s3-region"]').attr("required", "true");
+        $('[name="s3-bucket"]').attr("required", "true");
+        $('[name="s3-endpoint-url"]').attr("required", "true");
+        $('[name="s3-use-ssl"]').attr("required", "true");
+        $('#s3-access-key-div').toggle(true)
+        $('#s3-secret-key-div').toggle(true)
+        $('#s3-region-div').toggle(true)
+        $('#s3-bucket-div').toggle(true)
+        $('#s3-endpoint-url-div').toggle(true)
+        $('#s3-use-ssl-div').toggle(true)
+        $('#s3-signature-version-div').toggle(false)
+        $('[name="s3-signature-version"]').removeAttr('required')
+        if (val =='Minio') {
+          $('[name="s3-signature-version"]')[0].value = 's3v4'
+        }
+     }
+     if(val == 'Amazon') {
+        $('#s3-endpoint-url-div').toggle(false)
+        $('#s3-use-ssl-div').toggle(false)
+        $('#s3-signature-version-div').toggle(false)
+        $('[name="s3-endpoint-url"]').removeAttr('required')
+        $('[name="s3-use-ssl"]').removeAttr('required')
+        $('[name="s3-signature-version"]').removeAttr('required')
+        $('[name="s3-signature-version"]')[0].value = 'default'
+     }
+     $('[placeholder="server:/var/nfs"]').first().removeAttr('required')
 }
 </script>
 </head>
@@ -277,7 +388,7 @@ function setSwiftRequired(checked, val) {
 	                                        %else:
 		                                    <input name = "nodetype" type="radio"  value="controller" checked onclick='$("#import-tab")[0].style.display="";$("#certificate-tab")[0].style.display="";$("#import")[0].style.display="";$("#certificate")[0].style.display=""'>  Controller Node
 		                                    <input name = "nodetype" type="radio"  value="additional" onclick='$("#import-tab")[0].style.display="none";$("#certificate-tab")[0].style.display="none";$("#import")[0].style.display="none";$("#certificate")[0].style.display="none";'>   Additional Node <br><br>
-	                                        %end  
+	                                        %end
                                                 </div>
                                             </div>
                                             <div class="col-sm-5">
@@ -338,7 +449,7 @@ function setSwiftRequired(checked, val) {
                                                 <div class="col-sm-5">
                                                     <div class="form-group">
     	                                                <label class="control-label">Administrator</label>
-    	                                                <input name="admin-username" {{'value=' + admin_username if defined('admin_username') else ''}} type="text" required="" placeholder="admin" class="form-control"> 
+    	                                                <input name="admin-username" {{'value=' + admin_username if defined('admin_username') else ''}} type="text" required="" placeholder="admin" class="form-control">
                                                     </div>
                                                 </div>
                                                 <div class="col-sm-5">
@@ -452,17 +563,24 @@ function setSwiftRequired(checked, val) {
                                             <div class="col-sm-12">
                                                 <label class="radio-inline">
                                                 %if 'backup_target_type' in locals() and backup_target_type == 'NFS':
-                                                    <input type="radio" name="backup_target_type" aria-describedby="backup_target_helpblock" checked value="NFS" onchange="$($('#swiftstorage-panel')[0]).addClass('hidden');$($('#nfsstorage-panel')[0]).removeClass('hidden');" onclick="setSwiftRequired(true, 'NFS')">NFS
+                                                    <input type="radio" name="backup_target_type" aria-describedby="backup_target_helpblock" checked value="NFS" onchange="$($('#swiftstorage-panel')[0]).addClass('hidden');$($('#s3storage-panel')[0]).addClass('hidden');$($('#nfsstorage-panel')[0]).removeClass('hidden');" onclick="setSwiftRequired(true, 'NFS')">NFS
                                                 %else:
-                                                    <input type="radio" name="backup_target_type" aria-describedby="backup_target_helpblock" value="NFS" onchange="$($('#swiftstorage-panel')[0]).addClass('hidden');$($('#nfsstorage-panel')[0]).removeClass('hidden');" onclick="setSwiftRequired(true, 'NFS')" required>NFS
-                                                %end 
+                                                    <input type="radio" name="backup_target_type" aria-describedby="backup_target_helpblock" value="NFS" onchange="$($('#swiftstorage-panel')[0]).addClass('hidden');$($('#s3storage-panel')[0]).addClass('hidden');$($('#nfsstorage-panel')[0]).removeClass('hidden');" onclick="setSwiftRequired(true, 'NFS')" required>NFS
+                                                %end
                                                 </label>
                                                 <label class="radio-inline">
                                                 %if 'backup_target_type' in locals() and backup_target_type == 'SWIFT':
-                                                    <input type="radio" name="backup_target_type" aria-describedby="backup_target_helpblock"  checked value="SWIFT" onchange="$($('#nfsstorage-panel')[0]).addClass('hidden');$($('#swiftstorage-panel')[0]).removeClass('hidden');" onclick="setSwiftRequired(true, 'decide');">SWIFT
+                                                    <input type="radio" name="backup_target_type" aria-describedby="backup_target_helpblock"  checked value="SWIFT" onchange="$($('#nfsstorage-panel')[0]).addClass('hidden');$($('#s3storage-panel')[0]).addClass('hidden');$($('#swiftstorage-panel')[0]).removeClass('hidden');" onclick="setSwiftRequired(true, 'decide');">SWIFT
                                                 %else:
-                                                    <input type="radio" name="backup_target_type" aria-describedby="backup_target_helpblock" value="SWIFT" onchange="$($('#nfsstorage-panel')[0]).addClass('hidden');$($('#swiftstorage-panel')[0]).removeClass('hidden');" onclick="setSwiftRequired(true, 'decide');">SWIFT
-                                                %end 
+                                                    <input type="radio" name="backup_target_type" aria-describedby="backup_target_helpblock" value="SWIFT" onchange="$($('#nfsstorage-panel')[0]).addClass('hidden');$($('#s3storage-panel')[0]).addClass('hidden');$($('#swiftstorage-panel')[0]).removeClass('hidden');" onclick="setSwiftRequired(true, 'decide');">SWIFT
+                                                %end
+                                                </label>
+                                                <label class="radio-inline">
+                                                %if 'backup_target_type' in locals() and backup_target_type == 'S3':
+                                                    <input type="radio" name="backup_target_type" aria-describedby="backup_target_helpblock"  checked value="S3" onchange="$($('#nfsstorage-panel')[0]).addClass('hidden');$($('#swiftstorage-panel')[0]).addClass('hidden');$($('#s3storage-panel')[0]).removeClass('hidden');" onclick="setS3Required(true, 'decide');">S3
+                                                %else:
+                                                    <input type="radio" name="backup_target_type" aria-describedby="backup_target_helpblock" value="S3" onchange="$($('#nfsstorage-panel')[0]).addClass('hidden');$($('#swiftstorage-panel')[0]).addClass('hidden');$($('#s3storage-panel')[0]).removeClass('hidden');" onclick="setS3Required(true, 'decide');">S3
+                                                %end
                                                 </label>
                                                 <span id="backup_target_helpblock" class="help-block">Choose the backend for storing backup images.</span>
 
@@ -470,7 +588,7 @@ function setSwiftRequired(checked, val) {
 	                                        <div class="panel-group" id="nfsstorage-panel">
                                                 %else:
 	                                        <div class="panel-group hidden" id="nfsstorage-panel">
-                                                %end 
+                                                %end
 	                                            <div class="panel panel-default" id="panel3">
 		                                        <div class="panel-heading">
 		                                          <h4 class="panel-title">
@@ -498,7 +616,7 @@ function setSwiftRequired(checked, val) {
                                                 <div class="panel-group" id="swiftstorage-panel">
                                                 %else:
                                                 <div class="panel-group hidden" id="swiftstorage-panel">
-                                                %end 
+                                                %end
                                                     <div class="panel panel-default" id="panel5">
                                                         <div class="panel-heading">
                                                             <h4 class="panel-title">
@@ -510,15 +628,15 @@ function setSwiftRequired(checked, val) {
                                                                  <div class="input-group">
                                                                     %if 'swift_auth_version' in locals() and swift_auth_version == 'TEMPAUTH':
                                                                     <input name = "swift-auth-version" type="radio"  aria-describedby="swiftsel_helpblock" value="KEYSTONE" onchange="setSwiftRequired(this.checked, this.value);">  KEYSTONE &nbsp;&nbsp;
-                                                                    <input name = "swift-auth-version" type="radio"  aria-describedby="swiftsel_helpblock" value="TEMPAUTH" checked onchange="setSwiftRequired(this.checked, this.value)">  TEMPAUTH <br> <br>                       
+                                                                    <input name = "swift-auth-version" type="radio"  aria-describedby="swiftsel_helpblock" value="TEMPAUTH" checked onchange="setSwiftRequired(this.checked, this.value)">  TEMPAUTH <br> <br>
                                                                     %elif 'swift_auth_version' in locals() and swift_auth_version == 'KEYSTONE':
                                                                     <input name = "swift-auth-version" type="radio"  aria-describedby="swiftsel_helpblock" value="KEYSTONE" checked onchange="setSwiftRequired(this.checked, this.value);">  KEYSTONE &nbsp;&nbsp;
-                                                                    <input name = "swift-auth-version" type="radio"  aria-describedby="swiftsel_helpblock" value="TEMPAUTH" onchange="setSwiftRequired(this.checked, this.value)">  TEMPAUTH <br> <br>                                
+                                                                    <input name = "swift-auth-version" type="radio"  aria-describedby="swiftsel_helpblock" value="TEMPAUTH" onchange="setSwiftRequired(this.checked, this.value)">  TEMPAUTH <br> <br>
                                                                     %else:
                                                                     <input name = "swift-auth-version" type="radio"  aria-describedby="swiftsel_helpblock" value="KEYSTONE" checked onchange="setSwiftRequired(this.checked, this.value);">  KEYSTONE &nbsp;&nbsp;
-                                                                    <input name = "swift-auth-version" type="radio" aria-describedby="swiftsel_helpblock"  value="TEMPAUTH" onchange="setSwiftRequired(this.checked, this.value)">  TEMPAUTH <br> <br>      	
-                                                                    %end 
-                                                                    <span id="swiftsel_helpblock" class="help-block hidden">A block of help text that breaks onto a new line and may extend beyond one line.</span> 
+                                                                    <input name = "swift-auth-version" type="radio" aria-describedby="swiftsel_helpblock"  value="TEMPAUTH" onchange="setSwiftRequired(this.checked, this.value)">  TEMPAUTH <br> <br>
+                                                                    %end
+                                                                    <span id="swiftsel_helpblock" class="help-block hidden">A block of help text that breaks onto a new line and may extend beyond one line.</span>
                                                                  </div>
                                                                  <div class="input-group" id="swift-auth-url-div">
                                                                      <label class="control-label">Auth Url&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;</label>
@@ -529,7 +647,7 @@ function setSwiftRequired(checked, val) {
                                                                       <input name="swift-username" {{'value=' + swift_username if (defined('swift_username') and len(swift_username)) else ''}} type="text" placeholder="" class="form-control"> <br>
                                                                  </div><br>
                                                                  <div class="input-group" id="swift-password-div">
-                                                                     <label class="control-label">Password&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp</label>
+                                                                     <label class="control-label">Password&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;</label>
                                                                      <input name="swift-password" type="password" class="form-control" aria-describedby="swifturl_helpblock" onblur="">
                                                                      <span id="swifturl_helpblock" class="help-block hidden">A block of help text that breaks onto a new line and may extend beyond one line.</span>
                                                                  </div><br>
@@ -538,8 +656,78 @@ function setSwiftRequired(checked, val) {
 	                                            </div>
                                                 </div>
                                             </div>
-                                        </div>
-                                    </div>
+                                                %if 'backup_target_type' in locals() and backup_target_type == 'S3':
+                                                <div class="panel-group" id="s3storage-panel">
+                                                %else:
+                                                <div class="panel-group hidden" id="s3storage-panel">
+                                                %end
+                                                    <div class="panel panel-default" id="panel5">
+                                                        <div class="panel-heading">
+                                                            <h4 class="panel-title">
+                                                  <a data-toggle="collapse" data-target="#collapseFive" href="#collapseFive"> S3 Object Storage </a>
+                                              </h4>
+                                          </div>
+                                          <div id="collapseFive" class="panel-collapse collapse in">
+                                               <div class="panel-body">
+                                                                 <div class="input-group">
+                                                                    %if 's3_backend_type' in locals() and s3_backend_type == 'Ceph':
+                                                                    <input name = "s3-backend-type" type="radio"  aria-describedby="s3sel_helpblock" value="Amazon" onchange="setS3Required(this.checked, this.value);">  Amazon &nbsp;&nbsp;
+                                                                    <input name = "s3-backend-type" type="radio"  aria-describedby="s3sel_helpblock" value="Ceph" checked onchange="setS3Required(this.checked, this.value)">  Ceph &nbsp;&nbsp;
+                                                                    <input name = "s3-backend-type" type="radio"  aria-describedby="s3sel_helpblock" value="Minio" onchange="setS3Required(this.checked, this.value);">  Minio <br> <br>
+                                                                    %elif 's3_backend_type' in locals() and s3_backend_type == 'Amazon':
+                                                                    <input name = "s3-backend-type" type="radio"  aria-describedby="s3sel_helpblock" value="Amazon" checked onchange="setS3Required(this.checked, this.value);">  Amazon &nbsp;&nbsp;
+                                                                    <input name = "s3-backend-type" type="radio"  aria-describedby="s3sel_helpblock" value="Ceph" onchange="setS3Required(this.checked, this.value)">  Ceph &nbsp;&nbsp;
+                                                                    <input name = "s3-backend-type" type="radio"  aria-describedby="s3sel_helpblock" value="Minio" onchange="setS3Required(this.checked, this.value);">  Minio <br> <br>
+                                                                    %elif 's3_backend_type' in locals() and s3_backend_type == 'Minio':
+                                                                    <input name = "s3-backend-type" type="radio"  aria-describedby="s3sel_helpblock" value="Amazon" onchange="setS3Required(this.checked, this.value);">  Amazon &nbsp;&nbsp;
+                                                                    <input name = "s3-backend-type" type="radio"  aria-describedby="s3sel_helpblock" value="Ceph" onchange="setS3Required(this.checked, this.value)">  Ceph &nbsp;&nbsp;
+                                                                    <input name = "s3-backend-type" type="radio"  aria-describedby="s3sel_helpblock" value="Minio" checked onchange="setS3Required(this.checked, this.value);">  Minio <br> <br>
+                                                                    %else:
+                                                                    <input name = "s3-backend-type" type="radio"  aria-describedby="s3sel_helpblock" value="Amazon" checked onchange="setS3Required(this.checked, this.value);">  Amazon &nbsp;&nbsp;
+                                                                    <input name = "s3-backend-type" type="radio"  aria-describedby="s3sel_helpblock" value="Ceph" onchange="setS3Required(this.checked, this.value)">  Ceph &nbsp;&nbsp;
+                                                                    <input name = "s3-backend-type" type="radio"  aria-describedby="s3sel_helpblock" value="Minio" onchange="setS3Required(this.checked, this.value);">  Minio <br> <br>
+                                                                    %end
+                                                                    <span id="s3sel_helpblock" class="help-block hidden">A block of help text that breaks onto a new line and may extend beyond one line.</span>
+                                                                 </div>
+                                                                 <div class="input-group" id="s3-access-key-div">
+                                                                     <label class="control-label">Access Key&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;</label>
+                                                                     <input name="s3-access-key" {{'value=' + vault_s3_access_key_id if (defined('vault_s3_access_key_id') and len(vault_s3_access_key_id)) else ''}} type="text" placeholder="" class="form-control"><br>
+                                                                 </div><br>
+                                                                 <div class="input-group" id="s3-secret-key-div">
+                                                                     <label class="control-label">Secret Key&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;</label>
+                                                                     <input name="s3-secret-key" {{'value=' + vault_s3_secret_access_key if (defined('vault_s3_secret_access_key') and len(vault_s3_secret_access_key)) else ''}} type="text" placeholder="" class="form-control"> <br>
+                                                                 </div><br>
+                                                                 <div class="input-group" id="s3-region-div">
+                                                                     <label class="control-label">Region&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;</label>
+                                                                     <input name="s3-region" {{'value=' + vault_s3_region_name if (defined('vault_s3_region_name') and len(vault_s3_region_name)) else ''}} type="text" placeholder="" class="form-control"> <br>
+                                                                     <span id="s3url_helpblock" class="help-block hidden">A block of help text that breaks onto a new line and may extend beyond one line.</span>
+                                                                 </div><br>
+                                                                 <div class="input-group" id="s3-bucket-div">
+                                                                     <label class="control-label">Bucket Name&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;</label>
+                                                                     <input name="s3-bucket" {{'value=' + vault_s3_bucket if (defined('vault_s3_bucket') and len(vault_s3_bucket)) else ''}} type="text" placeholder="" class="form-control"> <br>
+                                                                     <span id="s3url_helpblock" class="help-block hidden">A block of help text that breaks onto a new line and may extend beyond one line.</span>
+                                                                 </div><br>
+                                                                 <div class="input-group" id="s3-endpoint-url-div">
+                                                                     <label class="control-label">Endpoint URL&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;</label>
+                                                                     <input name="s3-endpoint-url" {{'value=' + vault_s3_endpoint_url if (defined('vault_s3_endpoint_url') and len(vault_s3_endpoint_url)) else ''}} type="text" placeholder="http://127.0.0.1:9000" class="form-control"> <br>
+                                                                     <span id="s3url_helpblock" class="help-block hidden">A block of help text that breaks onto a new line and may extend beyond one line.</span>
+                                                                 </div><br>
+                                                                 <div class="input-group" id="s3-use-ssl-div">
+                                                                     <label class="control-label">Use SSL&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;</label>
+                                                                     <input name="s3-use-ssl" {{'value=' + vault_s3_ssl if (defined('vault_s3_ssl') and len(vault_s3_ssl)) else ''}} type="text" placeholder="False" class="form-control"> <br>
+                                                                     <span id="s3url_helpblock" class="help-block hidden">A block of help text that breaks onto a new line and may extend beyond one line.</span>
+                                                                 </div><br>
+                                                                 <div class="input-group" id="s3-signature-version-div">
+                                                                     <label class="control-label">Signature Version&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;</label>
+                                                                     <input name="s3-signature-version" {{'value=' + vault_s3_signature_version if (defined('vault_s3_signature_version') and len(vault_s3_signature_version)) else ''}} type="text" placeholder="" class="form-control"> <br>
+                                                                     <span id="s3url_helpblock" class="help-block hidden">A block of help text that breaks onto a new line and may extend beyond one line.</span>
+                                                                 </div><br>
+                                               </div> <!-- Panel Body -->
+                                          </div>
+                                                    </div>
+                                                </div> <!-- S3 Storage Panel -->
+                                                </div> <!-- S3 Storage Panel -->
+                                    </div> <!-- Tab Pane Storage -->
                                     <div class="tab-pane" id="import">
                                         <div class="row">
                                             <h5 class="info-text"> Import Workloads </h5>
