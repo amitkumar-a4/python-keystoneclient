@@ -1014,7 +1014,7 @@ def _authenticate_with_keystone():
     config_data['glance_production_port'] = parse_result.port
 
     #Get Image API version
-    versions = json.loads(urllib.urlopen(image_public_url).read()) 
+    versions = json.loads(urllib.urlopen(image_public_url).read())
     current_version = filter(lambda x: x['status'].lower() == 'current', versions['versions'])
     if 'v2' in current_version[0]['id']:
        config_data['glance_api_version'] = 2
@@ -2488,32 +2488,23 @@ def services_vmware():
         config_status = config_data.get('config_status', 'not_configured')
         nodetype = config_data.get('nodetype', 'not_configured')
 
-        command = ['sudo', 'initctl', 'list']
-        output = subprocess.check_output(command, shell=False)
-    except Exception as exception:
-        output = ''
+        for service_display_name, service_name in services.iteritems():
+            if nodetype != 'controller' and service_display_name in [
+                    'api_service', 'scheduler_service', 'inventory_service', ]:
+                services[service_display_name] = 'Not Applicable'
+                continue
 
-    output_lines = output.split('\n')
-    for service_display_name, service_name in services.iteritems():
-        if config_status == 'not_configured':
-            services[service_display_name] = 'Not Configured'
-            continue
-        if nodetype != 'controller' and service_display_name in [
-                'api_service', 'scheduler_service', 'inventory_service', ]:
-            services[service_display_name] = 'Not Applicable'
-            continue
-        for line in output_lines:
-            if service_name in line:
-                if 'running' in line:
-                    services[service_display_name] = 'Running'
-                elif 'stop' in line:
-                    services[service_display_name] = 'Stopped'
-                else:
-                    services[service_display_name] = 'Unknown'
-                break
-        if services[service_display_name] not in [
-                'Running', 'Stopped', 'Unknown']:
-            services[service_display_name] = 'Not Applicable'
+        for service_display_name, service_name in services.iteritems():
+            command = ['systemctl', 'show', service_name]
+            output = subprocess.check_output(command, shell=False)
+            for s in output.split('\n'):
+                if 'substate' in s.lower():
+                    if 'running' in s.lower():
+                        services[service_display_name] = 'Running'
+                    else:
+                        services[service_display_name] = 'Stopped'
+    except Exception as exception:
+        pass
 
     services['error_message'] = bottle.request.environ['beaker.session']['error_message']
     return services
@@ -2854,6 +2845,12 @@ def configure_host():
                     'prepend domain-name-servers ' +
                     config_data['name_server'] +
                     ';')
+
+                # Change dhcp timeout from 300 to 30 seconds.
+                replace_line(
+                    '/etc/dhcp/dhclient.conf',
+                    'timeout 300;',
+                    'timeout 30;')
                 command = ['sudo', 'dhclient']
                 subprocess.call(command, shell=False)
             except BaseException:
@@ -3264,10 +3261,10 @@ def configure_service():
                 config_data['glance_production_api_servers']))
 
         replace_line('/etc/workloadmgr/workloadmgr.conf',
-                     'glance_api_version = ', 
+                     'glance_api_version = ',
                      'glance_api_version = ' + str(
                        config_data['glance_api_version']))
-        
+
         replace_line(
             '/etc/workloadmgr/workloadmgr.conf',
             'neutron_admin_auth_url = ',
@@ -4639,7 +4636,7 @@ def main():
             Config.read('/etc/tvault-config/tvault-config.conf')
             config_data = dict(Config._defaults)
             prev_hostname = config_data.get('hostname', 'none')
-            fully_configured = config_data.get('fully_configured', 'false') 
+            fully_configured = config_data.get('fully_configured', 'false')
         except Exception as exception:
             prev_hostname = 'none'
 
@@ -4658,7 +4655,7 @@ def main():
             os.chmod('/etc/tvault/ssl/gen-cer', 0o554)
             command = ['sudo', 'sh', 'gen-cer', socket.gethostname()]
             subprocess.call(command, shell=False, cwd="/etc/tvault/ssl")
-            command = [ 'sudo', 'rm', '-rf', 
+            command = [ 'sudo', 'rm', '-rf',
                         os.path.join("/etc/tvault/ssl/",
                                      socket.gethostname() + ".csr")]
             subprocess.call(command, shell=False, cwd="/etc/tvault/ssl")
