@@ -73,7 +73,7 @@ def set_settings(context, new_settings):
             name_found = False
             for persisted_setting in persisted_setting_objs:
                 if persisted_setting.name == name:
-                    db.setting_update(context, name, {'value' : value})
+                    db.setting_update(context, name, {'value' : value}, cloud_setting=True)
                     name_found = True
                     break
             if name_found == False:
