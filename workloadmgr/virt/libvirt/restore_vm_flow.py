@@ -804,11 +804,11 @@ class RestoreInstanceFromVolume(task.Task):
     def execute(self, context, vmname, restore_id,
                 volume_id, restore_type, instance_options,
                 restored_security_groups, restored_nics,
-                restored_compute_flavor_id, keyname):
+                restored_compute_flavor_id, keyname, disk_name):
         return self.execute_with_log(context, vmname, restore_id,
                                      volume_id, restore_type, instance_options,
                                      restored_security_groups, restored_nics,
-                                     restored_compute_flavor_id, keyname)
+                                     restored_compute_flavor_id, keyname, disk_name)
 
     def revert(self, *args, **kwargs):
         return self.revert_with_log(*args, **kwargs)
@@ -817,7 +817,7 @@ class RestoreInstanceFromVolume(task.Task):
     def execute_with_log(self, context, vmname, restore_id,
                          volume_id, restore_type, instance_options,
                          restored_security_groups, restored_nics,
-                         restored_compute_flavor_id, keyname):
+                         restored_compute_flavor_id, keyname, disk_name):
 
         self.db = db = WorkloadMgrDB().db
         self.cntx = amqp.RpcContext.from_dict(context)
@@ -848,7 +848,7 @@ class RestoreInstanceFromVolume(task.Task):
         except Exception as ex:
             LOG.exception(ex)
 
-        block_device_mapping = {u'vda': volume_id + ":vol"}
+        block_device_mapping = {disk_name: volume_id + ":vol"}
 
         self.restored_instance = restored_instance = \
             compute_service.create_server(self.cntx, restored_instance_name,
