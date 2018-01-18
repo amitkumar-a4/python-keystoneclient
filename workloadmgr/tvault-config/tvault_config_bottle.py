@@ -2425,8 +2425,9 @@ def service_action(service_display_name, action):
     services = {'api_service': 'wlm-api',
                 'scheduler_service': 'wlm-scheduler',
                 'workloads_service': 'wlm-workloads',
-                'inventory_service': 'nova-api',
-                'tvault_gui_service': 'tvault-gui', }
+                #'inventory_service': 'nova-api',
+                #'tvault_gui_service': 'tvault-gui',
+               }
     try:
         Config = ConfigParser.RawConfigParser()
         Config.read('/etc/tvault-config/tvault-config.conf')
@@ -3125,6 +3126,7 @@ def configure_api():
                 "echo manual > /etc/init/wlm-api.override"]
             subprocess.call(command, shell=False)
 
+        """
         # configure tvault-gui
         command = ['sudo', 'rm', "/etc/init/tvault-gui.override"]
         subprocess.call(command, shell=False)
@@ -3187,7 +3189,7 @@ def configure_api():
         #subprocess.call(command, shell=False)
         #command = ['sudo', 'sh', '-c', "echo manual > /etc/init/tvault-gui-web-1.override"];
         #subprocess.call(command, shell=False)
-
+        """
     except Exception as exception:
         bottle.request.environ['beaker.session']['error_message'] = "Error: %(exception)s" % {
             'exception': exception, }
@@ -3682,6 +3684,7 @@ def start_api():
             command = ['sudo', 'service', 'wlm-api', 'restart']
             subprocess.call(command, shell=False)
 
+        """
         # configure tvault-gui
         command = ['sudo', 'service', 'tvault-gui', 'restart']
         subprocess.call(command, shell=False)
@@ -3693,6 +3696,7 @@ def start_api():
         subprocess.call(command, shell=False)
         command = ['sudo', 'service', 'tvault-gui-web-1', 'restart']
         subprocess.call(command, shell=False)
+        """
 
     except Exception as exception:
         bottle.request.environ['beaker.session']['error_message'] = "Error: %(exception)s" % {
