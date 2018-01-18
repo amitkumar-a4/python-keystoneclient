@@ -2856,7 +2856,7 @@ def configure_host():
                     config_data['name_server'] +
                     ';')
 
-                # change dhcp timeout to 30 seconds.
+                # Change dhcp timeout from 300 to 30 seconds.
                 replace_line(
                     '/etc/dhcp/dhclient.conf',
                     'timeout 300;',
