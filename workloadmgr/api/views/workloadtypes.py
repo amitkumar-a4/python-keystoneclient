@@ -34,10 +34,9 @@ class ViewBuilder(common.ViewBuilder):
         d['status'] = workloadtype['status']
         d['links'] = self._get_links(request, workloadtype['id'])
         d['name'] = workloadtype['display_name']
-        d['description'] =  workloadtype['display_description']
-        d['is_public'] =  workloadtype['is_public']
-        return {'workload_type': d}        
-
+        d['description'] = workloadtype['display_description']
+        d['is_public'] = workloadtype['is_public']
+        return {'workload_type': d}
 
     def detail(self, request, workloadtype):
         """Detailed view of a single workloadtype."""
@@ -51,16 +50,17 @@ class ViewBuilder(common.ViewBuilder):
         d['links'] = self._get_links(request, workloadtype['id'])
         d['name'] = workloadtype['display_name']
         d['description'] = workloadtype['display_description']
-        d['is_public'] =  workloadtype['is_public'] 
-        d['metadata'] = workloadtype['metadata']        
-        return {'workload_type': d}        
+        d['is_public'] = workloadtype['is_public']
+        d['metadata'] = workloadtype['metadata']
+        return {'workload_type': d}
 
     def _list_view(self, func, request, workloadtypes):
         """Provide a view for a list of workloadtypes."""
-        workloadtypes_list = [func(request, workloadtype)['workload_type'] for workloadtype in workloadtypes]
+        workloadtypes_list = [func(request, workloadtype)[
+            'workload_type'] for workloadtype in workloadtypes]
         workloadtypes_links = self._get_collection_links(request,
-                                                   workloadtypes,
-                                                   self._collection_name)
+                                                         workloadtypes,
+                                                         self._collection_name)
         workloadtypes_dict = dict(workload_types=workloadtypes_list)
 
         if workloadtypes_links:

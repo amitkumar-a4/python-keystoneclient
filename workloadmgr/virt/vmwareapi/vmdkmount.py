@@ -10,7 +10,7 @@ from os import remove, close
 
 from Queue import Queue
 from Queue import Queue, Empty
-from threading  import Thread
+from threading import Thread
 from tempfile import mkstemp
 
 from workloadmgr import exception
@@ -21,12 +21,14 @@ from workloadmgr import autolog
 LOG = logging.getLogger(__name__)
 Logger = autolog.Logger(LOG)
 
+
 def enqueue_output(out, queue):
     for line in iter(out.readline, b''):
         queue.put(line)
     out.close()
 
-def mount_local_vmdk(vmdkfiles, diskonly=False): 
+
+def mount_local_vmdk(vmdkfiles, diskonly=False):
     vix_disk_lib_env = os.environ.copy()
     vix_disk_lib_env['LD_LIBRARY_PATH'] = '/usr/lib/vmware-vix-disklib/lib64'
 
@@ -43,38 +45,46 @@ def mount_local_vmdk(vmdkfiles, diskonly=False):
                 with open(listfile, 'w') as f:
                     f.write(vmdkfile)
 
-                cmdspec = [ "trilio-vix-disk-cli", "-mount", "-mountpointsfile", mntlist, ]
+                cmdspec = [
+                    "trilio-vix-disk-cli",
+                    "-mount",
+                    "-mountpointsfile",
+                    mntlist,
+                ]
                 if diskonly:
                     cmdspec += ['-diskonly']
                 cmdspec += [listfile]
                 cmd = " ".join(cmdspec)
-                LOG.info(_( cmd ))
+                LOG.info(_(cmd))
                 process = subprocess.Popen(cmdspec,
                                            stdin=subprocess.PIPE,
                                            stdout=subprocess.PIPE,
                                            stderr=subprocess.PIPE,
-                                           bufsize= -1,
+                                           bufsize=-1,
                                            env=vix_disk_lib_env,
                                            close_fds=True,
                                            shell=False)
-                
+
                 queue = Queue()
-                read_thread = Thread(target=enqueue_output, args=(process.stdout, queue))
-                read_thread.daemon = True # thread dies with the program
-                read_thread.start()            
+                read_thread = Thread(
+                    target=enqueue_output, args=(
+                        process.stdout, queue))
+                read_thread.daemon = True  # thread dies with the program
+                read_thread.start()
 
                 mountpath = None
                 while process.poll() is None:
                     try:
                         try:
                             output = queue.get(timeout=5)
-                            LOG.info(_( output ))
+                            LOG.info(_(output))
                         except Empty:
-                            continue 
+                            continue
                         except Exception as ex:
                             LOG.exception(ex)
-    
-                        if output.startswith("Pausing the process until it is resumed"):
+
+                        if output.startswith(
+                                "Pausing the process until it is resumed"):
                             break
                     except Exception as ex:
                         LOG.exception(ex)
@@ -84,15 +94,16 @@ def mount_local_vmdk(vmdkfiles, diskonly=False):
                     if _returncode:
                         LOG.debug(_('Result was %s') % _returncode)
                         raise exception.ProcessExecutionError(
-                                                exit_code=_returncode,
-                                                stderr=process.stderr.read(),
-                                                cmd=cmd)
+                            exit_code=_returncode,
+                            stderr=process.stderr.read(),
+                            cmd=cmd)
                 with open(mntlist, 'r') as f:
                     for line in f:
                         line = line.strip("\n")
-                        mountpoints[line.split(":")[0]] = line.split(":")[1].split(";")
-    
-                LOG.info(_( mountpoints ))
+                        mountpoints[line.split(":")[0]] = line.split(":")[
+                            1].split(";")
+
+                LOG.info(_(mountpoints))
                 process.stdin.close()
                 processes.append(process)
 
@@ -110,7 +121,7 @@ def mount_local_vmdk(vmdkfiles, diskonly=False):
         LOG.exception(ex)
         try:
             umount_local_vmdk(processes)
-        except:
+        except BaseException:
             pass
 
         raise
@@ -118,7 +129,9 @@ def mount_local_vmdk(vmdkfiles, diskonly=False):
 ##
 # unmounts a vmdk by sending signal 18 to the process that as suspended during mount process
 ##
-def umount_local_vmdk(processes): 
+
+
+def umount_local_vmdk(processes):
     for process in processes:
         process.send_signal(18)
         process.wait()
@@ -128,10 +141,11 @@ def umount_local_vmdk(processes):
         if _returncode != 0:
             LOG.debug(_('Result was %s') % _returncode)
             raise exception.ProcessExecutionError(
-                                        exit_code=_returncode,
-                                        stderr=process.stderr.read())
+                exit_code=_returncode,
+                stderr=process.stderr.read())
 
-def mountdevice(mountpath, startoffset = '0', length = None):
+
+def mountdevice(mountpath, startoffset='0', length=None):
     options = []
     if length:
         options = ["-o", startoffset, "--sizelimit", length]
@@ -140,41 +154,44 @@ def mountdevice(mountpath, startoffset = '0', length = None):
                                       stderr=subprocess.STDOUT)
     freedev = freedev.strip("\n")
 
-    subprocess.check_output(["losetup", freedev, mountpath,] + options,
-                               stderr=subprocess.STDOUT)
+    subprocess.check_output(["losetup", freedev, mountpath, ] + options,
+                            stderr=subprocess.STDOUT)
     return freedev
+
 
 def umountdevice(devpath):
     subprocess.check_output(["losetup", "-d", devpath],
-                              stderr=subprocess.STDOUT)
+                            stderr=subprocess.STDOUT)
+
 
 def unassignloopdevices(devpaths):
     for key, devpath in devpaths.iteritems():
         try:
             umountdevice(devpath)
-        except:
+        except BaseException:
             pass
+
 
 def assignloopdevices(mountpaths):
     devicepaths = {}
     for key, mountpath in mountpaths.iteritems():
         try:
             devpath = mountdevice(mountpath.pop().strip().rstrip())
-        
+
             devicepaths[key] = devpath
             # Add partition mappings here
             try:
                 cmd = ["partx", "-d", devpath]
                 subprocess.check_output(cmd, stderr=subprocess.STDOUT)
-            except:
+            except BaseException:
                 pass
 
             try:
                 cmd = ["partx", "-a", devpath]
                 subprocess.check_output(cmd, stderr=subprocess.STDOUT)
-            except:
+            except BaseException:
                 pass
-        except:
+        except BaseException:
             unassignloopdevices(devicepaths)
             raise
 

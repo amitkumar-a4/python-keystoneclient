@@ -18,7 +18,7 @@ CONF = cfg.CONF
 LOG = logging.getLogger(__name__)
 
 # this call will make sure the _namespace field is initialized
-#CONF(args=[])
+# CONF(args=[])
 
 DEFAULT_RULES = policy.Rules.from_dict({'default': '!'})
 DEFAULT_RESOURCE_RULES = policy.Rules.from_dict({'default': '@'})

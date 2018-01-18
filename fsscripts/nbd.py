@@ -26,8 +26,11 @@ from eventlet import greenthread
 from eventlet import pools
 
 NBD_DEVICE_RE = re.compile('nbd[0-9]+')
+
+
 def _(*args):
     return str(args[0])
+
 
 class log():
     def info(self, *arg):
@@ -45,10 +48,13 @@ class log():
     def critical(self, *arg):
         print arg[0]
 
+
 LOG = log()
 timeout_nbd = 10
 
 workloadlock = Lock()
+
+
 def synchronized(lock=workloadlock):
     '''Synchronization decorator.'''
     def wrap(f):
@@ -60,7 +66,8 @@ def synchronized(lock=workloadlock):
                 lock.release()
         return new_function
     return wrap
-  
+
+
 def execute(*cmd, **kwargs):
     process_input = kwargs.pop('process_input', None)
     check_exit_code = kwargs.pop('check_exit_code', [0])
@@ -77,7 +84,7 @@ def execute(*cmd, **kwargs):
 
     if len(kwargs):
         raise Excepton(('Got unknown keyword args '
-                                'to utils.execute: %r') % kwargs)
+                        'to utils.execute: %r') % kwargs)
 
     cmd = ['sudo'] + list(cmd)
     cmd = map(str, cmd)
@@ -114,7 +121,7 @@ def execute(*cmd, **kwargs):
             if not attempts:
                 raise
             else:
-                LOG.debug(_('%r failed. Retrying.')% cmd)
+                LOG.debug(_('%r failed. Retrying.') % cmd)
                 if delay_on_retry:
                     greenthread.sleep(random.randint(20, 200) / 100.0)
         finally:
@@ -122,6 +129,7 @@ def execute(*cmd, **kwargs):
             #               call clean something up in between calls, without
             #               it two execute calls in a row hangs the second one
             greenthread.sleep(0)
+
 
 def trycmd(*args, **kwargs):
     """
@@ -180,7 +188,7 @@ class NbdMount(object):
                     return device
                 else:
                     LOG.error(_('NBD error - previous umount did not '
-                                  'cleanup /var/lock/qemu-nbd-%s.')% device)
+                                'cleanup /var/lock/qemu-nbd-%s.') % device)
         LOG.warning(_('No free nbd devices'))
         return None
 
@@ -210,10 +218,10 @@ class NbdMount(object):
         LOG.debug('Get nbd device %(dev)s for %(imgfile)s' %
                   {'dev': device, 'imgfile': self.image})
         _out, err = trycmd('qemu-nbd', '-c', device, self.image,
-                                 run_as_root=True)
+                           run_as_root=True)
         if err:
             self.error = _('qemu-nbd error: %s') % err
-            LOG.info(_('NBD mount error: %s')% self.error)
+            LOG.info(_('NBD mount error: %s') % self.error)
             return False
 
         # NOTE(vish): this forks into another process, so give it a chance
@@ -226,14 +234,14 @@ class NbdMount(object):
             time.sleep(1)
         else:
             self.error = _('nbd device %s did not show up') % device
-            LOG.info(_('NBD mount error: %s')% self.error)
+            LOG.info(_('NBD mount error: %s') % self.error)
 
             # Cleanup
             _out, err = trycmd('qemu-nbd', '-d', device,
-                                     run_as_root=True)
+                               run_as_root=True)
             if err:
                 LOG.warning(_('Detaching from erroneous nbd device returned '
-                                'error: %s')% err)
+                              'error: %s') % err)
             return False
 
         self.error = ''
@@ -253,7 +261,7 @@ class NbdMount(object):
             time.sleep(2)
             if time.time() - start_time > timeout_nbd:
                 LOG.warning(_('Device allocation failed after repeated '
-                                'retries.'))
+                              'retries.'))
                 return False
             device = self._inner_get_dev()
         return True
@@ -265,7 +273,7 @@ class NbdMount(object):
     def unget_dev(self):
         if not self.linked:
             return
-        LOG.debug('Release nbd device %s'% self.device)
+        LOG.debug('Release nbd device %s' % self.device)
         utils.execute('qemu-nbd', '-d', self.device, run_as_root=True)
         self.linked = False
         self.device = None

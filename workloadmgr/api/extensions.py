@@ -262,8 +262,9 @@ class ExtensionManager(object):
                             'standard_extensions')
         new_contrib_path = 'workloadmgr.api.contrib.standard_extensions'
         if old_contrib_path in extensions:
-            LOG.warn(_('osapi_workloadmgr_extension is set to deprecated path: %s'),
-                     old_contrib_path)
+            LOG.warn(
+                _('osapi_workloadmgr_extension is set to deprecated path: %s'),
+                old_contrib_path)
             LOG.warn(_('Please set your flag or workloadmgr.conf settings for '
                        'osapi_workloadmgr_extension to: %s'), new_contrib_path)
             extensions = [e.replace(old_contrib_path, new_contrib_path)

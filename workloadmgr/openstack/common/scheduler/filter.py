@@ -24,6 +24,7 @@ from stevedore import extension
 
 class BaseFilter(object):
     """Base class for all filter classes."""
+
     def _filter_one(self, obj, filter_properties):
         """Return True if it passes the filter, False otherwise.
         Override this in a subclass.
@@ -47,6 +48,7 @@ class BaseFilterHandler(object):
 
     This class should be subclassed where one needs to use filters.
     """
+
     def __init__(self, filter_class_type, filter_namespace):
         self.namespace = filter_namespace
         self.filter_class_type = filter_class_type

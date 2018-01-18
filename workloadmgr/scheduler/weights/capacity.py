@@ -17,10 +17,10 @@ from workloadmgr import flags
 from workloadmgr.openstack.common.scheduler import weights
 
 capacity_weight_opts = [
-        cfg.FloatOpt('capacity_weight_multiplier',
-                     default=-1.0,
-                     help='Multiplier used for weighing volume capacity. '
-                          'Negative numbers mean to stack vs spread.'),
+    cfg.FloatOpt('capacity_weight_multiplier',
+                 default=-1.0,
+                 help='Multiplier used for weighing volume capacity. '
+                 'Negative numbers mean to stack vs spread.'),
 ]
 
 FLAGS = flags.FLAGS

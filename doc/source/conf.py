@@ -124,9 +124,11 @@ modindex_common_prefix = ['workloadmgr.']
 # List of tuples 'sourcefile', 'target', u'title', u'Authors name', 'manual'
 
 man_pages = [
-    ('man/workloadmgr-manage', 'workloadmgr-manage', u'Cloud controller fabric',
-     [u'OpenStack'], 1)
-]
+    ('man/workloadmgr-manage',
+     'workloadmgr-manage',
+     u'Cloud controller fabric',
+     [u'OpenStack'],
+     1)]
 
 # -- Options for HTML output --------------------------------------------------
 

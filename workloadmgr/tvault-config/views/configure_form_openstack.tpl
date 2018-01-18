@@ -262,7 +262,7 @@ function setSwiftRequired(checked, val) {
                                             </a>
                                         </li>
                                     </ul>
-                                </div>
+                                </div><br>
                                 <div class="tab-content">
                                     <div class="tab-pane" id="triliovault">
                                         <div class="row">

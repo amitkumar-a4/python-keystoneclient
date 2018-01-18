@@ -47,11 +47,11 @@ def periodic_task(*args, **kwargs):
         f._ticks_between_runs = kwargs.pop('ticks_between_runs', 0)
         return f
 
-
     if kwargs:
         return decorator
     else:
         return decorator(args[0])
+
 
 class ManagerMeta(type):
     def __init__(cls, names, bases, dict_):
@@ -109,7 +109,7 @@ class Manager(base.Base):
                 continue
 
             self._ticks_to_skip[task_name] = task._ticks_between_runs
-            #Commenting the below log statement to remove the clutter in log 
+            # Commenting the below log statement to remove the clutter in log
             #LOG.debug(_("Running periodic task %(full_task_name)s"), locals())
 
             try:

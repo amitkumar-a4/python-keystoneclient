@@ -2,7 +2,6 @@
 # All Rights Reserved.
 
 
-
 import math
 
 from workloadmgr.openstack.common import log as logging

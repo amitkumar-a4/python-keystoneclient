@@ -38,7 +38,7 @@ def make_cluster(elem):
 
     dcsElem = xmlutil.SubTemplateElement(elem, 'datastores', selector=1)
     dcElem = xmlutil.SubTemplateElement(elem, 'datastore',
-                                         selector=xmlutil.get_items)
+                                        selector=xmlutil.get_items)
     dcElem.set('name', 0)
 
     networksElem = xmlutil.SubTemplateElement(elem, 'networks', selector=1)
@@ -50,14 +50,15 @@ def make_cluster(elem):
     svcStateElem.set('active')
     svcStateElem.set('updated_at')
 
+
 class ClustersTemplate(xmlutil.TemplateBuilder):
     def construct(self):
         root = xmlutil.TemplateElement('Clusters')
         clusterElem = xmlutil.SubTemplateElement(root, 'Cluster',
-                                                    selector='ClusterInfo')
+                                                 selector='ClusterInfo')
         make_cluster(clusterElem)
         return xmlutil.MasterTemplate(root, 1, nsmap={
-                                       Cluster.alias: Cluster.namespace})
+            Cluster.alias: Cluster.namespace})
 
 
 class ClusterController(wsgi.Controller):
@@ -97,6 +98,7 @@ class ClusterController(wsgi.Controller):
 
         return self._describe_clusters_verbose(context)
 
+
 class Cluster(extensions.ExtensionDescriptor):
     """VMware Cluster ."""
     name = "Cluster"
@@ -108,9 +110,11 @@ class Cluster(extensions.ExtensionDescriptor):
     def get_resources(self):
         resources = []
 
-        res = extensions.ResourceExtension('os-clusters',
-                                       ClusterController(),
-                                       collection_actions={'detail': 'GET'})
+        res = extensions.ResourceExtension(
+            'os-clusters',
+            ClusterController(),
+            collection_actions={
+                'detail': 'GET'})
         resources.append(res)
 
         return resources

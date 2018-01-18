@@ -32,22 +32,22 @@ cinder_opts = [
                     'catalog. Format is : separated values of the form: '
                     '<service_type>:<service_name>:<endpoint_type>'),
     cfg.StrOpt('cinder_production_endpoint_template',
-               default='http://localhost:8776/v1/%(project_id)s', #None,
+               default='http://localhost:8776/v1/%(project_id)s',  # None,
                help='Override service catalog lookup with template for cinder '
                     'endpoint e.g. http://localhost:8776/v1/%(project_id)s'),
     cfg.StrOpt('os_region_name',
-                default=None,
-                help='region name of this node'),
+               default=None,
+               help='region name of this node'),
     cfg.IntOpt('cinder_http_retries',
                default=3,
                help='Number of cinderclient retries on failed http calls'),
     cfg.BoolOpt('cinder_api_insecure',
-               default=True,
-               help='Allow to perform insecure SSL requests to cinder'),
+                default=True,
+                help='Allow to perform insecure SSL requests to cinder'),
     cfg.BoolOpt('cinder_cross_az_attach',
-               default=True,
-               help='Allow attach between instance and volume in different '
-                    'availability zones.'),
+                default=True,
+                help='Allow attach between instance and volume in different '
+                'availability zones.'),
 ]
 
 CONF = cfg.CONF
@@ -60,14 +60,14 @@ def _get_trusts(user_id, tenant_id):
 
     db = WorkloadMgrDB().db
     context = wlm_context.RequestContext(
-                user_id=user_id,
-                project_id=tenant_id)
+        user_id=user_id,
+        project_id=tenant_id)
 
     settings = db.setting_get_all_by_project(
-                        context, context.project_id)
+        context, context.project_id)
 
-    trust = [t for t in settings if t.type == "trust_id" and \
-             t.project_id == context.project_id and \
+    trust = [t for t in settings if t.type == "trust_id" and
+             t.project_id == context.project_id and
              t.user_id == context.user_id]
     return trust
 
@@ -79,7 +79,8 @@ def cinderclient(context, refresh_token=False):
     # Only needed parts of the service catalog are passed in, see
     # nova/context.py.
     compat_catalog = {
-        # TODO(gbasava): Check this...   'access': {'serviceCatalog': context.service_catalog or []}
+        # TODO(gbasava): Check this...   'access': {'serviceCatalog':
+        # context.service_catalog or []}
         'access': []
     }
     sc = service_catalog.ServiceCatalog(compat_catalog)
@@ -106,17 +107,17 @@ def cinderclient(context, refresh_token=False):
     trust = _get_trusts(context.user_id, context.tenant_id)
 
     if hasattr(context, 'user_domain_id'):
-       if context.user_domain_id is None:
-          user_domain_id = 'default'
-       else:
+        if context.user_domain_id is None:
+            user_domain_id = 'default'
+        else:
             user_domain_id = context.user_domain_id
     elif hasattr(context, 'user_domain'):
-       if context.user_domain is None:
-          user_domain_id = 'default'
-       else:
+        if context.user_domain is None:
+            user_domain_id = 'default'
+        else:
             user_domain_id = context.user_domain
     else:
-         user_domain_id = 'default'
+        user_domain_id = 'default'
 
     # pick the first trust. Usually it should not be more than one trust
     if len(trust):
@@ -146,15 +147,15 @@ def cinderclient(context, refresh_token=False):
         cinderclient.client_plugin = cinderclient
     else:
         cinderclient = cinder_client.Client(context.user_id,
-                                 context.auth_token,
-                                 project_id=context.project_id,
-                                 auth_url=url,
-                                 domain_name=user_domain_id,
-                                 insecure=CONF.cinder_api_insecure,
-                                 retries=CONF.cinder_http_retries)
+                                            context.auth_token,
+                                            project_id=context.project_id,
+                                            auth_url=url,
+                                            domain_name=user_domain_id,
+                                            insecure=CONF.cinder_api_insecure,
+                                            retries=CONF.cinder_http_retries)
         # noauth extracts user_id:project_id from auth_token
-        cinderclient.client.auth_token = context.auth_token or '%s:%s' % (context.user_id,
-                                                           context.project_id)
+        cinderclient.client.auth_token = context.auth_token or '%s:%s' % (
+            context.user_id, context.project_id)
         cinderclient.client.management_url = url
         if "v1" in url.split('/'):
             cinderclient.volume_api_version = 1
@@ -265,7 +266,7 @@ def exception_handler(ignore_exception=False, refresh_token=True):
                 except cinder_exception.Unauthorized as unauth_ex:
                     if refresh_token is True:
                         argv.pop('client')
-                        client = cinderclient(args[1], 
+                        client = cinderclient(args[1],
                                               refresh_token=True)
                         argv.update({'client': client})
                         return func(*args, **argv)
@@ -296,7 +297,7 @@ class API(base.Base):
         else:
             return _untranslate_volume_summary_view(context, item)
 
-        #self._reraise_translated_volume_exception(volume_id)
+        # self._reraise_translated_volume_exception(volume_id)
 
     @exception_handler()
     def get_all(self, context, search_opts={}):
@@ -371,13 +372,13 @@ class API(base.Base):
     def initialize_connection(self, context, volume, connector, **kwargs):
         client = kwargs['client']
         return client.\
-                 volumes.initialize_connection(volume['id'], connector)
+            volumes.initialize_connection(volume['id'], connector)
 
     @exception_handler()
     def terminate_connection(self, context, volume, connector, **kwargs):
         client = kwargs['client']
         return client.\
-                 volumes.terminate_connection(volume['id'], connector)
+            volumes.terminate_connection(volume['id'], connector)
 
     @exception_handler()
     def create(self, context, size, name, description, snapshot=None,

@@ -4,7 +4,5 @@
 # All Rights Reserved.
 
 
-
 class VirtAPI(object):
     pass
-
