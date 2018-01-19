@@ -1016,11 +1016,13 @@ def _authenticate_with_keystone():
     #Get Image API version
     versions = json.loads(urllib.urlopen(image_public_url).read()) 
     current_version = filter(lambda x: x['status'].lower() == 'current', versions['versions'])
+    '''
     if 'v2' in current_version[0]['id']:
        config_data['glance_api_version'] = 2
     else:
        config_data['glance_api_version'] = 1
-
+    '''
+    config_data['glance_api_version'] = 1
     # network
     try:
         if keystone.version == 'v3':
