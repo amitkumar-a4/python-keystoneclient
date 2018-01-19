@@ -860,6 +860,8 @@ class SwiftRepository(ObjectRepository):
                  d['st_size'] = int(st['headers']['x-container-bytes-used'])
             elif container != '' and  (prefix is None or prefix == ''):
                  d['st_size'] = 0
+            else:
+                 d['st_size'] = 0
             if (d['st_size'] == 0 and container == '') or (d['st_size'] == 0 and prefix is None) or \
                 (d['st_size'] == 0 and prefix == ''):
                 
