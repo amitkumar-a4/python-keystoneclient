@@ -580,8 +580,8 @@ def setting_get_all_by_project(context, project_id, **kwargs):
     return IMPL.setting_get_all_by_project(context, project_id, **kwargs)
 
 
-def setting_update(context, setting_key, values):
-    return IMPL.setting_update(context, setting_key, values)
+def setting_update(context, setting_key, values, **kwargs):
+    return IMPL.setting_update(context, setting_key, values, **kwargs)
 
 
 def vault_storage_create(context, values):
