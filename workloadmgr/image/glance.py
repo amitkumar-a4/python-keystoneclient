@@ -268,7 +268,7 @@ class GlanceImageService(object):
         or None if this attribute is not shown by Glance."""
         try:
             client = GlanceClientWrapper()
-            image_meta = client.call(context, CONF.glance_api_version, 'get', image_id)
+            image_meta = client.call(context, 2, 'get', image_id)
         except Exception:
             _reraise_translated_image_exception(image_id)
 
