@@ -1508,7 +1508,7 @@ def configure_rabbitmq():
         rabbitmq_cmds = [
             'rabbitmqctl add_user triliovault 52T8FVYZJse',
             'rabbitmqctl set_user_tags triliovault administrator',
-            'rabbitmqctl set_permissions -p / triliovault ".*" ".*" ".*"',
+            'rabbitmqctl set_permissions -p / triliovault .* .* .*',
             '/etc/init.d/rabbitmq-server restart']
         for cmd in rabbitmq_cmds:
             subprocess.call(cmd.split(), shell=False)
