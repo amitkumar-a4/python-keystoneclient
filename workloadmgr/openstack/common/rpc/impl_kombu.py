@@ -62,7 +62,7 @@ kombu_opts = [
                 default=False,
                 help='connect over SSL for RabbitMQ'),
     cfg.StrOpt('rabbit_userid',
-               default='guest',
+               default='triliovault',
                help='the RabbitMQ userid'),
     cfg.StrOpt('rabbit_password',
                default='guest',
