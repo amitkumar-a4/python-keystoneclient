@@ -1822,10 +1822,10 @@ class WorkloadMgrManager(manager.SchedulerDependentManager):
                 user = keystone_client.get_user_to_get_email_address(context)
                 if user.email is None or user.email == '':
                     user.email = settings.get_settings(
-                        context).get('smtp_default_recipient')
+                        context, get_smtp_settings=True).get('smtp_default_recipient')
             except BaseException:
                 o = {'name': 'admin', 'email': settings.get_settings(
-                    context).get('smtp_default_recipient')}
+                    context, get_smtp_settings=True).get('smtp_default_recipient')}
                 user = objectview(o)
                 pass
             with open('/opt/stack/workloadmgr/workloadmgr/templates/vms.html', 'r') as content_file:
@@ -1955,22 +1955,22 @@ class WorkloadMgrManager(manager.SchedulerDependentManager):
             msg['To'] = user.email
             #msg['From'] = 'admin@'+ socket.getfqdn()+'.vsphere'
             msg['From'] = settings.get_settings(
-                context).get('smtp_default_sender')
+                context, get_smtp_settings=True).get('smtp_default_sender')
             msg['Subject'] = subject
             part2 = MIMEText(html, 'html')
             msg.attach(part2)
             s = smtplib.SMTP(
-                settings.get_settings(context).get('smtp_server_name'), int(
-                    settings.get_settings(context).get('smtp_port')), timeout=int(
-                    settings.get_settings(context).get('smtp_timeout')))
+                settings.get_settings(context, get_smtp_settings=True).get('smtp_server_name'), int(
+                    settings.get_settings(context, get_smtp_settings=True).get('smtp_port')), timeout=int(
+                    settings.get_settings(context, get_smtp_settings=True).get('smtp_timeout')))
             if settings.get_settings(context).get(
                     'smtp_server_name') != 'localhost':
                 s.ehlo()
                 s.starttls()
                 s.ehlo
                 s.login(
-                    settings.get_settings(context).get('smtp_server_username'),
-                    settings.get_settings(context).get('smtp_server_password'))
+                    settings.get_settings(context, get_smtp_settings=True).get('smtp_server_username'),
+                    settings.get_settings(context, get_smtp_settings=True).get('smtp_server_password'))
             s.sendmail(msg['From'], msg['To'], msg.as_string())
             s.quit()
 
