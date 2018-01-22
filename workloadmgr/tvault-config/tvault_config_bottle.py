@@ -641,34 +641,14 @@ def replace_line(file_path, pattern, substitute, starts_with=False):
     os.chmod(file_path, 0o775)
 
 
-def get_interface_ip(ifname):
-    s = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
-    return socket.inet_ntoa(fcntl.ioctl(
-        s.fileno(), 0x8915, struct.pack('256s', ifname[:15]))[20:24])
-
-
 def get_lan_ip():
-    #ip = socket.gethostbyname(socket.gethostname())
-    ip = '127.0.0.1'
-    if ip.startswith("127.") and os.name != "nt":
-        interfaces = [
-            "eth0",
-            "eth1",
-            "eth2",
-            "wlan0",
-            "wlan1",
-            "wifi0",
-            "ath0",
-            "ath1",
-            "ppp0",
-        ]
-        for ifname in interfaces:
-            try:
-                ip = get_interface_ip(ifname)
-                break
-            except IOError:
-                pass
-    return ip
+    from netifaces import interfaces, ifaddresses, AF_INET
+
+    if not 'ens3' in interfaces():
+        raise Exception('ens3 interface is not found on virtual appliance')
+
+    addresses = [i['addr'] for i in ifaddresses('ens3').setdefault(AF_INET, [{'addr':'No IP addr'}] )]
+    return addresses[0]
 
 
 def _restart_wlm_services():
@@ -991,10 +971,6 @@ def _authenticate_with_keystone():
     #configure_mysql()
     configure_rabbitmq()
     configure_keystone()
-    configure_nova()
-    configure_neutron()
-    configure_glance()
-    # configure_horizon()
 
     # image
     if keystone.version == 'v3':
@@ -1527,8 +1503,16 @@ def configure_rabbitmq():
             'guest',
             TVAULT_SERVICE_PASSWORD]
         subprocess.call(command, shell=False)
-        command = ['sudo', '/etc/init.d/rabbitmq-server', 'restart']
-        subprocess.call(command, shell=False)
+
+        # configure rabbitmq triliovault user here and restart
+        rabbitmq_cmds = [
+            'rabbitmqctl add_user triliovault 52T8FVYZJse',
+            'rabbitmqctl set_user_tags triliovault administrator',
+            'rabbitmqctl set_permissions -p / triliovault .* .* .*',
+            '/etc/init.d/rabbitmq-server restart']
+        for cmd in rabbitmq_cmds:
+            subprocess.call(cmd.split(), shell=False)
+
     else:
         command = ['sudo', 'invoke-rc.d', 'rabbitmq-server', 'stop']
         subprocess.call(command, shell=False)
