@@ -215,6 +215,8 @@ def workload_vms_delete(context, vm_id, workload_id):
 def workload_vms_update(context, id, values, purge_metadata=False):
     return IMPL.workload_vms_update(context, id, values, purge_metadata)
 
+def restored_instance_get(context, instance_id, **kwargs):
+    return IMPL.restored_instance_get(context, instance_id, **kwargs)
 
 def snapshot_mark_incomplete_as_error(context, host):
     return IMPL.snapshot_mark_incomplete_as_error(context, host)

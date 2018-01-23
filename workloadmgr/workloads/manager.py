@@ -1249,18 +1249,30 @@ class WorkloadMgrManager(manager.SchedulerDependentManager):
                     if instance is None:
                         pass
                     else:
-                        #production = bool(self.db.get_metadata_value(restored_vm.metadata, 'production', True))
                         instance_id = self.db.get_metadata_value(
                             restored_vm.metadata, 'instance_id', None)
-                        production = compute_service.get_server_by_id(
-                            context, instance_id, admin=False)
+                        if rtype == 'selective':
+                            #During selective restore update the workload definition only when 
+                            #workload member doesn't exist.
+                            workload_vms = self.db.restored_instance_get(context, instance_id)
+                            production = None
+                            for workload_vm in workload_vms:
+                                if workload_vm.workload_id == workload.id:
+                                    production = compute_service.get_server_by_id(
+                                        context, workload_vm.vm_id, admin=False)
+                                    if production is not None:
+                                        break
+                        else:
+                            production = compute_service.get_server_by_id(
+                                context, instance_id, admin=False)
+
                         if production is None:
                             production = True
                         else:
                             production = False
 
                         if production:
-                            workload_metadata = {}
+                            workload_metadata = {}	
                             if instance_id is not None:
                                 restored_ids, snap_ins = self.get_metadata_value_by_chain(
                                     workload.metadata, instance_id, None)
