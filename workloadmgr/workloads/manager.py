@@ -1272,7 +1272,7 @@ class WorkloadMgrManager(manager.SchedulerDependentManager):
                             production = False
 
                         if production:
-                            workload_metadata = {}	
+                            workload_metadata = {}
                             if instance_id is not None:
                                 restored_ids, snap_ins = self.get_metadata_value_by_chain(
                                     workload.metadata, instance_id, None)
