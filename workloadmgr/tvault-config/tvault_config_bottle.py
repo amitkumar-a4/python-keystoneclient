@@ -3930,22 +3930,26 @@ def ntp_setup():
         else:
             contents = open('/etc/ntp.conf', 'r').read()
             new_contents = ""
-            detect = 0
+            done = False
             for line in contents.splitlines():
                 line = line.strip()
-                if (line.find('#server ') != -1 or line.find('server ') !=
-                        -1) and (detect == 0 or detect == 1):
-                    detect = 1
+                if line.startswith("server") or line.startswith("pool"):
+                    if not done:
+                        # Insert the requested NTP servers at the top of the list
+                        new_contents += "\n".join(["server %s iburst" %
+                                                   ntp for ntp in reachable_ntps[0:5]])
+                        new_contents += "\n"
+                        done = True
+                    if 'ubuntu.pool.ntp.org iburst' in line:
+                        # Comment out the default settings
+                        new_contents += "#" + line + "\n"
+                    elif line.startswith('pool ntp.ubuntu.com'):
+                        # Keep Ubuntu ntp server as Fallback
+                        new_contents += line + "\n"
+                    else:
+                        # Remove the server/pool line from the file by skipping it.
+                        continue
                 else:
-                    if line.find('fallback') != -1 and detect == 1:
-                        detect = 2
-                        new_contents += "\n".join(["server %s" %
-                                                   ntp for ntp in reachable_ntps[0:5]])
-                    elif detect == 1:
-                        detect = 3
-                        new_contents += "\n".join(["server %s" %
-                                                   ntp for ntp in reachable_ntps[0:5]])
-
                     new_contents += line + "\n"
 
             conf_file = open('/etc/ntp.conf', 'w')
