@@ -150,6 +150,7 @@ class AuditLog(object):
                             else:
                                 continue
                         except Exception as ex:
+                            LOG.exception(ex)
                             #In case if we have any corrupted log, we should send other
                             #available logs.
                             continue
