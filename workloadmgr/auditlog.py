@@ -100,13 +100,14 @@ class AuditLog(object):
             except LockTimeout as ex:
                 LOG.exception(ex)
                 log_lock.break_lock()
+                log_lock.acquire(timeout=1)
             with open(self._filepath, 'a') as auditlogfile:
                 auditlogfile.write(auditlogmsg, *args, **kwargs)
-            log_lock.release()
         except Exception as ex:
             LOG.exception(ex)
         finally:
             lock.release()
+            log_lock.release()
 
     def get_records(self, time_in_minutes, time_from, time_to):
 
