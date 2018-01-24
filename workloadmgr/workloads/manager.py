@@ -1969,8 +1969,8 @@ class WorkloadMgrManager(manager.SchedulerDependentManager):
                 s.starttls()
                 s.ehlo
                 s.login(
-                    settings.get_settings(context, get_smtp_settings=True).get('smtp_server_username'),
-                    settings.get_settings(context, get_smtp_settings=True).get('smtp_server_password'))
+                    str(settings.get_settings(context, get_smtp_settings=True).get('smtp_server_username')),
+                    str(settings.get_settings(context, get_smtp_settings=True).get('smtp_server_password')))
             s.sendmail(msg['From'], msg['To'], msg.as_string())
             s.quit()
 
