@@ -1022,6 +1022,26 @@ def workload_vms_delete(context, vm_id, workload_id):
                     'deleted': True,
                     'deleted_at': timeutils.utcnow(),
                     'updated_at': literal_column('updated_at')})
+
+
+@require_context
+def restored_instance_get(context, instance_id, **kwargs):
+    """"
+    Return list of models.WorkloadVMs which are using 
+    vms restored from given instance_id
+    """
+    session = get_session()
+    query = session.query(models.RestoredVMs.vm_id).join(models.RestoredVMMetadata).filter(
+            and_(models.RestoredVMMetadata.key == 'instance_id'), models.RestoredVMMetadata.value == instance_id,
+                  models.RestoredVMs.deleted == False)
+    restored_vms = [vm.vm_id for vm in query.all()]
+    if len(restored_vms) > 0:
+        query = session.query(models.WorkloadVMs).filter(
+            and_(models.WorkloadVMs.vm_id.in_(restored_vms), models.WorkloadVMs.deleted == False))
+        return query.all()
+    else:
+        return restored_vms
+
 #
 
 
