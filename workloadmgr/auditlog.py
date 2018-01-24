@@ -126,35 +126,40 @@ class AuditLog(object):
                 now = timeutils.utcnow()
                 with open(filename) as auditlogfile:
                     for line in auditlogfile:
-                        values = line.split(",")
-                        record_time = datetime.strptime(
-                            values[0], "%d-%m-%Y %H:%M:%S.%f")
-                        local_time = datetime.strftime(
-                            record_time, "%I:%M:%S.%f %p - %m/%d/%Y")
-                        fetch = False
-                        if time_in_minutes:
-                            if (now -
-                                    record_time) < timedelta(minutes=time_in_minutes):
-                                fetch = True
-                        else:
-                            if record_time >= time_from and record_time <= time_to:
-                                fetch = True
+                        try:
+                            values = line.split(",")
+                            record_time = datetime.strptime(
+                                values[0], "%d-%m-%Y %H:%M:%S.%f")
+                            local_time = datetime.strftime(
+                                record_time, "%I:%M:%S.%f %p - %m/%d/%Y")
+                            fetch = False
+                            if time_in_minutes:
+                                if (now -
+                                        record_time) < timedelta(minutes=time_in_minutes):
+                                    fetch = True
+                            else:
+                                if record_time >= time_from and record_time <= time_to:
+                                    fetch = True
 
-                        if fetch is True:
-                            record = {'Timestamp': local_time,
-                                      'UserName': values[1],
-                                      'UserId': values[2],
-                                      'ObjectName': values[3],
-                                      'ObjectId': values[4],
-                                      'Details': values[5],
-                                      'ProjectName': '',
-                                      'ProjectId': '',
-                                      }
-                            if len(values) > 6:
-                                record['ProjectName'] = values[6]
-                                record['ProjectId'] = values[7]
-                            yield record
-                        else:
+                            if fetch is True:
+                                record = {'Timestamp': local_time,
+                                          'UserName': values[1],
+                                          'UserId': values[2],
+                                          'ObjectName': values[3],
+                                          'ObjectId': values[4],
+                                          'Details': values[5],
+                                          'ProjectName': '',
+                                          'ProjectId': '',
+                                          }
+                                if len(values) > 6:
+                                    record['ProjectName'] = values[6]
+                                    record['ProjectId'] = values[7]
+                                yield record
+                            else:
+                                continue
+                        except Exception as ex:
+                            #In case if we have any corrupted log, we should send other
+                            #available logs.
                             continue
 
             for rec in _next_record():
