@@ -1217,7 +1217,19 @@ class API(base.Base):
             workload_obj = self.db.workload_update(
                 context, workload_id, options, purge_metadata)
             if unpause_workload is True:
+                #When scheduler is enabled by admin, context will contain
+                #user and tenant details of admin only. Which will get saved
+                #in scheduler jobs. When scheduler will run the job, it will
+                #use admin details to run the job,  even for workloads of other
+                #projects as well. That snapshot will fail as using admin creds
+                #scheduler will not be able to find workloads of other projects.
+                user_id = context.user_id
+                project_id = context.project_id
+                context.user_id = workloadobj['user_id']
+                context.project_id = workloadobj['project_id']
                 self.workload_resume(context, workload_id)
+                context.user_id = user_id
+                context.project_id = project_id
         except Exception as ex:
             LOG.exception(ex)
             raise wlm_exceptions.ErrorOccurred(

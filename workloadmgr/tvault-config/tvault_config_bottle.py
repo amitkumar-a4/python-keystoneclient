@@ -88,9 +88,11 @@ def get_https_app(app):
         return app(environ, start_response)
     return https_app
 
+
 def get_default_nic():
-   gws = netifaces.gateways()
-   return gws['default'][netifaces.AF_INET]
+    gws = netifaces.gateways()
+    return gws['default'][netifaces.AF_INET]
+
 
 app = get_https_app(bottle.app())
 session_opts = {
@@ -641,14 +643,11 @@ def replace_line(file_path, pattern, substitute, starts_with=False):
     os.chmod(file_path, 0o775)
 
 
-def get_lan_ip():
-    from netifaces import interfaces, ifaddresses, AF_INET
-
-    if not 'ens3' in interfaces():
-        raise Exception('ens3 interface is not found on virtual appliance')
-
-    addresses = [i['addr'] for i in ifaddresses('ens3').setdefault(AF_INET, [{'addr':'No IP addr'}] )]
-    return addresses[0]
+def get_default_lan_ip():
+    """ Return the first IPv4 address for interface on the default network.
+    """
+    default_nic = get_default_nic()
+    return default_nic[0]
 
 
 def _restart_wlm_services():
@@ -3931,22 +3930,26 @@ def ntp_setup():
         else:
             contents = open('/etc/ntp.conf', 'r').read()
             new_contents = ""
-            detect = 0
+            done = False
             for line in contents.splitlines():
                 line = line.strip()
-                if (line.find('#server ') != -1 or line.find('server ') !=
-                        -1) and (detect == 0 or detect == 1):
-                    detect = 1
+                if line.startswith("server") or line.startswith("pool"):
+                    if not done:
+                        # Insert the requested NTP servers at the top of the list
+                        new_contents += "\n".join(["server %s iburst" %
+                                                   ntp for ntp in reachable_ntps[0:5]])
+                        new_contents += "\n"
+                        done = True
+                    if 'ubuntu.pool.ntp.org iburst' in line:
+                        # Comment out the default settings
+                        new_contents += "#" + line + "\n"
+                    elif line.startswith('pool ntp.ubuntu.com'):
+                        # Keep Ubuntu ntp server as Fallback
+                        new_contents += line + "\n"
+                    else:
+                        # Remove the server/pool line from the file by skipping it.
+                        continue
                 else:
-                    if line.find('fallback') != -1 and detect == 1:
-                        detect = 2
-                        new_contents += "\n".join(["server %s" %
-                                                   ntp for ntp in reachable_ntps[0:5]])
-                    elif detect == 1:
-                        detect = 3
-                        new_contents += "\n".join(["server %s" %
-                                                   ntp for ntp in reachable_ntps[0:5]])
-
                     new_contents += line + "\n"
 
             conf_file = open('/etc/ntp.conf', 'w')
@@ -4005,7 +4008,7 @@ def configure_vmware():
         config_data['configuration_type'] = 'vmware'
         config_data['nodetype'] = config_inputs['nodetype']
         config_data['tvault_primary_node'] = config_inputs['tvault-primary-node']
-        config_data['tvault_ipaddress'] = get_lan_ip()
+        config_data['tvault_ipaddress'] = get_default_lan_ip()
         config_data['floating_ipaddress'] = config_data['tvault_ipaddress']
         config_data['name_server'] = config_inputs['name-server']
         config_data['domain_search_order'] = config_inputs['domain-search-order']
@@ -4115,7 +4118,7 @@ def configure_openstack():
 
         config_data['configuration_type'] = 'openstack'
         config_data['nodetype'] = config_inputs['nodetype']
-        config_data['tvault_ipaddress'] = get_lan_ip()
+        config_data['tvault_ipaddress'] = get_default_lan_ip()
         config_data['floating_ipaddress'] = config_inputs['floating-ipaddress'].strip()
         if config_data['nodetype'] == 'controller':
             config_data['tvault_primary_node'] = config_data['floating_ipaddress'].strip()
