@@ -94,20 +94,13 @@ class AuditLog(object):
             head, tail = os.path.split(self._filepath)
             log_lock = LockFile(self._filepath)
             fileutils.ensure_tree(head)
-            try:
-                log_lock = LockFile(self._filepath)
-                log_lock.acquire(timeout=2)
-            except LockTimeout as ex:
-                LOG.exception(ex)
-                log_lock.break_lock()
-                log_lock.acquire(timeout=1)
-            with open(self._filepath, 'a') as auditlogfile:
-                auditlogfile.write(auditlogmsg, *args, **kwargs)
+            with LockFile(self._filepath):
+                with open(self._filepath, 'a') as auditlogfile:
+                    auditlogfile.write(auditlogmsg, *args, **kwargs)
         except Exception as ex:
             LOG.exception(ex)
         finally:
             lock.release()
-            log_lock.release()
 
     def get_records(self, time_in_minutes, time_from, time_to):
 
