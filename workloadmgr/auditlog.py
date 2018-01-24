@@ -10,7 +10,7 @@ from workloadmgr.openstack.common import timeutils
 from workloadmgr.openstack.common import fileutils
 from oslo.config import cfg
 from keystoneclient.v2_0 import client as keystone_v2
-from lockfile import LockFile, LockTimeout
+from lockfile import LockFile
 from workloadmgr.openstack.common import log as logging
 from workloadmgr.vault import vault
 import base64
