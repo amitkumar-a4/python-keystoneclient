@@ -92,7 +92,6 @@ class AuditLog(object):
             auditlogmsg = auditlogmsg + ',' + tenant + ',' + context.project_id + '\n'
 
             head, tail = os.path.split(self._filepath)
-            log_lock = LockFile(self._filepath)
             fileutils.ensure_tree(head)
             with LockFile(self._filepath):
                 with open(self._filepath, 'a') as auditlogfile:
