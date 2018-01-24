@@ -10,6 +10,7 @@ from workloadmgr.openstack.common import timeutils
 from workloadmgr.openstack.common import fileutils
 from oslo.config import cfg
 from keystoneclient.v2_0 import client as keystone_v2
+from lockfile import LockFile, LockTimeout
 from workloadmgr.openstack.common import log as logging
 from workloadmgr.vault import vault
 import base64
@@ -91,9 +92,17 @@ class AuditLog(object):
             auditlogmsg = auditlogmsg + ',' + tenant + ',' + context.project_id + '\n'
 
             head, tail = os.path.split(self._filepath)
+            log_lock = LockFile(self._filepath)
             fileutils.ensure_tree(head)
+            try:
+                log_lock = LockFile(self._filepath)
+                log_lock.acquire(timeout=2)
+            except LockTimeout as ex:
+                LOG.exception(ex)
+                log_lock.break_lock()
             with open(self._filepath, 'a') as auditlogfile:
                 auditlogfile.write(auditlogmsg, *args, **kwargs)
+            log_lock.release()
         except Exception as ex:
             LOG.exception(ex)
         finally:
