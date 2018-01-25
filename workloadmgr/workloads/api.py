@@ -4260,18 +4260,19 @@ class API(base.Base):
             workloads = self.db.workload_get_all(context)
             workloads_chargeback = {}
             for w in workloads:
+                get_value = lambda obj, id, key:obj[id][key]  if id in obj else 0
                 if w.project_id in workloads_chargeback:
-                    workloads_chargeback["w.project_id"]["workloads"]["no_of_workloads"] += 1
-                    workloads_chargeback["w.project_id"]["workloads"][w.id] = {"name": w.display_name,
-                                                                               "size": snap_chargeback[w.id]["workload_size"],
+                    workloads_chargeback[w.project_id]["workloads"]["no_of_workloads"] += 1
+                    workloads_chargeback[w.project_id]["workloads"][w.id] = {"name": w.display_name,
+                                                                               "size": get_value(snap_chargeback, w.id, "workload_size"),
                                                                                "protected_vms": workload_vm_chargeback[w.id],
-                                                                               "snapshots": snap_chargeback[w.id]["snapshots"]
+                                                                               "snapshots": get_value(snap_chargeback, w.id, "snapshots" )
                                                                                }
                 else:
-                    workloads_chargeback["w.project_id"] = {"workloads": {w.id: {"name": w.display_name,
-                                                                                 "size": snap_chargeback[w.id]["workload_size"],
-                                                                                 "protected_vms": workload_vm_chargeback[w.id],
-                                                                                 "snapshots": snap_chargeback[w.id]["snapshots"],
+                    workloads_chargeback[w.project_id] = {"workloads": {w.id: {"name": w.display_name,
+                                                                               "size": get_value(snap_chargeback, w.id, "workload_size"),
+                                                                               "protected_vms": workload_vm_chargeback[w.id],
+                                                                               "snapshots": get_value(snap_chargeback, w.id, "snapshots"),
                                                                                  }, "no_of_workloads": 1}}
 
             tenants_usage = self.get_tenants_usage(context)["tenants_usage"]
