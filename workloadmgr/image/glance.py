@@ -149,7 +149,7 @@ class GlanceClientWrapper(object):
 
     def __init__( self, production, context=None,
                   host=None, port=None, use_ssl=False,
-                  version=CONF.glance_api_version):
+                  version=None):
         if host is not None:
             self.client = self._create_static_client(context,
                                                      host, port,
@@ -159,6 +159,7 @@ class GlanceClientWrapper(object):
 
         self.api_servers = None
         self._production = production
+        self.version = version or CONF.glance_api_version
 
     def _create_static_client(self, context, host, port, use_ssl, version):
         """Create a client that we'll use for every call."""
@@ -583,6 +584,6 @@ def get_remote_image_service(context, image_href, production=True):
 
 def get_default_image_service(production=True):
     if CONF.glance_api_version == 1:
-        return GlanceImageServiceV1(client, production)
+        return GlanceImageServiceV1(production=True)
     else:
-        return GlanceImageServiceV2(client, production)
+        return GlanceImageServiceV2(production=True)
