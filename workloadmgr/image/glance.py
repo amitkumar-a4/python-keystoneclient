@@ -396,6 +396,8 @@ class GlanceImageServiceV2(GlanceImageService):
         """Store the image data and return the new image object."""
         sent_service_image_meta = self._translate_to_glance(image_meta)
 
+        sent_service_image_meta.pop('is_public', None)
+        sent_service_image_meta.pop('properties', None)
         try:
             recv_service_image_meta = self._client.call(
                 context, 'create', **sent_service_image_meta)
@@ -417,21 +419,22 @@ class GlanceImageServiceV2(GlanceImageService):
                 data.write(chunk)
 
     def update(self, context, image_id, image_meta, data=None,
-               purge_props=True):
+               purge_props=False):
         """Modify the given image with the new data."""
         image_meta = self._translate_to_glance(image_meta)
-        image_meta['purge_props'] = purge_props
         image_meta.pop('id', None)
 
         if data:
             upload_retvalue = self._client.call(context, 'upload',
-                image_id, image_data)
+                image_id, data)
 
         if upload_retvalue == -1:
             raise Exception("Cannot upload image data for %s" % image_id)
 
         if len(image_meta):
             try:
+                image_meta.pop('is_public', None)
+                image_meta.pop('properties', None)
                 if purge_props == True:
                      image_meta = self._client.call(context, 'update',
                          image_id, remove_props=image_meta)
