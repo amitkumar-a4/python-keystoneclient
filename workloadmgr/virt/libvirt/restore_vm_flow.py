@@ -10,6 +10,7 @@ import time
 import datetime
 import subprocess
 from subprocess import check_output
+import tempfile
 
 from oslo.config import cfg
 
@@ -118,6 +119,23 @@ def get_availability_zone(instance_options, volume_id=None, az=None):
     if availability_zone == '':
         return None
     return availability_zone
+
+
+class temp_qcow2_create:
+    def __init__(self, size='1M'):
+        # create temp glance image file
+        fd, self.filepath = tempfile.mkstemp()
+        self.size = size
+        os.close(fd)
+
+    def __enter__(self):
+        # open the file and return the file handle
+        qemuimages.create_image(self.filepath, self.size)
+        return self.filepath
+
+    def __exit__(self, type, value, traceback):
+        # close the file and delete temp file
+        os.remove(self.filepath)
 
 
 class PrepareBackupImage(task.Task):
@@ -350,28 +368,33 @@ class UploadImageToGlance(task.Task):
            for prop in props:
                image_metadata['properties'][prop] = props[prop]
  
-        status_hw_qemu_guest_agent = db.get_metadata_value(snapshot_vm_resource.metadata, 'hw_qemu_guest_agent')
+        status_hw_qemu_guest_agent = db.get_metadata_value(snapshot_vm_resource.metadata,
+                                                           'hw_qemu_guest_agent')
         if str(status_hw_qemu_guest_agent).lower() in ['yes', 'no']:
             image_metadata['properties']['hw_qemu_guest_agent'] = status_hw_qemu_guest_agent
 
-        self.restored_image = restored_image = self.image_service.create(
-            self.cntx, image_metadata)
-        if restore_obj['restore_type'] == 'test':
-            shutil.move(
-                restore_file_path,
-                os.path.join(
-                    CONF.glance_images_path,
-                    restored_image['id']))
-            restore_file_path = os.path.join(
-                CONF.glance_images_path, restored_image['id'])
-            with file(restore_file_path) as image_file:
+        with temp_qcow2_create() as temp_image_file:
+            self.restored_image = restored_image = self.image_service.create(
+                self.cntx, image_metadata)
+            if restore_obj['restore_type'] == 'test':
+                shutil.move(
+                    temp_image_file,
+                    os.path.join(
+                        CONF.glance_images_path,
+                        restored_image['id']))
+                temp_image_file = os.path.join(
+                    CONF.glance_images_path, restored_image['id'])
+                with file(temp_image_file) as image_file:
+                    restored_image = self.image_service.update(
+                        self.cntx, restored_image['id'], image_metadata, image_file)
+            else:
                 restored_image = self.image_service.update(
-                    self.cntx, restored_image['id'], image_metadata, image_file)
-        else:
-            restored_image = self.image_service.update(
-                self.cntx, restored_image['id'], image_metadata, utils.ChunkedFile(
-                    restore_file_path, {
-                        'function': db.restore_update, 'context': self.cntx, 'id': restore_obj.id}))
+                    self.cntx, restored_image['id'], image_metadata, utils.ChunkedFile(
+                        temp_image_file, {
+                            'function': db.restore_update,
+                            'context': self.cntx,
+                            'id': restore_obj.id}))
+
         LOG.debug(_("restore_size: %(restore_size)s") %
                   {'restore_size': restore_obj.size, })
         LOG.debug(_("uploaded_size: %(uploaded_size)s") %

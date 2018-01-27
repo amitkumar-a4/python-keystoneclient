@@ -308,6 +308,7 @@ class GlanceImageService(object):
         """Returns a dict with image data for the given opaque 
            image id or image name."""
 
+        image = None
         try:
             # see if the image_id is image name
             uuid.UUID(encodeutils.safe_decode(image_id))
@@ -315,11 +316,10 @@ class GlanceImageService(object):
             # try to find the image by name
             matches = self.detail(context, filters={'name': image_id})
             num_matches = len(matches)
-            if num_matches == 0:
-                raise exception.ImageNotFound(image_id=image_id)
-            else:
+            if num_matches:
                 image = matches[0]
-        else:
+
+        if not image:
             try:
                 image = self._client.call(context, 'get', image_id)
             except Exception:
