@@ -14,10 +14,12 @@ import shutil
 import sys
 import time
 import urlparse
+import uuid
 
 import glanceclient
 import glanceclient.exc
 from oslo.config import cfg
+from oslo_utils import encodeutils
 
 from workloadmgr import exception
 from workloadmgr.openstack.common import jsonutils
@@ -312,7 +314,7 @@ class GlanceImageService(object):
         try:
             # see if the image_id is image name
             uuid.UUID(encodeutils.safe_decode(image_id))
-        except (ValueError, exc.NotFound):
+        except (ValueError, glanceclient.exc.NotFound):
             # try to find the image by name
             matches = self.detail(context, filters={'name': image_id})
             num_matches = len(matches)
