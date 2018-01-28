@@ -302,7 +302,7 @@ class UploadImageToGlance(task.Task):
             org_image_id = db.get_metadata_value(
                 snapshot_vm_resource.metadata, 'image_id')
             org_glance_image = self.image_service.show(self.cntx, org_image_id)
-            if org_glance_image and org_glance_image['deleted'] is False:
+            if org_glance_image and org_glance_image['deleted'] in (False, None):
                 return org_glance_image['id'], org_glance_image['disk_format']
         except BaseException:
             pass

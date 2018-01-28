@@ -412,8 +412,9 @@ class GlanceImageServiceV2(GlanceImageService):
         """Store the image data and return the new image object."""
         sent_service_image_meta = self._translate_to_glance(image_meta)
 
+        sent_service_image_meta.update(sent_service_image_meta.pop('properties', {}))
         sent_service_image_meta.pop('is_public', None)
-        sent_service_image_meta.pop('properties', None)
+        sent_service_image_meta.pop('virtual_size', None)
         try:
             recv_service_image_meta = self._client.call(
                 context, 'create', **sent_service_image_meta)
@@ -506,16 +507,26 @@ def _convert_to_string(metadata):
 
 
 def _extract_attributes(image):
+    ATTRIBUTES_TO_REMOVE = ['is_public', 'visibility', 'changes',
+                            '__original__', 'resolver', 'schema',
+                            'direct_url', 'file', 'virtual_size']
     IMAGE_ATTRIBUTES = ['size', 'disk_format', 'owner',
                         'container_format', 'checksum', 'id',
                         'name', 'created_at', 'updated_at',
                         'deleted_at', 'deleted', 'status',
-                        'min_disk', 'min_ram', 'is_public']
+                        'min_disk', 'min_ram',]
     output = {}
     for attr in IMAGE_ATTRIBUTES:
         output[attr] = getattr(image, attr, None)
 
-    output['properties'] = getattr(image, 'properties', {})
+    
+    if CONF.glance_api_version == 1:
+        output['properties'] = getattr(image, 'properties', {})
+    else:
+        output['properties'] = {}
+        for attr in list(set(image.keys()) - set(IMAGE_ATTRIBUTES) -\
+                            set(ATTRIBUTES_TO_REMOVE)):
+            output['properties'][attr] = getattr(image, attr, None)
 
     return output
 
