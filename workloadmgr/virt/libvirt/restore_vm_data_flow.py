@@ -220,7 +220,8 @@ class PrepareBackupImage(task.Task):
                 os.sep))
         image_info = qemuimages.qemu_img_info(resource_snap_path)
 
-        if snapshot_vm_resource.resource_name == 'vda' and db.get_metadata_value(
+        if snapshot_vm_resource.resource_name in ('vda', 'sda') \
+            and db.get_metadata_value(
                 snapshot_vm_resource.metadata, 'image_id') is not None:
             # upload the bottom of the chain to glance
             while image_info.backing_file:

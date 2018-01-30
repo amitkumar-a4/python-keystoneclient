@@ -1249,11 +1249,23 @@ class WorkloadMgrManager(manager.SchedulerDependentManager):
                     if instance is None:
                         pass
                     else:
-                        #production = bool(self.db.get_metadata_value(restored_vm.metadata, 'production', True))
                         instance_id = self.db.get_metadata_value(
                             restored_vm.metadata, 'instance_id', None)
-                        production = compute_service.get_server_by_id(
-                            context, instance_id, admin=False)
+                        if rtype == 'selective':
+                            #During selective restore update the workload definition only when 
+                            #workload member doesn't exist.
+                            workload_vms = self.db.restored_instance_get(context, instance_id)
+                            production = None
+                            for workload_vm in workload_vms:
+                                if workload_vm.workload_id == workload.id:
+                                    production = compute_service.get_server_by_id(
+                                        context, workload_vm.vm_id, admin=False)
+                                    if production is not None:
+                                        break
+                        else:
+                            production = compute_service.get_server_by_id(
+                                context, instance_id, admin=False)
+
                         if production is None:
                             production = True
                         else:
@@ -1822,10 +1834,10 @@ class WorkloadMgrManager(manager.SchedulerDependentManager):
                 user = keystone_client.get_user_to_get_email_address(context)
                 if user.email is None or user.email == '':
                     user.email = settings.get_settings(
-                        context).get('smtp_default_recipient')
+                        context, get_smtp_settings=True).get('smtp_default_recipient')
             except BaseException:
                 o = {'name': 'admin', 'email': settings.get_settings(
-                    context).get('smtp_default_recipient')}
+                    context, get_smtp_settings=True).get('smtp_default_recipient')}
                 user = objectview(o)
                 pass
             with open('/opt/stack/workloadmgr/workloadmgr/templates/vms.html', 'r') as content_file:
@@ -1955,22 +1967,22 @@ class WorkloadMgrManager(manager.SchedulerDependentManager):
             msg['To'] = user.email
             #msg['From'] = 'admin@'+ socket.getfqdn()+'.vsphere'
             msg['From'] = settings.get_settings(
-                context).get('smtp_default_sender')
+                context, get_smtp_settings=True).get('smtp_default_sender')
             msg['Subject'] = subject
             part2 = MIMEText(html, 'html')
             msg.attach(part2)
             s = smtplib.SMTP(
-                settings.get_settings(context).get('smtp_server_name'), int(
-                    settings.get_settings(context).get('smtp_port')), timeout=int(
-                    settings.get_settings(context).get('smtp_timeout')))
+                settings.get_settings(context, get_smtp_settings=True).get('smtp_server_name'), int(
+                    settings.get_settings(context, get_smtp_settings=True).get('smtp_port')), timeout=int(
+                    settings.get_settings(context, get_smtp_settings=True).get('smtp_timeout')))
             if settings.get_settings(context).get(
                     'smtp_server_name') != 'localhost':
                 s.ehlo()
                 s.starttls()
                 s.ehlo
                 s.login(
-                    settings.get_settings(context).get('smtp_server_username'),
-                    settings.get_settings(context).get('smtp_server_password'))
+                    str(settings.get_settings(context, get_smtp_settings=True).get('smtp_server_username')),
+                    str(settings.get_settings(context, get_smtp_settings=True).get('smtp_server_password')))
             s.sendmail(msg['From'], msg['To'], msg.as_string())
             s.quit()
 

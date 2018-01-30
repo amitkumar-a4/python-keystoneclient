@@ -649,34 +649,11 @@ def replace_line(file_path, pattern, substitute, starts_with=False):
     os.chmod(file_path, 0o775)
 
 
-def get_interface_ip(ifname):
-    s = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
-    return socket.inet_ntoa(fcntl.ioctl(
-        s.fileno(), 0x8915, struct.pack('256s', ifname[:15]))[20:24])
-
-
-def get_lan_ip():
-    #ip = socket.gethostbyname(socket.gethostname())
-    ip = '127.0.0.1'
-    if ip.startswith("127.") and os.name != "nt":
-        interfaces = [
-            "eth0",
-            "eth1",
-            "eth2",
-            "wlan0",
-            "wlan1",
-            "wifi0",
-            "ath0",
-            "ath1",
-            "ppp0",
-        ]
-        for ifname in interfaces:
-            try:
-                ip = get_interface_ip(ifname)
-                break
-            except IOError:
-                pass
-    return ip
+def get_default_lan_ip():
+    """ Return the first IPv4 address for interface on the default network.
+    """
+    default_nic = get_default_nic()
+    return default_nic[0]
 
 
 def _restart_wlm_services():
@@ -999,10 +976,6 @@ def _authenticate_with_keystone():
     #configure_mysql()
     configure_rabbitmq()
     configure_keystone()
-    configure_nova()
-    configure_neutron()
-    configure_glance()
-    # configure_horizon()
 
     # image
     if keystone.version == 'v3':
@@ -1024,6 +997,7 @@ def _authenticate_with_keystone():
     #Get Image API version
     versions = json.loads(urllib.urlopen(image_public_url).read())
     current_version = filter(lambda x: x['status'].lower() == 'current', versions['versions'])
+
     if 'v2' in current_version[0]['id']:
         config_data['glance_api_version'] = 2
     else:
@@ -1535,8 +1509,16 @@ def configure_rabbitmq():
             'guest',
             TVAULT_SERVICE_PASSWORD]
         subprocess.call(command, shell=False)
-        command = ['sudo', '/etc/init.d/rabbitmq-server', 'restart']
-        subprocess.call(command, shell=False)
+
+        # configure rabbitmq triliovault user here and restart
+        rabbitmq_cmds = [
+            'rabbitmqctl add_user triliovault 52T8FVYZJse',
+            'rabbitmqctl set_user_tags triliovault administrator',
+            'rabbitmqctl set_permissions -p / triliovault .* .* .*',
+            '/etc/init.d/rabbitmq-server restart']
+        for cmd in rabbitmq_cmds:
+            subprocess.call(cmd.split(), shell=False)
+
     else:
         command = ['sudo', 'invoke-rc.d', 'rabbitmq-server', 'stop']
         subprocess.call(command, shell=False)
@@ -2435,8 +2417,9 @@ def service_action(service_display_name, action):
     services = {'api_service': 'wlm-api',
                 'scheduler_service': 'wlm-scheduler',
                 'workloads_service': 'wlm-workloads',
-                'inventory_service': 'nova-api',
-                'tvault_gui_service': 'tvault-gui', }
+                #'inventory_service': 'nova-api',
+                #'tvault_gui_service': 'tvault-gui',
+               }
     try:
         Config = ConfigParser.RawConfigParser()
         Config.read('/etc/tvault-config/tvault-config.conf')
@@ -3141,6 +3124,7 @@ def configure_api():
                 "echo manual > /etc/init/wlm-api.override"]
             subprocess.call(command, shell=False)
 
+        """
         # configure tvault-gui
         command = ['sudo', 'rm', "/etc/init/tvault-gui.override"]
         subprocess.call(command, shell=False)
@@ -3203,7 +3187,7 @@ def configure_api():
         #subprocess.call(command, shell=False)
         #command = ['sudo', 'sh', '-c', "echo manual > /etc/init/tvault-gui-web-1.override"];
         #subprocess.call(command, shell=False)
-
+        """
     except Exception as exception:
         bottle.request.environ['beaker.session']['error_message'] = "Error: %(exception)s" % {
             'exception': exception, }
@@ -3783,6 +3767,7 @@ def start_api():
             command = ['sudo', 'service', 'wlm-api', 'restart']
             subprocess.call(command, shell=False)
 
+        """
         # configure tvault-gui
         command = ['sudo', 'service', 'tvault-gui', 'restart']
         subprocess.call(command, shell=False)
@@ -3794,6 +3779,7 @@ def start_api():
         subprocess.call(command, shell=False)
         command = ['sudo', 'service', 'tvault-gui-web-1', 'restart']
         subprocess.call(command, shell=False)
+        """
 
     except Exception as exception:
         bottle.request.environ['beaker.session']['error_message'] = "Error: %(exception)s" % {
@@ -4036,22 +4022,26 @@ def ntp_setup():
         else:
             contents = open('/etc/ntp.conf', 'r').read()
             new_contents = ""
-            detect = 0
+            done = False
             for line in contents.splitlines():
                 line = line.strip()
-                if (line.find('#server ') != -1 or line.find('server ') !=
-                        -1) and (detect == 0 or detect == 1):
-                    detect = 1
+                if line.startswith("server") or line.startswith("pool"):
+                    if not done:
+                        # Insert the requested NTP servers at the top of the list
+                        new_contents += "\n".join(["server %s iburst" %
+                                                   ntp for ntp in reachable_ntps[0:5]])
+                        new_contents += "\n"
+                        done = True
+                    if 'ubuntu.pool.ntp.org iburst' in line:
+                        # Comment out the default settings
+                        new_contents += "#" + line + "\n"
+                    elif line.startswith('pool ntp.ubuntu.com'):
+                        # Keep Ubuntu ntp server as Fallback
+                        new_contents += line + "\n"
+                    else:
+                        # Remove the server/pool line from the file by skipping it.
+                        continue
                 else:
-                    if line.find('fallback') != -1 and detect == 1:
-                        detect = 2
-                        new_contents += "\n".join(["server %s" %
-                                                   ntp for ntp in reachable_ntps[0:5]])
-                    elif detect == 1:
-                        detect = 3
-                        new_contents += "\n".join(["server %s" %
-                                                   ntp for ntp in reachable_ntps[0:5]])
-
                     new_contents += line + "\n"
 
             conf_file = open('/etc/ntp.conf', 'w')
@@ -4110,7 +4100,7 @@ def configure_vmware():
         config_data['configuration_type'] = 'vmware'
         config_data['nodetype'] = config_inputs['nodetype']
         config_data['tvault_primary_node'] = config_inputs['tvault-primary-node']
-        config_data['tvault_ipaddress'] = get_lan_ip()
+        config_data['tvault_ipaddress'] = get_default_lan_ip()
         config_data['floating_ipaddress'] = config_data['tvault_ipaddress']
         config_data['name_server'] = config_inputs['name-server']
         config_data['domain_search_order'] = config_inputs['domain-search-order']
@@ -4220,7 +4210,7 @@ def configure_openstack():
 
         config_data['configuration_type'] = 'openstack'
         config_data['nodetype'] = config_inputs['nodetype']
-        config_data['tvault_ipaddress'] = get_lan_ip()
+        config_data['tvault_ipaddress'] = get_default_lan_ip()
         config_data['floating_ipaddress'] = config_inputs['floating-ipaddress'].strip()
         if config_data['nodetype'] == 'controller':
             config_data['tvault_primary_node'] = config_data['floating_ipaddress'].strip()

@@ -1022,6 +1022,26 @@ def workload_vms_delete(context, vm_id, workload_id):
                     'deleted': True,
                     'deleted_at': timeutils.utcnow(),
                     'updated_at': literal_column('updated_at')})
+
+
+@require_context
+def restored_instance_get(context, instance_id, **kwargs):
+    """"
+    Return list of models.WorkloadVMs which are using 
+    vms restored from given instance_id
+    """
+    session = get_session()
+    query = session.query(models.RestoredVMs.vm_id).join(models.RestoredVMMetadata).filter(
+            and_(models.RestoredVMMetadata.key == 'instance_id'), models.RestoredVMMetadata.value == instance_id,
+                  models.RestoredVMs.deleted == False)
+    restored_vms = [vm.vm_id for vm in query.all()]
+    if len(restored_vms) > 0:
+        query = session.query(models.WorkloadVMs).filter(
+            and_(models.WorkloadVMs.vm_id.in_(restored_vms), models.WorkloadVMs.deleted == False))
+        return query.all()
+    else:
+        return restored_vms
+
 #
 
 
@@ -3600,20 +3620,22 @@ def _setting_metadata_delete(context, metadata_ref, session):
     """
     metadata_ref.delete(session=session)
 
-
-def _setting_update(context, values, setting_name, purge_metadata, session):
+def _setting_update(context, values, setting_name, purge_metadata, session, cloud_setting=False):
     try:
         lock.acquire()
         metadata = values.pop('metadata', {})
 
         if setting_name:
-            setting_ref = model_query(
-                context,
-                models.Settings,
-                session=session,
-                read_deleted="yes"). filter_by(
-                name=setting_name). filter_by(
-                project_id=context.project_id). first()
+            if cloud_setting is True:
+                setting_ref = model_query(context, models.Settings, session=session, read_deleted="yes").\
+                                            filter_by(name=setting_name).\
+                                            first()
+            else:
+                setting_ref = model_query(context, models.Settings, session=session, read_deleted="yes").\
+                                            filter_by(name=setting_name).\
+                                            filter_by(project_id=context.project_id).\
+                                            first()
+ 
             if not setting_ref:
                 lock.release()
                 raise exception.SettingNotFound(setting_name=setting_name)
@@ -3708,10 +3730,9 @@ def setting_create(context, values):
 
 
 @require_context
-def setting_update(context, setting_name, values, purge_metadata=False):
+def setting_update(context, setting_name, values, purge_metadata=False, cloud_setting=False):
     session = get_session()
-    return _setting_update(context, values, setting_name,
-                           purge_metadata, session)
+    return _setting_update(context, values, setting_name, purge_metadata, session, cloud_setting)
 
 
 @require_context
@@ -4685,6 +4706,8 @@ def get_tenants_usage(context, **kwargs):
             models.WorkloadVMs).filter_by(deleted=False)
         result = qry.all()
         for proj_id, vm_protected in result:
+            if proj_id not in tenant_chargeback:
+                tenant_chargeback[proj_id] = {'vms_protected': [], 'used_capacity': 0}
             tenant_chargeback[proj_id]['vms_protected'].append(vm_protected)
 
         return tenant_chargeback

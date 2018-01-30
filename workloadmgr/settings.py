@@ -41,11 +41,16 @@ def get_settings(context=None, get_hidden=False, get_smtp_settings=False):
                     get_smtp_settings=False):
         try:
             copy_settings = {}
-            if context.is_admin is True or get_smtp_settings is True:
-                copy_settings = default_settings
+            is_admin = context.is_admin
+            #If get_smtp_settings is True then changing context to admin
+            #because smtp settings belongs to admin project.
+            if get_smtp_settings is True:
+               context.is_admin = True
+               copy_settings = default_settings
             persisted_settings = {}
             persisted_setting_objs = db.setting_get_all(
                 context, read_deleted='no', get_hidden=get_hidden)
+            context.is_admin = is_admin
             for persisted_setting in persisted_setting_objs:
                 if get_smtp_settings is False:
                     persisted_settings[persisted_setting.name] = persisted_setting.value
@@ -79,7 +84,7 @@ def set_settings(context, new_settings):
             name_found = False
             for persisted_setting in persisted_setting_objs:
                 if persisted_setting.name == name:
-                    db.setting_update(context, name, {'value': value})
+                    db.setting_update(context, name, {'value' : value}, cloud_setting=True)
                     name_found = True
                     break
             if not name_found:
