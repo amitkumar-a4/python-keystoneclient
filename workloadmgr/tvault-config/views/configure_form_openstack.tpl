@@ -277,7 +277,7 @@ function setSwiftRequired(checked, val) {
 	                                        %else:
 		                                    <input name = "nodetype" type="radio"  value="controller" checked onclick='$("#import-tab")[0].style.display="";$("#certificate-tab")[0].style.display="";$("#import")[0].style.display="";$("#certificate")[0].style.display=""'>  Controller Node
 		                                    <input name = "nodetype" type="radio"  value="additional" onclick='$("#import-tab")[0].style.display="none";$("#certificate-tab")[0].style.display="none";$("#import")[0].style.display="none";$("#certificate")[0].style.display="none";'>   Additional Node <br><br>
-	                                        %end  
+	                                        %end
                                                 </div>
                                             </div>
                                             <div class="col-sm-5">
@@ -327,7 +327,7 @@ function setSwiftRequired(checked, val) {
                                                 <div class="col-sm-5">
                                                     <div class="form-group">
     	                                                <label class="control-label">Administrator</label>
-    	                                                <input name="admin-username" {{'value=' + admin_username if defined('admin_username') else ''}} type="text" required="" placeholder="admin" class="form-control"> 
+    	                                                <input name="admin-username" {{'value=' + admin_username if defined('admin_username') else ''}} type="text" required="" placeholder="admin" class="form-control">
                                                     </div>
                                                 </div>
                                                 <div class="col-sm-5">
@@ -444,14 +444,14 @@ function setSwiftRequired(checked, val) {
                                                     <input type="radio" name="backup_target_type" aria-describedby="backup_target_helpblock" checked value="NFS" onchange="$($('#swiftstorage-panel')[0]).addClass('hidden');$($('#nfsstorage-panel')[0]).removeClass('hidden');" onclick="setSwiftRequired(true, 'NFS')">NFS
                                                 %else:
                                                     <input type="radio" name="backup_target_type" aria-describedby="backup_target_helpblock" value="NFS" onchange="$($('#swiftstorage-panel')[0]).addClass('hidden');$($('#nfsstorage-panel')[0]).removeClass('hidden');" onclick="setSwiftRequired(true, 'NFS')" required>NFS
-                                                %end 
+                                                %end
                                                 </label>
                                                 <label class="radio-inline">
                                                 %if 'backup_target_type' in locals() and backup_target_type == 'SWIFT':
                                                     <input type="radio" name="backup_target_type" aria-describedby="backup_target_helpblock"  checked value="SWIFT" onchange="$($('#nfsstorage-panel')[0]).addClass('hidden');$($('#swiftstorage-panel')[0]).removeClass('hidden');" onclick="setSwiftRequired(true, 'decide');">SWIFT
                                                 %else:
                                                     <input type="radio" name="backup_target_type" aria-describedby="backup_target_helpblock" value="SWIFT" onchange="$($('#nfsstorage-panel')[0]).addClass('hidden');$($('#swiftstorage-panel')[0]).removeClass('hidden');" onclick="setSwiftRequired(true, 'decide');">SWIFT
-                                                %end 
+                                                %end
                                                 </label>
                                                 <span id="backup_target_helpblock" class="help-block">Choose the backend for storing backup images.</span>
 
@@ -459,7 +459,7 @@ function setSwiftRequired(checked, val) {
 	                                        <div class="panel-group" id="nfsstorage-panel">
                                                 %else:
 	                                        <div class="panel-group hidden" id="nfsstorage-panel">
-                                                %end 
+                                                %end
 	                                            <div class="panel panel-default" id="panel3">
 		                                        <div class="panel-heading">
 		                                          <h4 class="panel-title">
@@ -487,7 +487,7 @@ function setSwiftRequired(checked, val) {
                                                 <div class="panel-group" id="swiftstorage-panel">
                                                 %else:
                                                 <div class="panel-group hidden" id="swiftstorage-panel">
-                                                %end 
+                                                %end
                                                     <div class="panel panel-default" id="panel5">
                                                         <div class="panel-heading">
                                                             <h4 class="panel-title">
@@ -499,15 +499,15 @@ function setSwiftRequired(checked, val) {
                                                                  <div class="input-group">
                                                                     %if 'swift_auth_version' in locals() and swift_auth_version == 'TEMPAUTH':
                                                                     <input name = "swift-auth-version" type="radio"  aria-describedby="swiftsel_helpblock" value="KEYSTONE" onchange="setSwiftRequired(this.checked, this.value);">  KEYSTONE &nbsp;&nbsp;
-                                                                    <input name = "swift-auth-version" type="radio"  aria-describedby="swiftsel_helpblock" value="TEMPAUTH" checked onchange="setSwiftRequired(this.checked, this.value)">  TEMPAUTH <br> <br>                       
+                                                                    <input name = "swift-auth-version" type="radio"  aria-describedby="swiftsel_helpblock" value="TEMPAUTH" checked onchange="setSwiftRequired(this.checked, this.value)">  TEMPAUTH <br> <br>
                                                                     %elif 'swift_auth_version' in locals() and swift_auth_version == 'KEYSTONE':
                                                                     <input name = "swift-auth-version" type="radio"  aria-describedby="swiftsel_helpblock" value="KEYSTONE" checked onchange="setSwiftRequired(this.checked, this.value);">  KEYSTONE &nbsp;&nbsp;
-                                                                    <input name = "swift-auth-version" type="radio"  aria-describedby="swiftsel_helpblock" value="TEMPAUTH" onchange="setSwiftRequired(this.checked, this.value)">  TEMPAUTH <br> <br>                                
+                                                                    <input name = "swift-auth-version" type="radio"  aria-describedby="swiftsel_helpblock" value="TEMPAUTH" onchange="setSwiftRequired(this.checked, this.value)">  TEMPAUTH <br> <br>
                                                                     %else:
                                                                     <input name = "swift-auth-version" type="radio"  aria-describedby="swiftsel_helpblock" value="KEYSTONE" checked onchange="setSwiftRequired(this.checked, this.value);">  KEYSTONE &nbsp;&nbsp;
-                                                                    <input name = "swift-auth-version" type="radio" aria-describedby="swiftsel_helpblock"  value="TEMPAUTH" onchange="setSwiftRequired(this.checked, this.value)">  TEMPAUTH <br> <br>      	
-                                                                    %end 
-                                                                    <span id="swiftsel_helpblock" class="help-block hidden">A block of help text that breaks onto a new line and may extend beyond one line.</span> 
+                                                                    <input name = "swift-auth-version" type="radio" aria-describedby="swiftsel_helpblock"  value="TEMPAUTH" onchange="setSwiftRequired(this.checked, this.value)">  TEMPAUTH <br> <br>
+                                                                    %end
+                                                                    <span id="swiftsel_helpblock" class="help-block hidden">A block of help text that breaks onto a new line and may extend beyond one line.</span>
                                                                  </div>
                                                                  <div class="input-group" id="swift-auth-url-div">
                                                                      <label class="control-label">Auth Url&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;</label>
@@ -698,8 +698,13 @@ function validate_keystone_credentials(inputelement) {
               IsV3 = true
            }
            setRequired()
+           _trustee_role = "{{trustee_role}}"
            $.each(result.roles, function( index, value ) {
-               options += "<option value="+ value +" selected>"+ value + "</option>"
+               if (_trustee_role == value) {
+                  options += "<option value="+ value +" selected>"+ value + "</option>"
+               } else {
+                  options += "<option value="+ value +">"+ value + "</option>"
+               }
            });
            document.getElementsByName("trustee-role")[0].innerHTML = options
            Invalid = false
