@@ -4228,8 +4228,8 @@ class API(base.Base):
             backends_storage_stats = self.get_storage_usage(context)
 
             for backend in backends_storage_stats['storage_usage']:
-                total_capacity += int(backend['total_capacity'])
-                total_usage += int(backend['total_utilization'])
+                total_capacity += long(round(float(backend['total_capacity'])))
+                total_usage += long(round(float(backend['total_utilization'])))
             global_usage = {'total_capacity': total_capacity, 'total_usage': total_usage, 'total_vms': len(
                 servers), 'vms_protected': total_vms_protected}
             return {'tenants_usage': tenants_usage,
@@ -4240,3 +4240,65 @@ class API(base.Base):
                 reason=ex.message %
                 (ex.kwargs if hasattr(
                     ex, 'kwargs') else {}))
+
+    @autolog.log_method(logger=Logger)
+    @wrap_check_policy
+    def get_tenants_chargeback(self, context):
+        """
+        Get tenants chargeback.
+        """
+        try:
+            snap_chargeback = {}
+            snapshots = self.db.snapshot_get_all(context)
+            for snap in snapshots:
+                if snap.workload_id in snap_chargeback:
+                    snap_chargeback[snap.workload_id]["workload_size"] += long(
+                        round(float(snap.size)))
+                    snap_chargeback[snap.workload_id]["snapshots"][snap.id] = {"name": snap.display_name,
+                                                                               "size": long(round(float(snap.size))),
+                                                                               "created_at": snap.created_at}
+                else:
+                    snap_chargeback[snap.workload_id] = {"workload_size": snap.size, "snapshots": {
+                        snap.id: {"name": snap.display_name, "size": long(round(float(snap.size))), "created_at": snap.created_at}}}
+
+            workload_vm_chargeback = {}
+            workload_vms = self.db.workload_vms_get(context, None)
+            for w_vm in workload_vms:
+                if w_vm.workload_id in workload_vm_chargeback:
+                    workload_vm_chargeback[w_vm.workload_id][w_vm.vm_id] = {
+                        "name": w_vm.vm_name}
+                else:
+                    workload_vm_chargeback[w_vm.workload_id] = {
+                        w_vm.vm_id: {"name": w_vm.vm_name}}
+
+            workloads = self.db.workload_get_all(context)
+            workloads_chargeback = {}
+            for w in workloads:
+                def get_value(
+                    obj, id, key): return obj[id][key] if id in obj else None
+                if w.project_id in workloads_chargeback:
+                    workloads_chargeback[w.project_id]["workloads"][w.id] = {"name": w.display_name,
+                                                                          "size": get_value(snap_chargeback, w.id, "workload_size") or 0 ,
+                                                                          "protected_vms": workload_vm_chargeback[w.id],
+                                                                          "snapshots": get_value(snap_chargeback, w.id, "snapshots") or {}
+                                                                             }
+                else:
+                    workloads_chargeback[w.project_id] = {"workloads": {w.id: {"name": w.display_name,
+                                                                          "size": get_value(snap_chargeback, w.id, "workload_size") or 0,
+                                                                          "protected_vms": workload_vm_chargeback[w.id],
+                                                                          "snapshots": get_value(snap_chargeback, w.id, "snapshots")or {},
+                                                                               }}}
+
+            tenants_usage = self.get_tenants_usage(context)["tenants_usage"]
+            tenant_chargeback = tenants_usage.copy()
+            for tenant_id in tenants_usage.keys():
+                if tenant_id in workloads_chargeback:
+                    tenant_chargeback[tenant_id]["no_of_workloads"] = len(
+                        workloads_chargeback[tenant_id]["workloads"].keys())
+                    tenant_chargeback[tenant_id]["workloads"] = workloads_chargeback[tenant_id]["workloads"]
+                else:
+                    tenant_chargeback[tenant_id]["no_of_workloads"] = 0
+                    tenant_chargeback[tenant_id]["workloads"] = {}
+            return tenant_chargeback
+        except Exception as ex:
+            LOG.exception(ex)

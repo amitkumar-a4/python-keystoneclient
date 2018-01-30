@@ -1121,6 +1121,24 @@ class WorkloadMgrsController(wsgi.Controller):
             LOG.exception(error)
             raise exc.HTTPServerError(explanation=unicode(error))
 
+    def get_tenants_chargeback(self, req):
+        try:
+            context = req.environ['workloadmgr.context']
+            try:
+                tenants_chargeback = self.workload_api.get_tenants_chargeback(context)
+                return tenants_chargeback
+            except Exception as ex:
+                LOG.exception(ex)
+                raise ex
+        except exc.HTTPBadRequest as error:
+            LOG.exception(error)
+            raise error
+        except exc.HTTPServerError as error:
+            LOG.exception(error)
+            raise error
+        except Exception as error:
+            LOG.exception(error)
+            raise exc.HTTPServerError(explanation=unicode(error))
 
 def create_resource():
     return wsgi.Resource(WorkloadMgrsController())
