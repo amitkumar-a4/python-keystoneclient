@@ -1130,9 +1130,6 @@ class WorkloadMgrsController(wsgi.Controller):
             except Exception as ex:
                 LOG.exception(ex)
                 raise ex
-        except exc.HTTPNotFound as error:
-            LOG.exception(error)
-            raise error
         except exc.HTTPBadRequest as error:
             LOG.exception(error)
             raise error
