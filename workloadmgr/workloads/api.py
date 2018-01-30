@@ -1384,7 +1384,7 @@ class API(base.Base):
 
     @autolog.log_method(logger=Logger)
     @wrap_check_policy
-    def get_import_workloads_list(self, context):
+    def get_import_workloads_list(self, context, project_id=None):
         AUDITLOG.log(context, 'Get Import Workloads List Requested', None)
         if not context.is_admin:
             raise wlm_exceptions.AdminRequired()
@@ -1400,8 +1400,11 @@ class API(base.Base):
                     try:
                         workload_values = json.loads(backup_target.get_object(
                             os.path.join(workload_url, 'workload_db')))
-                        workloads.append(workload_values)
-
+                        if project_id is not None:
+                            if workload_values['project_id'] == project_id:
+                                workloads.append(workload_values)
+                        else:
+                            workloads.append(workload_values)
                     except Exception as ex:
                         LOG.exception(ex)
                         continue
