@@ -182,6 +182,13 @@ def convert_image(source, dest, out_format, run_as_root=False):
     utils.execute(*cmd, run_as_root=run_as_root)
 
 
+def create_image(qemu_img_path, size, img_format='qcow2', run_as_root=False):
+    """Create qemu-img in the format."""
+    cmd = ('qemu-img', 'create', '-f',
+           img_format, qemu_img_path, str(size))
+    utils.execute(*cmd, run_as_root=run_as_root)
+
+
 def fetch(context, image_href, path, _user_id, _project_id):
     # TODO(vish): Improve context handling and add owner and auth data
     #             when it is added to glance.  Right now there is no
@@ -318,7 +325,7 @@ def get_effective_size(path, run_as_root=False):
         restore_size = 0
         for line in json.loads(subprocess.check_output(
                ["qemu-img", "map", "--output", "json", path])):
-            if line['data'] is True:
+            if line['zero'] is False:
                 restore_size += int(line['length'])
 
         return  restore_size
