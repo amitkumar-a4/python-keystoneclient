@@ -548,9 +548,14 @@ class WorkloadMgrsController(wsgi.Controller):
     def get_import_workloads_list(self, req):
         try:
             context = req.environ['workloadmgr.context']
+            project_id = None
+            if ('QUERY_STRING' in req.environ):
+                qs = parse_qs(req.environ['QUERY_STRING'])
+                project_id = qs.get('project_id', [None])[0]
+                project_id = escape(project_id)
             try:
                 workloads = self.workload_api.get_import_workloads_list(
-                    context)
+                    context, project_id)
                 return self._view_builder.detail_list(req, workloads)
             except exception.WorkloadNotFound as error:
                 LOG.exception(error)
