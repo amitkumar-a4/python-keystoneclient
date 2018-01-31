@@ -1410,14 +1410,12 @@ def restore_vm_security_groups(cntx, db, restore):
 
     def build_graph_from_existing_secgrps():
         existing_secgroups = network_service.security_group_list(cntx)
-        import pdb;pdb.set_trace()
         for secgrp in existing_secgroups['security_groups']:
             existing_secgroups_graph.append(build_secgrp_graph(secgrp))
 
     def build_graph_from_backup_secgrps():
         snapshot_secgraphs = {}
 
-        import pdb;pdb.set_trace()
         snapshot_vm_resources = db.snapshot_resources_get(
             cntx, restore['snapshot_id'])
         for snapshot_vm_resource in snapshot_vm_resources:
@@ -1435,18 +1433,22 @@ def restore_vm_security_groups(cntx, db, restore):
 
                 secgraph = snapshot_secgraphs[vm_id]
    
-                vm_security_group_rule_snaps = db.vm_security_group_rule_snaps_get(
-                    cntx, snapshot_vm_resource.id)
-                vm_security_group_rule_values = pickle.loads(
-                    str(vm_security_group_rule_snaps.pickle))
+                vm_security_group_rule_values = []
+                for snap_rule in db.vm_security_group_rule_snaps_get(
+                    cntx, snapshot_vm_resource.id):
+                    vm_security_group_rule_values.append(pickle.loads(
+                        str(snap_rule.pickle)))
+
                 sec1 = {'id': snapshot_vm_resource.resource_name,
                         'name': db.get_metadata_value(snapshot_vm_resource.metadata, 'name'),
                         'security_group_rules': vm_security_group_rule_values}
+
                 s = {'name': sec1['name'],
                      'id': sec1['id'],
                      'json': json.dumps(sec1)}
                 secgraph.add_vertex(**s)
 
+        return snapshot_secgraphs
 
     # refresh token
     cntx = nova._get_tenant_context(cntx)
