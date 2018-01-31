@@ -632,31 +632,31 @@ function setS3Required(checked, val) {
                                                                      <input name="swift-auth-url" {{'value=' + swift_auth_url if (defined('swift_auth_url') and len(swift_auth_url)) else ''}} type="text" placeholder="" class="form-control"><br>
                                                                  </div><br>
                                                                  <div class="input-group" id="swift-username-div">
-                                                                      <label class="control-label">Username&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;</label>
+                                                                      <label class="control-label">Username&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;</label>
                                                                       <input name="swift-username" {{'value=' + swift_username if (defined('swift_username') and len(swift_username)) else ''}} type="text" placeholder="" class="form-control"> <br>
                                                                  </div><br>
                                                                  <div class="input-group" id="swift-password-div">
                                                                      <label class="control-label">Password&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;</label>
                                                                      <input name="swift-password" type="password" class="form-control" aria-describedby="swifturl_helpblock" onblur="">
                                                                      <span id="swifturl_helpblock" class="help-block hidden">A block of help text that breaks onto a new line and may extend beyond one line.</span>
-                                                                 </div><br>
-	 	                                             </div>
-		                                        </div>
-	                                            </div>
+                                                                 </div>
+	 	                                             </div> <!-- class="panel-body" -->
+		                                        </div> <!-- id="collapseFive" class="panel-collapse collapse in" -->
+	                                                   </div>
                                                 </div>
-                                            </div>
+
                                                 %if 'backup_target_type' in locals() and backup_target_type == 'S3':
                                                 <div class="panel-group" id="s3storage-panel">
                                                 %else:
                                                 <div class="panel-group hidden" id="s3storage-panel">
                                                 %end
-                                                    <div class="panel panel-default" id="panel5">
+                                                    <div class="panel panel-default" id="panel6">
                                                         <div class="panel-heading">
                                                             <h4 class="panel-title">
-                                                  <a data-toggle="collapse" data-target="#collapseFive" href="#collapseFive"> S3 Object Storage </a>
+                                                  <a data-toggle="collapse" data-target="#collapseSix" href="#collapseSix"> S3 Object Storage </a>
                                               </h4>
                                           </div>
-                                          <div id="collapseFive" class="panel-collapse collapse in">
+                                          <div id="collapseSix" class="panel-collapse collapse in">
                                                <div class="panel-body">
                                                                  <div class="input-group">
                                                                     %if 's3_backend_type' in locals() and s3_backend_type == 'Ceph':
@@ -678,44 +678,57 @@ function setS3Required(checked, val) {
                                                                     %end
                                                                     <span id="s3sel_helpblock" class="help-block hidden">A block of help text that breaks onto a new line and may extend beyond one line.</span>
                                                                  </div>
-                                                                 <div class="input-group" id="s3-access-key-div">
-                                                                     <label class="control-label">Access Key&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;</label>
-                                                                     <input name="s3-access-key" {{'value=' + vault_s3_access_key_id if (defined('vault_s3_access_key_id') and len(vault_s3_access_key_id)) else ''}} type="text" placeholder="" class="form-control"><br>
-                                                                 </div><br>
-                                                                 <div class="input-group" id="s3-secret-key-div">
-                                                                     <label class="control-label">Secret Key&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;</label>
-                                                                     <input name="s3-secret-key" {{'value=' + vault_s3_secret_access_key if (defined('vault_s3_secret_access_key') and len(vault_s3_secret_access_key)) else ''}} type="text" placeholder="" class="form-control"> <br>
-                                                                 </div><br>
-                                                                 <div class="input-group" id="s3-region-div">
-                                                                     <label class="control-label">Region&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;</label>
-                                                                     <input name="s3-region" {{'value=' + vault_s3_region_name if (defined('vault_s3_region_name') and len(vault_s3_region_name)) else ''}} type="text" placeholder="" class="form-control"> <br>
-                                                                     <span id="s3url_helpblock" class="help-block hidden">A block of help text that breaks onto a new line and may extend beyond one line.</span>
-                                                                 </div><br>
-                                                                 <div class="input-group" id="s3-bucket-div">
-                                                                     <label class="control-label">Bucket Name&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;</label>
-                                                                     <input name="s3-bucket" {{'value=' + vault_s3_bucket if (defined('vault_s3_bucket') and len(vault_s3_bucket)) else ''}} type="text" placeholder="" class="form-control"> <br>
-                                                                     <span id="s3url_helpblock" class="help-block hidden">A block of help text that breaks onto a new line and may extend beyond one line.</span>
-                                                                 </div><br>
-                                                                 <div class="input-group" id="s3-endpoint-url-div">
-                                                                     <label class="control-label">Endpoint URL&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;</label>
-                                                                     <input name="s3-endpoint-url" {{'value=' + vault_s3_endpoint_url if (defined('vault_s3_endpoint_url') and len(vault_s3_endpoint_url)) else ''}} type="text" placeholder="http://127.0.0.1:9000" class="form-control"> <br>
-                                                                     <span id="s3url_helpblock" class="help-block hidden">A block of help text that breaks onto a new line and may extend beyond one line.</span>
-                                                                 </div><br>
-                                                                 <div class="input-group" id="s3-use-ssl-div">
-                                                                     <label class="control-label">Use SSL&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;</label>
-                                                                     <input name="s3-use-ssl" {{'value=' + vault_s3_ssl if (defined('vault_s3_ssl') and len(vault_s3_ssl)) else ''}} type="text" placeholder="False" class="form-control"> <br>
-                                                                     <span id="s3url_helpblock" class="help-block hidden">A block of help text that breaks onto a new line and may extend beyond one line.</span>
-                                                                 </div><br>
+                                                                 <div class="col-sm-5">
+                                                                     <div class="input-group" id="s3-access-key-div">
+                                                                         <label class="control-label">Access Key&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;</label>
+                                                                         <input name="s3-access-key" {{'value=' + vault_s3_access_key_id if (defined('vault_s3_access_key_id') and len(vault_s3_access_key_id)) else ''}} type="text" placeholder="" class="form-control"><br>
+                                                                     </div>
+                                                                 </div>
+                                                                 <div class="col-sm-7">
+                                                                     <div class="input-group" id="s3-secret-key-div">
+                                                                         <label class="control-label">Secret Key&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;</label>
+                                                                         <input name="s3-secret-key" {{'value=' + vault_s3_secret_access_key if (defined('vault_s3_secret_access_key') and len(vault_s3_secret_access_key)) else ''}} type="text" placeholder="" class="form-control"> <br>
+                                                                     </div>
+                                                                 </div>
+                                                                 <div class="col-sm-5">
+                                                                     <div class="input-group" id="s3-region-div">
+                                                                         <label class="control-label">Region&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;</label>
+                                                                         <input name="s3-region" {{'value=' + vault_s3_region_name if (defined('vault_s3_region_name') and len(vault_s3_region_name)) else ''}} type="text" placeholder="" class="form-control"> <br>
+                                                                         <span id="s3url_helpblock" class="help-block hidden">A block of help text that breaks onto a new line and may extend beyond one line.</span>
+                                                                     </div>
+                                                                 </div>
+                                                                 <div class="col-sm-7">
+                                                                     <div class="input-group" id="s3-bucket-div">
+                                                                         <label class="control-label">Bucket Name&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;</label>
+                                                                         <input name="s3-bucket" {{'value=' + vault_s3_bucket if (defined('vault_s3_bucket') and len(vault_s3_bucket)) else ''}} type="text" placeholder="" class="form-control"> <br>
+                                                                         <span id="s3url_helpblock" class="help-block hidden">A block of help text that breaks onto a new line and may extend beyond one line.</span>
+                                                                     </div>
+                                                                 </div>
+                                                                 <div class="col-sm-5">
+                                                                     <div class="input-group" id="s3-endpoint-url-div">
+                                                                         <label class="control-label">Endpoint URL&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;</label>
+                                                                         <input name="s3-endpoint-url" {{'value=' + vault_s3_endpoint_url if (defined('vault_s3_endpoint_url') and len(vault_s3_endpoint_url)) else ''}} type="text" placeholder="http://127.0.0.1:9000" class="form-control"> <br>
+                                                                         <span id="s3url_helpblock" class="help-block hidden">A block of help text that breaks onto a new line and may extend beyond one line.</span>
+                                                                     </div>
+                                                                 </div>
+                                                                 <div class="col-sm-7">
+                                                                     <div class="input-group" id="s3-use-ssl-div">
+                                                                         <label class="control-label">Use SSL&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;</label>
+                                                                         <input name="s3-use-ssl" {{'value=' + vault_s3_ssl if (defined('vault_s3_ssl') and len(vault_s3_ssl)) else ''}} type="text" placeholder="False" class="form-control"> <br>
+                                                                         <span id="s3url_helpblock" class="help-block hidden">A block of help text that breaks onto a new line and may extend beyond one line.</span>
+                                                                     </div>
+                                                                 </div>
                                                                  <div class="input-group" id="s3-signature-version-div">
                                                                      <label class="control-label">Signature Version&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;</label>
                                                                      <input name="s3-signature-version" {{'value=' + vault_s3_signature_version if (defined('vault_s3_signature_version') and len(vault_s3_signature_version)) else ''}} type="text" placeholder="" class="form-control"> <br>
                                                                      <span id="s3url_helpblock" class="help-block hidden">A block of help text that breaks onto a new line and may extend beyond one line.</span>
-                                                                 </div><br>
+                                                                 </div>
                                                </div> <!-- Panel Body -->
                                           </div>
                                                     </div>
                                                 </div> <!-- S3 Storage Panel -->
                                                 </div> <!-- S3 Storage Panel -->
+</div>
                                     </div> <!-- Tab Pane Storage -->
                                     <div class="tab-pane" id="import">
                                         <div class="row">
