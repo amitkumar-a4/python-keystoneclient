@@ -886,8 +886,13 @@ function validate_keystone_credentials(inputelement) {
               IsV3 = true
            }
            setRequired()
+           _trustee_role = "{{trustee_role}}"
            $.each(result.roles, function( index, value ) {
-               options += "<option value="+ value +" selected>"+ value + "</option>"
+               if (_trustee_role == value) {
+                  options += "<option value="+ value +" selected>"+ value + "</option>"
+               } else {
+                  options += "<option value="+ value +">"+ value + "</option>"
+               }
            });
            document.getElementsByName("trustee-role")[0].innerHTML = options
            Invalid = false
