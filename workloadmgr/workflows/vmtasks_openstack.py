@@ -1448,6 +1448,15 @@ def restore_vm_security_groups(cntx, db, restore):
                      'json': json.dumps(sec1)}
                 secgraph.add_vertex(**s)
 
+        # add edges
+        for vm_id, secgraph in snapshot_secgraphs.iteritems():
+            for vs in secgraph.vs:
+                secgrp = json.loads(vs['json'])
+                for rule in secgrp['security_group_rules']:
+                    if rule.get('remote_group_id', None):
+                        rvs = secgraph.vs.find(id=rule.get('remote_group_id'))
+                        secgraph.add_edge(vs.index, rvs.index)
+
         return snapshot_secgraphs
 
     # refresh token
