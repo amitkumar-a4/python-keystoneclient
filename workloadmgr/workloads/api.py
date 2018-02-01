@@ -1007,7 +1007,7 @@ class API(base.Base):
             self, context, jobschedule, workload, is_config_backup=False):
         if self._scheduler.running is True:
             if jobschedule and len(jobschedule):
-                if jobschedule.get('enabled', False) is True:
+                if str(jobschedule.get('enabled', False)).lower() == 'true':
                     if hasattr(context, 'user_domain_id'):
                         if context.user_domain_id is None:
                             user_domain_id = 'default'
