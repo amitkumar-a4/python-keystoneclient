@@ -1393,24 +1393,82 @@ def restore_vm_security_groups(cntx, db, restore):
         else:
             return None
 
+    def compare_secgrp_graphs_by_dfs(graph1, graph2, v1, v2):
+        v1['visited'] = True
+
+        adjedges1 = graph1.get_inclist()[v1.index]
+        adjedges2 = graph2.get_inclist()[v2.index]
+
+        if len(adjedges1) != len(adjedges2):
+            return False
+
+        for e1 in graph1.get_inclist()[v1.index]:
+            edge1 = graph1.es[e1]
+            found = False
+
+            if edge1.attributes().get('visited', False):
+                edge1['backedge'] = True
+                continue
+
+            w1 = graph1.vs[edge1.target]
+            if w1.attributes().get('visited', False):
+                continue
+            for e2 in graph2.get_inclist()[v2.index]:
+                edge2 = graph2.es[e2]
+                w2 = graph2.vs[edge2.target]
+
+                found = compare_secgrp_graphs_by_dfs(graph1, graph2, w1, w2)
+                if not found:
+                    continue
+
+                # make sure w1 and w2 are identical
+                # compare the rules
+                vs1 = graph1.vs[w1.index]
+                vs2 = graph2.vs[w2.index]
+                rules1 = copy.deepcopy(json.loads(vs1['json'])['security_group_rules'])
+                rules2 = copy.deepcopy(json.loads(vs2['json'])['security_group_rules'])
+
+                if len(rules1) != len(rules2):
+                    break
+
+                for rules in [rules1, rules2]:
+                    for r in rules:
+                        for key in ['id', 'name', 'remote_group']:
+                            r.pop(key, None)
+                found = all(r in rules2 for r in rules1)
+                if found:
+                    break
+
+            edge1['discovered'] = True
+            edge1['visited'] = True
+
+            if not found:
+                return False
+
+        return True
+
     def _build_secgrp_graph(secgrps):
         secgraph = Graph(directed=True)
         # add vertices
         for sec1 in secgrps:
-            secgraph.add_vertex(**sec1)
+            s = {'name': sec1['name'],
+                 'id': sec1['id'],
+                 'json': json.dumps(sec1)}
+            secgraph.add_vertex(**s)
 
         # add edges
         for vs in secgraph.vs:
-            for rule in vs['rules']:
-                if rule.get('remote_group', None):
-                    rvs = secgraph.vs.find(id=rule.get('remote_group'))
+            secgrp = json.loads(vs['json'])
+            for rule in secgrp['security_group_rules']:
+                if rule.get('remote_group_id', None):
+                    rvs = secgraph.vs.find(id=rule.get('remote_group_id'))
                     secgraph.add_edge(vs.index, rvs.index)
 
         return secgraph
 
     def build_graph_from_existing_secgrps():
         existing_secgroups = network_service.security_group_list(cntx)
-        return build_secgrp_graph(existing_secgroups['security_groups'])
+        return _build_secgrp_graph(existing_secgroups['security_groups'])
 
     def build_graph_from_backup_secgrps():
         snapshot_secgraphs = {}
@@ -1440,10 +1498,16 @@ def restore_vm_security_groups(cntx, db, restore):
 
                 sec1 = {'id': snapshot_vm_resource.resource_name,
                         'name': db.get_metadata_value(snapshot_vm_resource.metadata, 'name'),
+                        'description': db.get_metadata_value(snapshot_vm_resource.metadata, 'description'),
                         'security_group_rules': vm_security_group_rule_values}
 
                 s = {'name': sec1['name'],
                      'id': sec1['id'],
+                     'description': sec1['description'],
+                     'res_id': snapshot_vm_resource.id,
+                     'pit_id': snapshot_vm_resource.resource_pit_id,
+                     'vm_attached': db.get_metadata_value(snapshot_vm_resource.metadata,
+                                                          'vm_attached') in ('1', True, None),
                      'json': json.dumps(sec1)}
                 secgraph.add_vertex(**s)
 
@@ -1469,54 +1533,43 @@ def restore_vm_security_groups(cntx, db, restore):
     # list of graphs, one per instance in the backup
     tgraphs = build_graph_from_backup_secgrps()
 
+    restored_security_groups = {}
     for vm_id, tgraph in tgraphs.iteritems():
-        tvno = tvmseccluster.subgraphs()[0].es[0].source
-        tv = tvmseccluster.subgraphs()[0].vs[tvno]
-        for ng in seccluster.subgraphs():
-            nvno = seccluster.subgraphs()[0].es[0].source
-            nv = seccluster.subgraphs()[0].vs[nvno]
-            print compare_secgrp_graphs_by_dfs(tg, ng, tv, nv)
+        for tg in tgraph.components():
+            tvno = tg[0]
+            tv = tgraph.vs[tvno]
+            found = False
+            for ng in ngraph.components():
+                nvno = ng[0]
+                nv = ngraph.vs[nvno]
+                if compare_secgrp_graphs_by_dfs(tgraph, ngraph, tv, nv):
+                    found = True
+                    break
 
-    snapshot_vm_resources = db.snapshot_resources_get(
-        cntx, restore['snapshot_id'])
-    for snapshot_vm_resource in snapshot_vm_resources:
-        if snapshot_vm_resource.resource_type == 'security_group':
-            security_group_type = db.get_metadata_value(
-                snapshot_vm_resource.metadata,
-                'security_group_type')
-            if security_group_type != 'neutron':
-                continue
-            vm_id = db.get_metadata_value(
-                snapshot_vm_resource.metadata, 'vm_id')
             if vm_id not in restored_security_groups:
                 restored_security_groups[vm_id] = {}
 
-            sg_id = security_group_exists(snapshot_vm_resource)
-            if sg_id is not None:
-                restored_security_groups[vm_id][snapshot_vm_resource.resource_pit_id] = \
-                    {'sec_id': sg_id,
-                     'vm_attached': db.get_metadata_value(snapshot_vm_resource.metadata, 'vm_attached') in ('1', True, None),
-                     'res_id': snapshot_vm_resource.id}
+            if found:
+                restored_security_groups[vm_id][tv['pit_id']] = \
+                    {'sec_id': nv['id'],
+                     'vm_attached': tv['vm_attached'],
+                     'res_id': tv['res_id']}
                 continue
 
             # create new security group here
-            name = 'snap_of_' + db.get_metadata_value(
-                snapshot_vm_resource.metadata, 'name')
-            description = 'snapshot - ' + db.get_metadata_value(
-                snapshot_vm_resource.metadata, 'description')
+            name = 'snap_of_' + tv['name']
+            description = 'snapshot - ' + tv['description']
             security_group_obj = network_service.security_group_create(
                 cntx, name, description)
             security_group = security_group_obj.get('security_group')
-            restored_security_groups[vm_id][snapshot_vm_resource.resource_pit_id] = \
+            restored_security_groups[vm_id][tv['pit_id']] = \
                 {'sec_id': security_group['id'],
-                 'vm_attached': db.get_metadata_value(snapshot_vm_resource.metadata, 'vm_attached') in ('1', True, None),
-                 'res_id': snapshot_vm_resource.id}
+                 'vm_attached': tv['vm_attached'],
+                 'res_id': tv['res_id']}
             restored_vm_resource_values = {
                 'id': str(
                     uuid.uuid4()),
-                'vm_id': db.get_metadata_value(
-                    snapshot_vm_resource.metadata,
-                    'vm_id'),
+                'vm_id': vm_id,
                 'restore_id': restore['id'],
                 'resource_type': 'security_group',
                 'resource_name': security_group['id'],
@@ -1535,7 +1588,7 @@ def restore_vm_security_groups(cntx, db, restore):
                     cntx, security_group_rule['id'])
 
             vm_security_group_rule_snaps = db.vm_security_group_rule_snaps_get(
-                cntx, snapshot_vm_resource.id)
+                cntx, tv['res_id'])
             for vm_security_group_rule in vm_security_group_rule_snaps:
                 vm_security_group_rule_values = pickle.loads(
                     str(vm_security_group_rule.pickle))
