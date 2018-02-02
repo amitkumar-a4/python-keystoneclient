@@ -1084,10 +1084,6 @@ class API(base.Base):
             options['metadata'] = workload['metadata']
             if 'policy_id' in workload['metadata'] and workload['metadata']['policy_id'] is not None:
                 policy_id = workload['metadata']['policy_id']
-                #assignments = self.get_assigned_policies(
-                #    context, context.project_id)
-                #available_policies = [
-                #    assignment.policy_id for assignment in assignments]
                 if policy_id not in available_policies:
                     message = "Policy %s is not assigned to project %s" % (
                         policy_id, context.project_id)
