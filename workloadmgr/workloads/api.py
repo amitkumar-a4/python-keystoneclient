@@ -1071,15 +1071,23 @@ class API(base.Base):
         if 'description' in workload and workload['description']:
             options['display_description'] = workload['description']
 
+        assignments = self.get_assigned_policies(context, context.project_id)
+        available_policies = [assignment.policy_id for assignment in assignments]
+
+        if len(available_policies) > 0 and 'policy_id' not in workload.get('metadata', {})\
+                                      and len(workload.get('jobschedule', {})) > 0:
+            msg = "Can not update scheduler settings when policies are "\
+                    "applied on project, please use available policies: %s" %(available_policies)
+            raise wlm_exceptions.ErrorOccurred(reason=msg)
         if 'metadata' in workload and workload['metadata']:
             purge_metadata = True
             options['metadata'] = workload['metadata']
             if 'policy_id' in workload['metadata'] and workload['metadata']['policy_id'] is not None:
                 policy_id = workload['metadata']['policy_id']
-                assignments = self.get_assigned_policies(
-                    context, context.project_id)
-                available_policies = [
-                    assignment.policy_id for assignment in assignments]
+                #assignments = self.get_assigned_policies(
+                #    context, context.project_id)
+                #available_policies = [
+                #    assignment.policy_id for assignment in assignments]
                 if policy_id not in available_policies:
                     message = "Policy %s is not assigned to project %s" % (
                         policy_id, context.project_id)
