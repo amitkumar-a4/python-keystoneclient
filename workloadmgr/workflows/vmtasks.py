@@ -141,8 +141,8 @@ class RestoreSecurityGroups(task.Task):
                 self.security_groups = vmtasks_vcloud.restore_vm_security_groups(
                     cntx, db, restore)
             return self.security_groups
-        except BaseException:
-            pass
+        except BaseException as ex:
+            LOG.exception(ex)
 
     @autolog.log_method(Logger, 'RestoreSecurityGroups.revert')
     def revert_with_log(self, *args, **kwargs):
