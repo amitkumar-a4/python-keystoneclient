@@ -1288,18 +1288,23 @@ def delete_vm_networks(cntx, restored_net_resources):
 @autolog.log_method(Logger, 'vmtasks_openstack.restore_vm_security_groups')
 def restore_vm_security_groups(cntx, db, restore):
 
-    def match_rule_values(rule1, rule2):
+    def match_rule_values(rules1, rules2):
         # Removing id, security_group_id, tenant_id and remote_group_id,
         # from rules as values for this will not match
         if len(rules1) != len(rules2):
             return False
 
-        local_rule1 = copy.deepcopy(rule1)
-        local_rule2 = copy.deepcopy(rule2)
-        for key in ['id', 'name', 'tenant_id',
-                    'security_group_id', 'remote_group_id']:
-            local_rule1.pop(key, None)
-            local_rule2.pop(key, None)
+        local_rule1 = copy.deepcopy(rules1)
+        local_rule2 = copy.deepcopy(rules2)
+        for rule in local_rule1:
+            for key in ['id', 'name', 'tenant_id',
+                        'security_group_id', 'remote_group_id']:
+                rule.pop(key, None)
+
+        for rule in local_rule2:
+            for key in ['id', 'name', 'tenant_id',
+                        'security_group_id', 'remote_group_id']:
+                rule.pop(key, None)
 
         return all(r in local_rule2 for r in local_rule1)
 
@@ -1310,6 +1315,16 @@ def restore_vm_security_groups(cntx, db, restore):
         adjedges2 = graph2.get_inclist()[v2.index]
 
         if len(adjedges1) != len(adjedges2):
+            return False
+
+        # make sure v1 and v2 are identical
+        # compare the rules
+        vs1 = graph1.vs[v1.index]
+        vs2 = graph2.vs[v2.index]
+        rules1 = json.loads(vs1['json'])['security_group_rules']
+        rules2 = json.loads(vs2['json'])['security_group_rules']
+
+        if not match_rule_values(rules1, rules2):
             return False
 
         for e1 in graph1.get_inclist()[v1.index]:
