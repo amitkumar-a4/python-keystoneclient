@@ -1,7 +1,7 @@
 #!/usr/bin/env python
 # vim: tabstop=4 shiftwidth=4 softtabstop=4
 #
-# Copyright (c) 2014 TrilioData, Inc.
+# Copyright (c) 2018 Trilio Data, Inc.
 # All Rights Reserved.
 #
 # The following users are already available:
@@ -4359,14 +4359,14 @@ def validate_swift_credentials():
     if swift_auth_version == 'KEYSTONE':
         data['swift_auth_url'] = public_url
         data['swift_username'] = bottle.request.query['username']
-        data['swift_password'] = bottle.request.query['password']
+        data['swift_password'] = urllib.unquote(bottle.request.query['password'])
         data['swift_tenantname'] = bottle.request.query['project_name']
         data['swift_domain_id'] = bottle.request.query['domain_id']
         data['region_name'] = bottle.request.query['region_name']
     elif swift_auth_version == 'TEMPAUTH':
         data['swift_auth_url'] = bottle.request.query['swift_auth_url']
         data['swift_username'] = bottle.request.query['swift_username']
-        data['swift_password'] = bottle.request.query['swift_password']
+        data['swift_password'] = urllib.unquote(bottle.request.query['swift_password'])
 
     try:
         _authenticate_with_swift(data)
