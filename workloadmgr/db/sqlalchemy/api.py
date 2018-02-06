@@ -4674,7 +4674,8 @@ def get_tenants_usage(context, **kwargs):
         tenant_chargeback = {}
         session = get_session()
         qry = session.query(models.Snapshots.project_id, func.sum(cast(models.Snapshots.size, Integer))).\
-            group_by(models.Snapshots.project_id)
+            group_by(models.Snapshots.project_id).filter_by(deleted=False)
+
         result = qry.all()
         for proj_id, storage_used in result:
             if proj_id not in tenant_chargeback:
