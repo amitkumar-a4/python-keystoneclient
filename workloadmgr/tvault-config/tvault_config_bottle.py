@@ -4359,7 +4359,7 @@ def validate_swift_credentials():
     if swift_auth_version == 'KEYSTONE':
         data['swift_auth_url'] = public_url
         data['swift_username'] = bottle.request.query['username']
-        data['swift_password'] = urllib.unquote(bottle.request.query['password'])
+        data['swift_password'] = bottle.request.query['password']
         data['swift_tenantname'] = bottle.request.query['project_name']
         data['swift_domain_id'] = bottle.request.query['domain_id']
         data['region_name'] = bottle.request.query['region_name']
