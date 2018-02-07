@@ -1482,18 +1482,17 @@ def restore_vm_security_groups(cntx, db, restore):
                     if compare_secgrp_graphs_by_dfs(tgraph, ngraph, tv, nv):
                         found = True
                         break
+
                 if found:
-                    break
+                   if vm_id not in restored_security_groups:
+                       restored_security_groups[vm_id] = {}
 
-            if vm_id not in restored_security_groups:
-                restored_security_groups[vm_id] = {}
-
-            if found:
-                restored_security_groups[vm_id][tv['pit_id']] = \
-                    {'sec_id': nv['id'],
-                     'vm_attached': tv['vm_attached'],
-                     'res_id': tv['res_id']}
-                continue
+                   restored_security_groups[vm_id][tv['pit_id']] = \
+                       {'sec_id': nv['id'],
+                        'vm_attached': tv['vm_attached'],
+                        'res_id': tv['res_id'],
+                        'fully_formed': True}
+                   break
 
             # create new security group here
             name = 'snap_of_' + tv['name']
@@ -1504,7 +1503,8 @@ def restore_vm_security_groups(cntx, db, restore):
             restored_security_groups[vm_id][tv['pit_id']] = \
                 {'sec_id': security_group['id'],
                  'vm_attached': tv['vm_attached'],
-                 'res_id': tv['res_id']}
+                 'res_id': tv['res_id'],
+                 'fully_formed': True}
             restored_vm_resource_values = {
                 'id': str(
                     uuid.uuid4()),
@@ -1548,7 +1548,7 @@ def restore_vm_security_groups(cntx, db, restore):
 
     for vm_id, restored_security_groups_per_vm in restored_security_groups.iteritems():
         for pit_id, res_map in restored_security_groups_per_vm.iteritems():
-            if pit_id == res_map['sec_id']:
+            if res_map['fully_formed']:
                 continue
 
             security_group_id = res_map['sec_id']
@@ -1563,12 +1563,12 @@ def restore_vm_security_groups(cntx, db, restore):
                 # If found a rule with remote_security group then delete matching rule
                 # from security group and create a new rule with remote
                 # _security group.
-                if vm_security_group_rule_values.get(
-                        'remote_group_id', None) is not None:
+                if not vm_security_group_rule_values.get(
+                        'remote_group_id', None) is None:
                     for sec_group_rule in security_group['security_group_rules']:
                         if match_rule_values(
-                                dict(vm_security_group_rule_values),
-                                dict(sec_group_rule)) is True:
+                                [dict(vm_security_group_rule_values)],
+                                [dict(sec_group_rule)]) is True:
                             network_service.security_group_rule_delete(
                                 cntx, sec_group_rule['id'])
                             break
