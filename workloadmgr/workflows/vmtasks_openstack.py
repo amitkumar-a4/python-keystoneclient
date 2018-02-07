@@ -1498,56 +1498,58 @@ def restore_vm_security_groups(cntx, db, restore):
                 continue
 
             # create new security group here
-            name = 'snap_of_' + tv['name']
-            description = 'snapshot - ' + tv['description']
-            security_group_obj = network_service.security_group_create(
-                cntx, name, description)
-            security_group = security_group_obj.get('security_group')
-            restored_security_groups[vm_id][tv['pit_id']] = \
-                {'sec_id': security_group['id'],
-                 'vm_attached': tv['vm_attached'],
-                 'res_id': tv['res_id'],
-                 'fully_formed': True}
-            restored_vm_resource_values = {
-                'id': str(
-                    uuid.uuid4()),
-                'vm_id': vm_id,
-                'restore_id': restore['id'],
-                'resource_type': 'security_group',
-                'resource_name': security_group['id'],
-                'resource_pit_id': security_group['id'],
-                'metadata': {
-                    'name': security_group['name'],
-                    'security_group_type': 'neutron',
-                    'description': security_group['description']},
-                'status': 'available'}
-            db.restored_vm_resource_create(
-                cntx, restored_vm_resource_values)
+            for t in tg:
+               tv = tgraph.vs[t]
+               name = 'snap_of_' + tv['name']
+               description = 'snapshot - ' + tv['description']
+               security_group_obj = network_service.security_group_create(
+                   cntx, name, description)
+               security_group = security_group_obj.get('security_group')
+               restored_security_groups[vm_id][tv['pit_id']] = \
+                   {'sec_id': security_group['id'],
+                    'vm_attached': tv['vm_attached'],
+                    'res_id': tv['res_id'],
+                    'fully_formed': False}
+               restored_vm_resource_values = {
+                    'id': str(
+                        uuid.uuid4()),
+                    'vm_id': vm_id,
+                    'restore_id': restore['id'],
+                    'resource_type': 'security_group',
+                    'resource_name': security_group['id'],
+                    'resource_pit_id': security_group['id'],
+                    'metadata': {
+                        'name': security_group['name'],
+                        'security_group_type': 'neutron',
+                        'description': security_group['description']},
+                    'status': 'available'}
+               db.restored_vm_resource_create(
+                    cntx, restored_vm_resource_values)
 
-            # delete default rules
-            for security_group_rule in security_group['security_group_rules']:
-                network_service.security_group_rule_delete(
-                    cntx, security_group_rule['id'])
-
-            vm_security_group_rule_snaps = db.vm_security_group_rule_snaps_get(
-                cntx, tv['res_id'])
-            for vm_security_group_rule in vm_security_group_rule_snaps:
-                vm_security_group_rule_values = pickle.loads(
-                    str(vm_security_group_rule.pickle))
-                # creting each security group with remote security group id
-                # as None because till this point we are not aware of
-                # new remote security group id if it's deleted.
-                remote_group_id = None
-                network_service.security_group_rule_create(
-                    cntx,
-                    security_group['id'],
-                    vm_security_group_rule_values['direction'],
-                    vm_security_group_rule_values['ethertype'],
-                    vm_security_group_rule_values['protocol'],
-                    vm_security_group_rule_values['port_range_min'],
-                    vm_security_group_rule_values['port_range_max'],
-                    vm_security_group_rule_values['remote_ip_prefix'],
-                    remote_group_id)
+               # delete default rules
+               for security_group_rule in security_group['security_group_rules']:
+                   network_service.security_group_rule_delete(
+                       cntx, security_group_rule['id'])
+    
+               vm_security_group_rule_snaps = db.vm_security_group_rule_snaps_get(
+                   cntx, tv['res_id'])
+               for vm_security_group_rule in vm_security_group_rule_snaps:
+                   vm_security_group_rule_values = pickle.loads(
+                       str(vm_security_group_rule.pickle))
+                   # creting each security group with remote security group id
+                   # as None because till this point we are not aware of
+                   # new remote security group id if it's deleted.
+                   remote_group_id = None
+                   network_service.security_group_rule_create(
+                       cntx,
+                       security_group['id'],
+                       vm_security_group_rule_values['direction'],
+                       vm_security_group_rule_values['ethertype'],
+                       vm_security_group_rule_values['protocol'],
+                       vm_security_group_rule_values['port_range_min'],
+                       vm_security_group_rule_values['port_range_max'],
+                       vm_security_group_rule_values['remote_ip_prefix'],
+                       remote_group_id)
 
     for vm_id, restored_security_groups_per_vm in restored_security_groups.iteritems():
         for pit_id, res_map in restored_security_groups_per_vm.iteritems():
