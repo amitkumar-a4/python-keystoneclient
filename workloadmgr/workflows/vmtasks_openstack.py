@@ -1494,6 +1494,9 @@ def restore_vm_security_groups(cntx, db, restore):
                         'fully_formed': True}
                    break
 
+            if found:
+                continue
+
             # create new security group here
             name = 'snap_of_' + tv['name']
             description = 'snapshot - ' + tv['description']
