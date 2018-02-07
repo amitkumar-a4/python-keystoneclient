@@ -1453,6 +1453,8 @@ def restore_vm_security_groups(cntx, db, restore):
 
     restored_security_groups = {}
     for vm_id, tgraph in tgraphs.iteritems():
+        if vm_id not in restored_security_groups:
+            restored_security_groups[vm_id] = {}
         for tg in tgraph.components():
 
             for t in tg:
@@ -1484,8 +1486,6 @@ def restore_vm_security_groups(cntx, db, restore):
                         break
 
                 if found:
-                   if vm_id not in restored_security_groups:
-                       restored_security_groups[vm_id] = {}
 
                    restored_security_groups[vm_id][tv['pit_id']] = \
                        {'sec_id': nv['id'],
