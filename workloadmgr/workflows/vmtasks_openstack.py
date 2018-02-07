@@ -1454,14 +1454,35 @@ def restore_vm_security_groups(cntx, db, restore):
     restored_security_groups = {}
     for vm_id, tgraph in tgraphs.iteritems():
         for tg in tgraph.components():
-            tvno = tg[0]
-            tv = tgraph.vs[tvno]
+
+            for t in tg:
+               tv = tgraph.vs[t]
+               if tv['vm_attached']:
+                   # We are only interested in the security groups
+                   # attached to VM
+                   break
+               else:
+                   tv = None
+
+            if tv is None:
+                # We should never be in this position. 
+                continue
+
             found = False
             for ng in ngraph.components():
-                nvno = ng[0]
-                nv = ngraph.vs[nvno]
-                if compare_secgrp_graphs_by_dfs(tgraph, ngraph, tv, nv):
-                    found = True
+                for n in ng:
+                    rules1 = json.loads(ngraph.vs[n]['json'])['security_group_rules']
+                    rules2 =  json.loads(tv['json'])['security_group_rules']
+
+                    # in circular sec group, there is no starting sec grp
+                    # find the sec grp that matches the tv
+                    if not match_rule_values(rules1, rules2):
+                        continue
+                    nv = ngraph.vs[n]
+                    if compare_secgrp_graphs_by_dfs(tgraph, ngraph, tv, nv):
+                        found = True
+                        break
+                if found:
                     break
 
             if vm_id not in restored_security_groups:
