@@ -1076,9 +1076,15 @@ class API(base.Base):
 
         if len(available_policies) > 0 and 'policy_id' not in workload.get('metadata', {})\
                                       and len(workload.get('jobschedule', {})) > 0:
-            msg = "Can not update scheduler settings when policies are "\
+
+            fields = self.db.policy_fields_get_all(context)
+            policy_fields = [f.field_name for f in fields]
+
+            if len(set(workload.get('jobschedule', {}).keys()).intersection(set(policy_fields))) > 0:
+                msg = "Can not update policy fields settings when policies are "\
                     "applied on project, please use available policies: %s" %(available_policies)
-            raise wlm_exceptions.ErrorOccurred(reason=msg)
+                raise wlm_exceptions.ErrorOccurred(reason=msg)
+
         if 'metadata' in workload and workload['metadata']:
             purge_metadata = True
             options['metadata'] = workload['metadata']
