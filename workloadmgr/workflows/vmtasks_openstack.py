@@ -1468,6 +1468,8 @@ def restore_vm_security_groups(cntx, db, restore):
 
             if tv is None:
                 # We should never be in this position. 
+                LOG.debug('The circurlar sec group in the backup does not contain'
+                          ' any groups attached to vm')
                 continue
 
             found = False
