@@ -2,7 +2,6 @@
 # All Rights Reserved.
 
 import os
-import threading
 import time
 from datetime import datetime
 from datetime import timedelta
@@ -10,6 +9,7 @@ from workloadmgr.openstack.common import timeutils
 from workloadmgr.openstack.common import fileutils
 from oslo.config import cfg
 from keystoneclient.v2_0 import client as keystone_v2
+from NamedAtomicLock import NamedAtomicLock
 from workloadmgr.openstack.common import log as logging
 from workloadmgr.vault import vault
 import base64
@@ -34,8 +34,7 @@ CONF = cfg.CONF
 CONF.register_opts(auditlog_opts)
 
 _auditloggers = {}
-lock = threading.Lock()
-
+lock = NamedAtomicLock('auditlog_lock', maxLockAge=15)
 
 def getAuditLogger(name='auditlog', version='unknown',
                    filepath=None, CONF1=None):
