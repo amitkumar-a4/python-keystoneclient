@@ -92,8 +92,11 @@ def set_settings(context, new_settings):
                                             'value': value,
                                             'user_id': context.user_id,
                                             'project_id': context.project_id,
-                                            'status': 'available'})
+                                            'status': 'available',
+                                            'type': "email_settings" if "smtp" in name else None })
+
         upload_settings(name, context)
+
         return get_settings()
     except Exception as ex:
         LOG.exception(ex)
