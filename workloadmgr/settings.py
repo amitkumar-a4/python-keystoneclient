@@ -53,7 +53,12 @@ def get_settings(context=None, get_hidden=False, get_smtp_settings=False):
             context.is_admin = is_admin
             for persisted_setting in persisted_setting_objs:
                 if get_smtp_settings is False:
-                    persisted_settings[persisted_setting.name] = persisted_setting.value
+                    #Filtering smtp_snable setting for corrent context
+                    if persisted_setting.name == 'smtp_email_enable':
+                        if persisted_setting.project_id == context.project_id:
+                            persisted_settings[persisted_setting.name] = persisted_setting.value
+                    else:
+                        persisted_settings[persisted_setting.name] = persisted_setting.value
                 elif get_smtp_settings is True and 'smtp' in persisted_setting.name:
                     persisted_settings[persisted_setting.name] = persisted_setting.value
             for setting, value in copy_settings.iteritems():
@@ -84,9 +89,15 @@ def set_settings(context, new_settings):
             name_found = False
             for persisted_setting in persisted_setting_objs:
                 if persisted_setting.name == name:
-                    db.setting_update(context, name, {'value' : value}, cloud_setting=True)
-                    name_found = True
-                    break
+                    if name == 'smtp_email_enable':
+                        if persisted_setting.project_id == context.project_id:
+                            db.setting_update(context, name, {'value' : value}, cloud_setting=False)
+                            name_found = True
+                            break
+                    else:
+                        db.setting_update(context, name, {'value' : value}, cloud_setting=True)
+                        name_found = True
+                        break
             if not name_found:
                 db.setting_create(context, {'name': name,
                                             'value': value,
@@ -96,8 +107,7 @@ def set_settings(context, new_settings):
                                             'type': "email_settings" if "smtp" in name else None })
 
         upload_settings(name, context)
-
-        return get_settings()
+        return get_settings(context)
     except Exception as ex:
         LOG.exception(ex)
         return default_settings
