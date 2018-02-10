@@ -30,3 +30,4 @@ tzlocal
 fusepy>=2.0.4
 bunch>=1.0.1
 cachetools>=2.0.0
+NamedAtomicLock==1.1.3
