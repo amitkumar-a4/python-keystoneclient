@@ -1021,8 +1021,8 @@ class API(base.Base):
                     else:
                         user_domain_id = 'default'
                     kwargs = {'workload_id': workload.id,
-                              'user_id': context.user_id,
-                              'project_id': context.project_id,
+                              'user_id': workload.user_id,
+                              'project_id': workload.project_id,
                               'user_domain_id': user_domain_id,
                               'user': context.user,
                               'tenant': context.tenant}
@@ -1076,9 +1076,15 @@ class API(base.Base):
 
         if len(available_policies) > 0 and 'policy_id' not in workload.get('metadata', {})\
                                       and len(workload.get('jobschedule', {})) > 0:
-            msg = "Can not update scheduler settings when policies are "\
+
+            fields = self.db.policy_fields_get_all(context)
+            policy_fields = [f.field_name for f in fields]
+
+            if len(set(workload.get('jobschedule', {}).keys()).intersection(set(policy_fields))) > 0:
+                msg = "Can not update policy fields settings when policies are "\
                     "applied on project, please use available policies: %s" %(available_policies)
-            raise wlm_exceptions.ErrorOccurred(reason=msg)
+                raise wlm_exceptions.ErrorOccurred(reason=msg)
+
         if 'metadata' in workload and workload['metadata']:
             purge_metadata = True
             options['metadata'] = workload['metadata']
@@ -1221,19 +1227,7 @@ class API(base.Base):
             workload_obj = self.db.workload_update(
                 context, workload_id, options, purge_metadata)
             if unpause_workload is True:
-                #When scheduler is enabled by admin, context will contain
-                #user and tenant details of admin only. Which will get saved
-                #in scheduler jobs. When scheduler will run the job, it will
-                #use admin details to run the job,  even for workloads of other
-                #projects as well. That snapshot will fail as using admin creds
-                #scheduler will not be able to find workloads of other projects.
-                user_id = context.user_id
-                project_id = context.project_id
-                context.user_id = workloadobj['user_id']
-                context.project_id = workloadobj['project_id']
                 self.workload_resume(context, workload_id)
-                context.user_id = user_id
-                context.project_id = project_id
         except Exception as ex:
             LOG.exception(ex)
             raise wlm_exceptions.ErrorOccurred(

@@ -865,13 +865,17 @@ class WorkloadMgrsController(wsgi.Controller):
             context = req.environ['workloadmgr.context']
             html = '<html><head></head><body>'
             html += 'Test email</body></html>'
+            required_settings = ['smtp_server_name', 'smtp_server_password', 'smtp_port',
+                                 'smtp_server_username', 'smtp_timeout', 'smtp_default_sender']
             try:
                 settings = settings_module.get_settings(context)
                 import re
-                found_smtp_settings = False
+                for required_setting in required_settings:
+                    if settings_module.get_settings(context).get(required_setting) is None:
+                       raise exception.ErrorOccurred("Required e-mail settings not found. Save them first.")
+
                 for setting in settings:
                     if setting.strip().find('smtp_') >= 0:
-                        found_smtp_settings = True
                         value = settings_module.get_settings(
                             context).get(setting)
                         if (value == "" or len(value) <=
@@ -888,9 +892,6 @@ class WorkloadMgrsController(wsgi.Controller):
                         elif setting == 'smtp_timeout' and int(value) > 10:
                             raise exception.ErrorOccurred(
                                 setting + " cannot be greater than 10")
-
-                if found_smtp_settings is not True:
-                   raise exception.ErrorOccurred("No Email settings found. Save them first.")
 
                 msg = MIMEMultipart('alternative')
                 msg['From'] = settings_module.get_settings(

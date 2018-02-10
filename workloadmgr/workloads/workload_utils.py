@@ -41,7 +41,7 @@ def upload_settings_db_entry(cntx):
     settings_db = db.setting_get_all(
         None, read_deleted='no', backup_settings=True)
     for setting in settings_db:
-        if 'password' in setting.name.lower():
+        if 'password' in setting.name.lower() and 'smtp_server_password' not in setting.name:
             setting.value = '******'
         for kvpair in setting.metadata:
             if 'Password' in kvpair['key'] or 'password' in kvpair['key']:
