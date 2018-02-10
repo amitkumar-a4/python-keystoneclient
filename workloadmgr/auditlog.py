@@ -159,5 +159,6 @@ class AuditLog(object):
 
         records = _get_records_from_audit_file()
         # for backward compatilibity
-        records += _get_records_from_audit_file(CONF.legacy_audit_log_file)
+        if os.path.exists(CONF.legacy_audit_log_file):
+            records += _get_records_from_audit_file(CONF.legacy_audit_log_file)
         return records
