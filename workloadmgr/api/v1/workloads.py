@@ -929,17 +929,19 @@ class WorkloadMgrsController(wsgi.Controller):
                     else:
                         msg = "Error authenticating with given email settings."
                     raise exception.ErrorOccurred(msg)
+
             except Exception as error:
+                LOG.exception(error)
                 msg = error
                 try:
                     if hasattr(error, 'message') and error.message[0] == -5:
                         msg = 'smtp_server_name is not valid'
+                    if hasattr(error, 'errno') and int(error.errno) == -3:
+                        msg = 'SMTP server is unreachable'
                     if hasattr(error, 'message') and error.message.__class__.__name__ == 'timeout':
                         msg = 'smtp server unreachable with this smtp_server_name and smtp_port values'
                     if hasattr(error, 'strerror') and error.strerror != '':
                         msg = error.strerror
-                    if 'reason' in error.message:
-                        msg = error.args[0]
                 except Exception as ex:
                     msg = "Error validation email settings"
                 raise exception.ErrorOccurred(msg)
