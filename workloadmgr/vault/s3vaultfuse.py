@@ -1276,7 +1276,6 @@ class BackendRepository(ObjectRepository):
         if obj != '' and obj != '/':
             args1.append(obj)
         try:
-            # import pdb; pdb.set_trace()
             self.__backend.rmdir_object(args1, _opts)
         except Exception as ex:
             LOG.exception(ex)
