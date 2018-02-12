@@ -58,6 +58,7 @@ from workloadmgr.openstack.common import timeutils
 import boto3
 import botocore
 from botocore.exceptions import ClientError
+from botocore.exceptions import ConnectionError
 
 
 logging.basicConfig(
@@ -2419,7 +2420,7 @@ def service_action(service_display_name, action):
                 'workloads_service': 'wlm-workloads',
                 #'inventory_service': 'nova-api',
                 #'tvault_gui_service': 'tvault-gui',
-               }
+                }
     try:
         Config = ConfigParser.RawConfigParser()
         Config.read('/etc/tvault-config/tvault-config.conf')
@@ -4334,9 +4335,9 @@ def configure_openstack():
 
             if config_data['s3_backend_type'].lower() != 'amazon':
                 config_data['vault_s3_endpoint_url'] = config_inputs['s3-endpoint-url']
+                config_data['vault_s3_ssl'] = config_inputs['s3-use-ssl']
 
             if config_data['s3_backend_type'].lower() == 'minio':
-                config_data['vault_s3_ssl'] = config_inputs['s3-use-ssl']
                 config_data['vault_s3_signature_version'] = 's3v4'
                 config_data['vault_s3_support_empty_dir'] = 'True'
 
@@ -4604,6 +4605,7 @@ def validate_s3_credentials():
     s3_region = bottle.request.query['s3_region']
     s3_bucket = bottle.request.query['s3_bucket']
     s3_signature_version = bottle.request.query['s3_signature']
+    s3_backend_type = bottle.request.query['s3_backend_type']
     s3_config_object = None
     if s3_signature_version != 'default' and s3_signature_version != '':
         s3_config_object = botocore.client.Config(signature_version=s3_signature_version)
@@ -4618,13 +4620,30 @@ def validate_s3_credentials():
                                  config=s3_config_object)
 
         bucket_info = s3_client.head_bucket(Bucket=s3_bucket)
+    except ConnectionError as error:
+        return bottle.HTTPResponse(status=500, body='Connection Error: Verify endpoint URL, region, and SSL settings if applicable.')
+
     except ClientError as error:
         if error.response['ResponseMetadata']['HTTPStatusCode'] == 404:
-            return bottle.HTTPResponse(status=404, body='S3 bucket not found.')
+            return bottle.HTTPResponse(status=404, body='S3 bucket not found: Verify bucket name.')
         elif error.response['ResponseMetadata']['HTTPStatusCode'] == 403:
-            return bottle.HTTPResponse(status=403, body='Authorization error. Check keys and bucket values.')
+            return bottle.HTTPResponse(status=403, body='Authorization error: Verify keys and bucket values.')
         else:
             return bottle.HTTPResponse(status=500, body=str(error))
+
+    # Add a check to see if the current file system on the OSD(s) will support
+    # our path length.
+    if s3_backend_type == 'Ceph':
+        try:
+            long_key = 'tvault_config/workload_f5190be6-7f80-4856-8c24-149cb40500c5/snapshot_f2e5c6a7-3c21-4b7f-969c-915bb408c64f/vm_id_e81d1ac8-b49a-4ccf-9d92-5f1ef358f1be/vm_res_id_72477d99-c475-4a5d-90ae-2560f5f3b319_vda/deac2b8a-dca9-4415-adc1-f3c6598204ed-segments/0000000000000000.00000000'
+            s3_client.put_object(Bucket=s3_bucket, Key=long_key, Body='Test Data')
+        except ClientError as error:
+            if error.response['Error']['Code'] == 'UnknownError':
+                return bottle.HTTPResponse(status=500, body='Error: Ceph object store does not support object names greater than 256 characters.')
+            else:
+                return bottle.HTTPResponse(status=500, body=str(error))
+
+        s3_client.delete_object(Bucket=s3_bucket, Key=long_key)
 
     return {'status': 'Success'}
 

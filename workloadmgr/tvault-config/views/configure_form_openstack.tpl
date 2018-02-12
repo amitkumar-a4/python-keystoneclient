@@ -27,7 +27,7 @@
 <!--  More information about jquery.validate here: http://jqueryvalidation.org/     -->
 <script src="js/jquery.validate.min.js" type="text/javascript"></script>
 
-<script src="js/bootstrap-tagsinput.min.js"></script>
+<script src="js/bootstrap-tagsinput.min.js" type="text/javascript"></script>
 
 <style>
 .bootstrap-tagsinput > span {
@@ -87,20 +87,22 @@ function validate_swift_credentials(inputelement) {
 function validate_s3_credentials(inputelement) {
     s3_access_key_id = $('[name="s3-access-key"]')[0].value
     s3_secret_access_key = encodeURIComponent($('[name="s3-secret-key"]')[0].value)
-    s3_region = $('[name="s3-region"]')[0].value
     s3_bucket = $('[name="s3-bucket"]')[0].value
-    if (($('[name="s3-backend-type"]')[0].value == 'Amazon') && ($('[name="s3-backend-type"]')[0].checked == false)) {
+    obj = $("#configure_openstack input[name='s3-backend-type']:checked")
+    inputelement = obj
+    s3_backend_type = obj.val()
+    if (s3_backend_type != 'Amazon') {
       s3_endpoint = $('[name="s3-endpoint-url"]')[0].value
       s3_ssl = $('[name="s3-use-ssl"]')[0].value
       s3_signature_version = $('[name="s3-signature-version"]')[0].value
+      s3_region = 'us-east-1'
     }
     else {
       s3_endpoint = ''
       s3_ssl = 'True'
       s3_signature_version = 'default'
+      s3_region = $('[name="s3-region"]')[0].value
     }
-    obj = $("#configure_openstack input[name='s3-backend-type']:checked")
-    inputelement = obj
     $.ajax({
         url: "validate_s3_credentials?s3_access_key_id="+s3_access_key_id+
              "&s3_secret_access_key="+s3_secret_access_key+
@@ -108,7 +110,8 @@ function validate_s3_credentials(inputelement) {
              "&s3_ssl="+s3_ssl+
              "&s3_region="+s3_region+
              "&s3_bucket="+s3_bucket+
-             "&s3_signature="+s3_signature_version,
+             "&s3_signature="+s3_signature_version+
+             "&s3_backend_type="+s3_backend_type,
         beforeSend: function() {
            spinelement = $($($(inputelement).parent()[0])[0]).find(".fa-spinner")
            $(spinelement[0]).removeClass("hidden")
@@ -177,7 +180,6 @@ function hideshowstorages() {
      $($('#s3storage-panel')[0]).removeClass('hidden');
      obj = $("#configure_openstack input[name='s3-backend-type']:checked")
      setS3Required(obj.attr('checked'), obj.val())
-     //validate_swift_credentials('custom')
   }
 }
 
@@ -230,31 +232,47 @@ function setS3Required(checked, val) {
          }
          val = obj.val()
      }
-     if((checked==true || checked=='checked') && (val=='Minio' || val=='Ceph')) {
+
+     $('#s3-signature-version-div').toggle(false)
+     $('[name="s3-signature-version"]').removeAttr('required')
+     $('[name="s3-signature-version"]')[0].value = 'default'
+     $('#s3-use-ssl-div').toggle(false)
+     $('[name="s3-use-ssl"]').removeAttr('required')
+
+     if(val=='Minio' || val=='Ceph') {
         $('[name="s3-access-key"]').attr("required", "true");
-        $('[name="s3-secret-key"]').attr("required", "true");
-        $('[name="s3-region"]').attr("required", "true");
-        $('[name="s3-bucket"]').attr("required", "true");
-        $('[name="s3-endpoint-url"]').attr("required", "true");
-        $('[name="s3-use-ssl"]').attr("required", "true");
         $('#s3-access-key-div').toggle(true)
+        $('[name="s3-secret-key"]').attr("required", "true");
         $('#s3-secret-key-div').toggle(true)
-        $('#s3-region-div').toggle(true)
+        $('[name="s3-region"]').removeAttr('required')
+        $('#s3-region-div').toggle(false)
+        $('[name="s3-bucket"]').attr("required", "true");
         $('#s3-bucket-div').toggle(true)
+        $('[name="s3-endpoint-url"]').attr("required", "true");
         $('#s3-endpoint-url-div').toggle(true)
-        $('#s3-use-ssl-div').toggle(true)
-        $('#s3-signature-version-div').toggle(false)
-        $('[name="s3-signature-version"]').removeAttr('required')
+        $('#s3-ssl-checkbox-div').toggle(true)
+        if ($('[name="s3-use-ssl"]')[0].value = 'True') {
+          // $('#s3-ssl-checkbox-div').attr('checked', 'checked').change()
+          $('[name="s3-ssl-checkbox"]').attr("checked", true);
+        }
+        else {
+          // $('#s3-ssl-checkbox-div').attr('checked', '').change()
+          $('[name="s3-ssl-checkbox"]').attr("checked", false);
+        }
         if (val =='Minio') {
           $('[name="s3-signature-version"]')[0].value = 's3v4'
         }
      }
      if(val == 'Amazon') {
+        $('[name="s3-region"]').attr("required", "true");
+        $('#s3-region-div').toggle(true)
         $('#s3-endpoint-url-div').toggle(false)
-        $('#s3-use-ssl-div').toggle(false)
-        $('#s3-signature-version-div').toggle(false)
         $('[name="s3-endpoint-url"]').removeAttr('required')
-        $('[name="s3-use-ssl"]').removeAttr('required')
+        $('[name="s3-endpoint-url"]')[0].value = ''
+        $('#s3-ssl-checkbox-div').toggle(false)
+        $('[name="s3-ssl-checkbox"]').removeAttr('required')
+        $('[name="s3-use-ssl"]')[0].value = 'True'
+        $('#s3-signature-version-div').toggle(false)
         $('[name="s3-signature-version"]').removeAttr('required')
         $('[name="s3-signature-version"]')[0].value = 'default'
      }
@@ -696,6 +714,11 @@ function setS3Required(checked, val) {
                                                                          <input name="s3-region" {{'value=' + vault_s3_region_name if (defined('vault_s3_region_name') and len(vault_s3_region_name)) else ''}} type="text" placeholder="" class="form-control"> <br>
                                                                          <span id="s3url_helpblock" class="help-block hidden">A block of help text that breaks onto a new line and may extend beyond one line.</span>
                                                                      </div>
+                                                                     <div class="input-group" id="s3-endpoint-url-div">
+                                                                         <label class="control-label">Endpoint URL&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;</label>
+                                                                         <input name="s3-endpoint-url" {{'value=' + vault_s3_endpoint_url if (defined('vault_s3_endpoint_url') and len(vault_s3_endpoint_url)) else ''}} type="text" placeholder="http://127.0.0.1:9000" class="form-control"> <br>
+                                                                         <span id="s3url_helpblock" class="help-block hidden">A block of help text that breaks onto a new line and may extend beyond one line.</span>
+                                                                     </div>
                                                                  </div>
                                                                  <div class="col-sm-7">
                                                                      <div class="input-group" id="s3-bucket-div">
@@ -704,19 +727,19 @@ function setS3Required(checked, val) {
                                                                          <span id="s3url_helpblock" class="help-block hidden">A block of help text that breaks onto a new line and may extend beyond one line.</span>
                                                                      </div>
                                                                  </div>
-                                                                 <div class="col-sm-5">
-                                                                     <div class="input-group" id="s3-endpoint-url-div">
-                                                                         <label class="control-label">Endpoint URL&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;</label>
-                                                                         <input name="s3-endpoint-url" {{'value=' + vault_s3_endpoint_url if (defined('vault_s3_endpoint_url') and len(vault_s3_endpoint_url)) else ''}} type="text" placeholder="http://127.0.0.1:9000" class="form-control"> <br>
-                                                                         <span id="s3url_helpblock" class="help-block hidden">A block of help text that breaks onto a new line and may extend beyond one line.</span>
+                                                                 <div class="col-sm-7">
+                                                                     <div class="input-group" id="s3-ssl-checkbox-div">
+                                                                       %if 'vault_s3_ssl' in locals() and vault_s3_ssl == 'True':
+                                                                         <input name="s3-ssl-checkbox" checked id="s3-ssl-checkbox-div" type="checkbox"> Use SSL<br>
+                                                                       %else:
+                                                                         <input name="s3-ssl-checkbox" id="s3-ssl-checkbox-div" type="checkbox"> Use SSL<br>
+                                                                       %end
                                                                      </div>
                                                                  </div>
-                                                                 <div class="col-sm-7">
-                                                                     <div class="input-group" id="s3-use-ssl-div">
-                                                                         <label class="control-label">Use SSL&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;</label>
-                                                                         <input name="s3-use-ssl" {{'value=' + vault_s3_ssl if (defined('vault_s3_ssl') and len(vault_s3_ssl)) else ''}} type="text" placeholder="False" class="form-control"> <br>
-                                                                         <span id="s3url_helpblock" class="help-block hidden">A block of help text that breaks onto a new line and may extend beyond one line.</span>
-                                                                     </div>
+                                                                 <div class="input-group" id="s3-use-ssl-div">
+                                                                     <label class="control-label">SSL&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;</label>
+                                                                     <input name="s3-use-ssl" {{'value=' + vault_s3_ssl if (defined('vault_s3_ssl') and len(vault_s3_ssl)) else ''}} type="text" placeholder="" class="form-control"> <br>
+                                                                     <span id="s3url_helpblock" class="help-block hidden">A block of help text that breaks onto a new line and may extend beyond one line.</span>
                                                                  </div>
                                                                  <div class="input-group" id="s3-signature-version-div">
                                                                      <label class="control-label">Signature Version&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;</label>
@@ -741,6 +764,7 @@ function setS3Required(checked, val) {
                                                             <input name="workloads-import" checked id="workloads-import" type="checkbox"> Import workloads metadata from backup media. <span style="font-size:11px;">Choose this option if you are upgrading TrilioVault VM.</span>
                                                         %else:
                                                             <a data-toggle="collapse" data-target="#collapseFour" href="#collapseFour"> Import Workloads </a>
+                                                        %end
                                                       </div>
                                                   </div>
                                                 </div>
@@ -827,6 +851,17 @@ if($(this).is(':checked'))
 else
 {
     $('#ntp-servers').removeAttr('required');
+}
+});
+
+$('#s3-ssl-checkbox-div').click(function(){
+if($(this).is(':checked'))
+{
+    $('[name="s3-use-ssl"]')[0].value = 'True'
+}
+else
+{
+    $('[name="s3-use-ssl"]')[0].value = 'False'
 }
 });
 
