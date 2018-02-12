@@ -1,7 +1,7 @@
 #!/usr/bin/env python
 # vim: tabstop=4 shiftwidth=4 softtabstop=4
 
-# Copyright (c) 2017 Trilio Data, Inc.
+# Copyright (c) 2018 Trilio Data, Inc.
 # All Rights Reserved.
 """ Trilio Fuse plugin implimentation
 
@@ -856,7 +856,7 @@ class BackendRepository(ObjectRepository):
                     object_name, object_manifest, metadata={
                         'segments-dir': segments_dir,
                         'segments': str(segments),
-                        'total_size': str(total_size)})
+                        'total-size': str(total_size)})
 
                 offset = 0
                 while True:
@@ -1334,7 +1334,7 @@ class BackendRepository(ObjectRepository):
                 new, new_manifest, metadata={
                     'segments-dir': segments_dir,
                     'segments': old_metadata['segments'],
-                    'total_size': old_metadata['total_size']})
+                    'total-size': old_metadata['total_size']})
             self.object_unlink(old, leave_segments=True)
         except BaseException:
             self.object_unlink(new, leave_segments=True)

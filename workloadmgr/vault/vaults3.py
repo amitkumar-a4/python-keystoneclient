@@ -106,7 +106,7 @@ class S3Backend(object):
             list_paginator = self.__client.get_paginator('list_objects_v2')
             page_iterator = list_paginator.paginate(Bucket=self.__bucket_name, Prefix=object_tree)
             for objects in page_iterator:
-                if objects['KeyCount'] > 0:
+                if 'Contents' in objects and objects.get('KeyCount', len(objects['Contents'])) > 0:
                     for obj in objects['Contents']:
                         object_list.append(obj['Key'])
 
@@ -267,7 +267,7 @@ class S3Backend(object):
                 page_iterator = list_paginator.paginate(Bucket=self.__bucket_name,
                                                         Prefix=prefix)
             for objects in page_iterator:
-                if objects['KeyCount'] > 0 and 'Contents' in objects:
+                if 'Contents' in objects and objects.get('KeyCount', len(objects['Contents'])) > 0:
                     split_token = prefix + '/'
                     for item in objects['Contents']:
                         path, object_name = os.path.split(item['Key'].rstrip('/'))
@@ -418,7 +418,7 @@ class S3Backend(object):
 
                 if stat_data['headers']['Metadata'].get('x-object-meta-segments', 0) > 0:
                     stat_data['size'] = stat_data['headers']['Metadata'].get(
-                        'x-object-meta-total_size', 0)
+                        'x-object-meta-total-size', 0)
                 else:
                     stat_data['size'] = obj_header['ContentLength']
 
