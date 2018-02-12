@@ -1035,12 +1035,10 @@ def restored_instance_get(context, instance_id, **kwargs):
             and_(models.RestoredVMMetadata.key == 'instance_id'), models.RestoredVMMetadata.value == instance_id,
                   models.RestoredVMs.deleted == False)
     restored_vms = [vm.vm_id for vm in query.all()]
-    if len(restored_vms) > 0:
-        query = session.query(models.WorkloadVMs).filter(
-            and_(models.WorkloadVMs.vm_id.in_(restored_vms), models.WorkloadVMs.deleted == False))
-        return query.all()
-    else:
-        return restored_vms
+    restored_vms.append(instance_id)
+    query = session.query(models.WorkloadVMs).filter(
+        and_(models.WorkloadVMs.vm_id.in_(restored_vms), models.WorkloadVMs.deleted == False))
+    return query.all()
 
 #
 
@@ -4694,7 +4692,8 @@ def get_tenants_usage(context, **kwargs):
         tenant_chargeback = {}
         session = get_session()
         qry = session.query(models.Snapshots.project_id, func.sum(cast(models.Snapshots.size, Integer))).\
-            group_by(models.Snapshots.project_id)
+            group_by(models.Snapshots.project_id).filter_by(deleted=False)
+
         result = qry.all()
         for proj_id, storage_used in result:
             if proj_id not in tenant_chargeback:

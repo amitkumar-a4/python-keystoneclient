@@ -1007,7 +1007,7 @@ class API(base.Base):
             self, context, jobschedule, workload, is_config_backup=False):
         if self._scheduler.running is True:
             if jobschedule and len(jobschedule):
-                if jobschedule.get('enabled', False) is True:
+                if str(jobschedule.get('enabled', False)).lower() == 'true':
                     if hasattr(context, 'user_domain_id'):
                         if context.user_domain_id is None:
                             user_domain_id = 'default'
@@ -1021,8 +1021,8 @@ class API(base.Base):
                     else:
                         user_domain_id = 'default'
                     kwargs = {'workload_id': workload.id,
-                              'user_id': context.user_id,
-                              'project_id': context.project_id,
+                              'user_id': workload.user_id,
+                              'project_id': workload.project_id,
                               'user_domain_id': user_domain_id,
                               'user': context.user,
                               'tenant': context.tenant}
@@ -1071,15 +1071,25 @@ class API(base.Base):
         if 'description' in workload and workload['description']:
             options['display_description'] = workload['description']
 
+        assignments = self.get_assigned_policies(context, context.project_id)
+        available_policies = [assignment.policy_id for assignment in assignments]
+
+        if len(available_policies) > 0 and 'policy_id' not in workload.get('metadata', {})\
+                                      and len(workload.get('jobschedule', {})) > 0:
+
+            fields = self.db.policy_fields_get_all(context)
+            policy_fields = [f.field_name for f in fields]
+
+            if len(set(workload.get('jobschedule', {}).keys()).intersection(set(policy_fields))) > 0:
+                msg = "Can not update policy fields settings when policies are "\
+                    "applied on project, please use available policies: %s" %(available_policies)
+                raise wlm_exceptions.ErrorOccurred(reason=msg)
+
         if 'metadata' in workload and workload['metadata']:
             purge_metadata = True
             options['metadata'] = workload['metadata']
             if 'policy_id' in workload['metadata'] and workload['metadata']['policy_id'] is not None:
                 policy_id = workload['metadata']['policy_id']
-                assignments = self.get_assigned_policies(
-                    context, context.project_id)
-                available_policies = [
-                    assignment.policy_id for assignment in assignments]
                 if policy_id not in available_policies:
                     message = "Policy %s is not assigned to project %s" % (
                         policy_id, context.project_id)
@@ -1217,19 +1227,7 @@ class API(base.Base):
             workload_obj = self.db.workload_update(
                 context, workload_id, options, purge_metadata)
             if unpause_workload is True:
-                #When scheduler is enabled by admin, context will contain
-                #user and tenant details of admin only. Which will get saved
-                #in scheduler jobs. When scheduler will run the job, it will
-                #use admin details to run the job,  even for workloads of other
-                #projects as well. That snapshot will fail as using admin creds
-                #scheduler will not be able to find workloads of other projects.
-                user_id = context.user_id
-                project_id = context.project_id
-                context.user_id = workloadobj['user_id']
-                context.project_id = workloadobj['project_id']
                 self.workload_resume(context, workload_id)
-                context.user_id = user_id
-                context.project_id = project_id
         except Exception as ex:
             LOG.exception(ex)
             raise wlm_exceptions.ErrorOccurred(

@@ -47,7 +47,7 @@ function validate_swift_credentials(inputelement) {
     region_name = $('[name="region-name"]')[0].value
     swift_auth_url = $('[name="swift-auth-url"]')[0].value
     swift_username = $('[name="swift-username"]')[0].value
-    swift_password = $('[name="swift-password"]')[0].value
+    swift_password = encodeURIComponent($('[name="swift-password"]')[0].value)
     obj = $("#configure_openstack input[name='swift-auth-version']:checked")
     inputelement = obj
     /*if (inputelement.name != 'swift-auth-version' || inputelement == 'custom') {

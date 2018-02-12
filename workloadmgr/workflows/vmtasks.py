@@ -141,8 +141,8 @@ class RestoreSecurityGroups(task.Task):
                 self.security_groups = vmtasks_vcloud.restore_vm_security_groups(
                     cntx, db, restore)
             return self.security_groups
-        except BaseException:
-            pass
+        except BaseException as ex:
+            LOG.exception(ex)
 
     @autolog.log_method(Logger, 'RestoreSecurityGroups.revert')
     def revert_with_log(self, *args, **kwargs):
@@ -1259,7 +1259,7 @@ def LinearFreezeVMs(instances):
 
 def UnorderedPauseVMs(instances):
     flow = uf.Flow("pausevmsuf")
-    if instances[0]['pause_at_snapshot']:
+    if not instances[0]['pause_at_snapshot'] in (False, str(0), 0):
         for index, item in enumerate(instances):
             flow.add(
                 PauseVM(
@@ -1278,7 +1278,7 @@ def UnorderedPauseVMs(instances):
 
 def LinearPauseVMs(instances):
     flow = lf.Flow("pausevmslf")
-    if instances[0]['pause_at_snapshot']:
+    if not instances[0]['pause_at_snapshot'] in (False, str(0), 0):
         for index, item in enumerate(instances):
             flow.add(
                 PauseVM(
@@ -1328,7 +1328,7 @@ def LinearSnapshotVMs(instances):
 def UnorderedUnPauseVMs(instances):
     flow = uf.Flow("unpausevmsuf")
     for index, item in enumerate(instances):
-        if item['pause_at_snapshot']:
+        if not item['pause_at_snapshot'] in (False, str(0), 0):
             flow.add(
                 UnPauseVM(
                     "UnPauseVM_" +
@@ -1345,7 +1345,7 @@ def UnorderedUnPauseVMs(instances):
 def LinearUnPauseVMs(instances):
     flow = lf.Flow("unpausevmslf")
     for index, item in enumerate(instances):
-        if item['pause_at_snapshot']:
+        if not item['pause_at_snapshot'] in (False, str(0), 0):
             flow.add(
                 UnPauseVM(
                     "UnPauseVM_" +

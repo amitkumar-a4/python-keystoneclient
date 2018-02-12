@@ -978,7 +978,7 @@ class ObjectStoreTrilioVaultBackupTarget(NfsTrilioVaultBackupTarget):
     def snapshot_delete(self, context, snapshot_metadata):
         try:
             snapshot_path = self.get_snapshot_path(snapshot_metadata)
-            _delete_path(snapshot_path)
+            self._delete_path(snapshot_path)
         except Exception as ex:
             LOG.exception(ex)
 
@@ -986,7 +986,7 @@ class ObjectStoreTrilioVaultBackupTarget(NfsTrilioVaultBackupTarget):
     def config_backup_delete(self, context, backup_id):
         try:
             backup_path = self.get_config_backup_path(backup_id)
-            _delete_path(backup_path)
+            self._delete_path(backup_path)
         except Exception as ex:
             LOG.exception(ex)
 

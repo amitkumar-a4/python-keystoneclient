@@ -865,9 +865,15 @@ class WorkloadMgrsController(wsgi.Controller):
             context = req.environ['workloadmgr.context']
             html = '<html><head></head><body>'
             html += 'Test email</body></html>'
+            required_settings = ['smtp_server_name', 'smtp_server_password', 'smtp_port',
+                                 'smtp_server_username', 'smtp_timeout', 'smtp_default_sender']
             try:
                 settings = settings_module.get_settings(context)
                 import re
+                for required_setting in required_settings:
+                    if settings_module.get_settings(context).get(required_setting) is None:
+                       raise exception.ErrorOccurred("Required e-mail settings not found. Save them first.")
+
                 for setting in settings:
                     if setting.strip().find('smtp_') >= 0:
                         value = settings_module.get_settings(
@@ -918,22 +924,24 @@ class WorkloadMgrsController(wsgi.Controller):
                     s.sendmail(msg['From'], msg['To'], msg.as_string())
                     s.quit()
                 except smtplib.SMTPException as ex:
-                    if ex.smtp_code == 535:
+                    if getattr(ex, 'smtp_code', 0)  == 535:
                         msg = ex.smtp_error
                     else:
-                        msg = "Error authenticating with specified username and password"
+                        msg = "Error authenticating with given email settings."
                     raise exception.ErrorOccurred(msg)
+
             except Exception as error:
+                LOG.exception(error)
                 msg = error
                 try:
-                    if error.message != '' and error.message[0] == -5:
+                    if hasattr(error, 'message') and error.message[0] == -5:
                         msg = 'smtp_server_name is not valid'
-                    if error.message != '' and error.message.__class__.__name__ == 'timeout':
+                    if hasattr(error, 'errno') and int(error.errno) == -3:
+                        msg = 'SMTP server is unreachable'
+                    if hasattr(error, 'message') and error.message.__class__.__name__ == 'timeout':
                         msg = 'smtp server unreachable with this smtp_server_name and smtp_port values'
                     if hasattr(error, 'strerror') and error.strerror != '':
                         msg = error.strerror
-                    if '%(reason)' in error.message:
-                        msg = error.args[0]
                 except Exception as ex:
                     msg = "Error validation email settings"
                 raise exception.ErrorOccurred(msg)
