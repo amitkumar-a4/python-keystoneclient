@@ -902,11 +902,11 @@ class SwiftTrilioVaultBackupTarget(NfsTrilioVaultBackupTarget):
     def __init__(self, backupendpoint):
         super(SwiftTrilioVaultBackupTarget, self).__init__(backupendpoint)
 
-    def _delete_path(path):
+    def _delete_path(self, path):
         retry = 0
-        while os.path.isdir(backup_path):
+        while os.path.isdir(path):
             try:
-                command = ['rm', '-rf', backup_path]
+                command = ['rm', '-rf', path]
                 subprocess.check_call(command, shell=False)
             except BaseException:
                 pass
