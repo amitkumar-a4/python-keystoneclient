@@ -1,6 +1,6 @@
 # vim: tabstop=4 shiftwidth=4 softtabstop=4
 
-# Copyright (c) 2013 TrilioData, Inc.
+# Copyright (c) 2013-2017 Trilio Data, Inc.
 # All Rights Reserved.
 
 """
@@ -425,7 +425,7 @@ class NfsTrilioVaultBackupTarget(TrilioVaultBackupTarget):
             base64encode = base64.b64encode(backupendpoint)
             mountpath = os.path.join(CONF.vault_data_directory,
                                      base64encode)
-            self.umount_backup_target_swift()
+            self.umount_backup_target_object_store()
             fileutils.ensure_tree(mountpath)
             self.__mountpath = mountpath
             super(
@@ -437,14 +437,15 @@ class NfsTrilioVaultBackupTarget(TrilioVaultBackupTarget):
             if not self.is_mounted():
                 utils.chmod(mountpath, '0777')
 
-        elif CONF.vault_storage_type == 'swift-s':
+        elif (CONF.vault_storage_type.lower() == 'swift-s' or
+              CONF.vault_storage_type.lower() == 's3'):
             mountpath = CONF.vault_data_directory
             self.__mountpath = mountpath
             super(
                 NfsTrilioVaultBackupTarget,
                 self).__init__(
                 backupendpoint,
-                "swift-s",
+                CONF.vault_storage_type.lower(),
                 mountpath=mountpath)
 
     def get_progress_tracker_directory(self, tracker_metadata):
@@ -656,9 +657,9 @@ class NfsTrilioVaultBackupTarget(TrilioVaultBackupTarget):
 
         return len(mounts) and mounts[0].get(mountpath, None) == nfsshare
 
-    def umount_backup_target_swift(self):
+    def umount_backup_target_object_store(self):
         try:
-            command = ['sudo', 'service', 'tvault-swift', 'stop']
+            command = ['sudo', 'service', 'tvault-object-store', 'stop']
             subprocess.check_call(command, shell=False)
         except Exception as ex:
             pass
@@ -898,9 +899,9 @@ class NfsTrilioVaultBackupTarget(TrilioVaultBackupTarget):
             raise
 
 
-class SwiftTrilioVaultBackupTarget(NfsTrilioVaultBackupTarget):
+class ObjectStoreTrilioVaultBackupTarget(NfsTrilioVaultBackupTarget):
     def __init__(self, backupendpoint):
-        super(SwiftTrilioVaultBackupTarget, self).__init__(backupendpoint)
+        super(ObjectStoreTrilioVaultBackupTarget, self).__init__(backupendpoint)
 
     def _delete_path(self, path):
         retry = 0
@@ -931,7 +932,7 @@ class SwiftTrilioVaultBackupTarget(NfsTrilioVaultBackupTarget):
     @autolog.log_method(logger=Logger)
     def mount_backup_target(self, old_share=False):
         try:
-            command = ['sudo', 'service', 'tvault-swift', 'start']
+            command = ['sudo', 'service', 'tvault-object-store', 'start']
             subprocess.check_call(command, shell=False)
         except Exception as ex:
             pass
@@ -940,7 +941,7 @@ class SwiftTrilioVaultBackupTarget(NfsTrilioVaultBackupTarget):
     def is_online(self):
         status = False
         stdout, stderr = utils.execute(
-            'sudo', 'service', 'tvault-swift', 'status', run_as_root=False)
+            'sudo', 'service', 'tvault-object-store', 'status', run_as_root=False)
         if 'running' in stdout:
             stdout, stderr = utils.execute('stat', '-f', self.mount_path)
             if stderr != '':
@@ -955,7 +956,7 @@ class SwiftTrilioVaultBackupTarget(NfsTrilioVaultBackupTarget):
     @autolog.log_method(logger=Logger)
     def umount_backup_target(self):
         try:
-            command = ['sudo', 'service', 'tvault-swift', 'stop']
+            command = ['sudo', 'service', 'tvault-object-store', 'stop']
             subprocess.check_call(command, shell=False)
         except Exception as ex:
             pass
@@ -1030,10 +1031,11 @@ def mount_backup_media():
         backup_target = backup_target.strip()
         if backup_target == '':
             continue
-        if CONF.vault_storage_type == 'nfs':
+        if CONF.vault_storage_type.lower() == 'nfs':
             backend = NfsTrilioVaultBackupTarget(backup_target)
-        elif CONF.vault_storage_type == 'swift-s':
-            backend = SwiftTrilioVaultBackupTarget(backup_target)
+        elif (CONF.vault_storage_type.lower() == 'swift-s' or
+              CONF.vault_storage_type.lower() == 's3'):
+            backend = ObjectStoreTrilioVaultBackupTarget(backup_target)
 
         triliovault_backup_targets[backup_target] = backend
         backend.mount_backup_target()
