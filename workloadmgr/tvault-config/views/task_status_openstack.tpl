@@ -29,7 +29,7 @@ function loadXMLDoc(url, callback)
         if (document.getElementById("authenticate_with_swift") == null && url == 'authenticate_with_swift') {
            return
         }
-        if (document.getElementById("tvault-object-store") == null && url == 'tvault-object-store') {
+        if (document.getElementById("start_object_store_service") == null && url == 'start_object_store_service') {
            return
         }
         flag = $('#'+url).css('display')
@@ -164,14 +164,14 @@ function taskfunction()
 		              {
 						 return redirectToConf(xmlhttp);
 		              }
-                              loadXMLDoc("tvault-object-store",function() {
-                                       document.getElementById("tvault-object-store").children[0].classList.add("glyphicon-refresh");
+                              loadXMLDoc("start_object_store_service",function() {
+                                       document.getElementById("start_object_store_service").children[0].classList.add("glyphicon-refresh");
                                        if (xmlhttp.readyState != 4) return;
-                                       document.getElementById("tvault-object-store").children[0].classList.remove("glyphicon-refresh");
+                                       document.getElementById("start_object_store_service").children[0].classList.remove("glyphicon-refresh");
                                        if (xmlhttp.readyState==4 && xmlhttp.status==200)
                                        {
-                                          document.getElementById("tvault-object-store").classList.add("list-group-item-success");
-                                          document.getElementById("tvault-object-store").children[0].classList.add("glyphicon-ok");
+                                          document.getElementById("start_object_store_service").classList.add("list-group-item-success");
+                                          document.getElementById("start_object_store_service").children[0].classList.add("glyphicon-ok");
                                        }
                                        else
                                        {
@@ -321,11 +321,14 @@ $( document ).ready(function() {
                 Configuring tVault service </li>
 
     %if 'swift_auth_url' in locals() and len(locals()['swift_auth_url']) > 0:
-    <li id="tvault-object-store" class="list-group-item"><span class="glyphicon"></span>
-               Starting swift mount service</li>
+    <li id="start_object_store_service" class="list-group-item"><span class="glyphicon"></span>
+               Starting Swift object store mount service</li>
+    %elif 'vault_s3_secret_access_key' in locals() and len(locals()['vault_s3_secret_access_key']) > 0:
+    <li id="start_object_store_service" class="list-group-item"><span class="glyphicon"></span>
+               Starting S3 object store mount service</li>
     %else:
-    <li id="tvault-object-store" class="list-group-item" style="display:None"><span class="glyphicon"></span>
-             Starting swift mount service</li>
+    <li id="start_object_store_service" class="list-group-item" style="display:None"><span class="glyphicon"></span>
+             Starting object store mount service</li>
     %end
     <li id="start_api" class="list-group-item"><span class="glyphicon"></span>
                 Starting tVault API service</li>
