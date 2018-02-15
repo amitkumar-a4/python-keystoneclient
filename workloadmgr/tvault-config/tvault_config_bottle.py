@@ -54,6 +54,13 @@ from tzlocal import get_localzone
 from workloadmgr import auditlog
 from workloadmgr.openstack.common import timeutils
 
+# AWS S3 API
+import boto3
+import botocore
+from botocore.exceptions import ClientError
+from botocore.exceptions import ConnectionError
+
+
 logging.basicConfig(
     format='localhost - - [%(asctime)s] %(message)s',
     level=logging.WARNING)
@@ -993,9 +1000,9 @@ def _authenticate_with_keystone():
     current_version = filter(lambda x: x['status'].lower() == 'current', versions['versions'])
 
     if 'v2' in current_version[0]['id']:
-       config_data['glance_api_version'] = 2
+        config_data['glance_api_version'] = 2
     else:
-       config_data['glance_api_version'] = 1
+        config_data['glance_api_version'] = 1
 
     # network
     try:
@@ -1445,6 +1452,7 @@ def _workloads_import():
 
     return {'status': 'Success'}
 
+
 '''
 def configure_mysql():
     if config_data['nodetype'] == 'controller':
@@ -1477,6 +1485,7 @@ def configure_mysql():
             "echo manual > /etc/init/mysql.override"]
         subprocess.call(command, shell=False)
 '''
+
 
 def configure_rabbitmq():
     if config_data['nodetype'] == 'controller':
@@ -2411,7 +2420,7 @@ def service_action(service_display_name, action):
                 'workloads_service': 'wlm-workloads',
                 #'inventory_service': 'nova-api',
                 #'tvault_gui_service': 'tvault-gui',
-               }
+                }
     try:
         Config = ConfigParser.RawConfigParser()
         Config.read('/etc/tvault-config/tvault-config.conf')
@@ -2861,7 +2870,7 @@ def configure_host():
                 pass
 
             try:
-                command = ['sudo', 'service', 'tvault-swift', 'stop']
+                command = ['sudo', 'service', 'tvault-object-store', 'stop']
                 subprocess.call(command, shell=False)
             except BaseException:
                 pass
@@ -3217,6 +3226,86 @@ def configure_scheduler():
     return {'status': 'Success'}
 
 
+def _configure_s3_parameters():
+    """ Utility routine to set the s3 related parameters.
+    """
+    # Start with the 'common' s3 parameters
+    replace_line(
+        '/etc/workloadmgr/workloadmgr.conf',
+        'vault_storage_nfs_export =',
+        'vault_storage_nfs_export = TrilioVault')
+    replace_line(
+        '/etc/workloadmgr/workloadmgr.conf',
+        'vault_storage_type =',
+        'vault_storage_type = s3')
+    replace_line(
+        '/etc/workloadmgr/workloadmgr.conf',
+        'vault_s3_auth_version =',
+        'vault_s3_auth_version = DEFAULT')
+    replace_line(
+        '/etc/workloadmgr/workloadmgr.conf',
+        'vault_s3_access_key_id =',
+        'vault_s3_access_key_id = ' +
+        str(config_data['vault_s3_access_key_id']))
+    replace_line(
+        '/etc/workloadmgr/workloadmgr.conf',
+        'vault_s3_secret_access_key =',
+        'vault_s3_secret_access_key = ' +
+        str(config_data['vault_s3_secret_access_key']))
+    replace_line(
+        '/etc/workloadmgr/workloadmgr.conf',
+        'vault_s3_region_name =',
+        'vault_s3_region_name = ' +
+        str(config_data['vault_s3_region_name']))
+    replace_line(
+        '/etc/workloadmgr/workloadmgr.conf',
+        'vault_s3_bucket =',
+        'vault_s3_bucket = ' +
+        str(config_data['vault_s3_bucket']))
+
+    # S3 ceph based, Suse, RH, etc.
+    # For Amazon, this should be empty.
+    replace_line(
+        '/etc/workloadmgr/workloadmgr.conf',
+        'vault_s3_endpoint_url =',
+        'vault_s3_endpoint_url = ' +
+        str(config_data['vault_s3_endpoint_url']))
+
+    replace_line(
+        '/etc/workloadmgr/workloadmgr.conf',
+        'vault_s3_signature_version =',
+        'vault_s3_signature_version = ' +
+        str(config_data['vault_s3_signature_version']))
+
+    replace_line(
+        '/etc/workloadmgr/workloadmgr.conf',
+        'vault_s3_ssl =',
+        'vault_s3_ssl = ' +
+        str(config_data['vault_s3_ssl']))
+
+    replace_line(
+        '/etc/workloadmgr/workloadmgr.conf',
+        'vault_s3_support_empty_dir =',
+        'vault_s3_support_empty_dir = ' +
+        str(config_data['vault_s3_support_empty_dir']))
+
+    # Replace the object store service line with the S3 version.
+    # TODO - This should be removed post 2.6 once vaultfuse.py is modified to
+    # support both Swift and S3. -cjk
+    replace_line(
+        '/etc/systemd/system/tvault-object-store.service',
+        'ExecStart=/usr/bin/python',
+        'ExecStart=/usr/bin/python /opt/stack/workloadmgr/workloadmgr/vault/s3vaultfuse.py --config-file=/etc/workloadmgr/workloadmgr.conf'
+    )
+    # We need to reload the system manager configuration even though we only changed
+    # the ExecStart line.
+    try:
+        command = ['sudo', 'systemctl', 'daemon-reload']
+        subprocess.call(command, shell=False)
+    except BaseException:
+        pass
+
+
 @bottle.route('/configure_service')
 @authorize()
 def configure_service():
@@ -3249,7 +3338,7 @@ def configure_service():
         replace_line('/etc/workloadmgr/workloadmgr.conf',
                      'glance_api_version = ',
                      'glance_api_version = ' + str(
-                       config_data['glance_api_version']))
+                     config_data['glance_api_version']))
 
         replace_line(
             '/etc/workloadmgr/workloadmgr.conf',
@@ -3409,6 +3498,11 @@ def configure_service():
                     'vault_swift_domain_id = ',
                     'vault_swift_domain_id = ' +
                     config_data['triliovault_user_domain_id'])
+
+        # All S3 configurations need a vault_s3_access_key_id
+        s3_access_key_id = config_data.get('vault_s3_access_key_id', '')
+        if len(s3_access_key_id) > 0:
+            _configure_s3_parameters()
 
         replace_line(
             '/etc/workloadmgr/workloadmgr.conf',
@@ -3620,7 +3714,7 @@ def configure_service():
                 subprocess.check_call(command, shell=True)
                 command = 'crm node attribute ' + socket.gethostname() + ' set configured disabled'
                 subprocess.check_call(command, shell=True)
-            except:
+            except Exception as ex:
                 pass
 
         if config_data['nodetype'] == 'controller' and config_data['enable_ha'] == 'on':
@@ -3644,13 +3738,13 @@ def configure_service():
                     command = 'crm node attribute ' + socket.gethostname() + ' set ip ' + \
                         config_data['floating_ipaddress']
                     subprocess.check_call(command, shell=True)
-                except:
+                except Exception as ex:
                     pass
                 try:
                     command = 'crm node attribute ' + socket.gethostname() + ' set virtip ' + \
                         config_data['virtual_ip']
                     subprocess.check_call(command, shell=True)
-                except:
+                except Exception as ex:
                     pass
             except Exception as ex:
                 pass
@@ -3669,7 +3763,7 @@ def start_api():
     # Python code to configure api service
     try:
         if config_data['nodetype'] == 'controller':
-	    command = ['sudo', 'systemctl', 'enable', 'wlm-api']
+            command = ['sudo', 'systemctl', 'enable', 'wlm-api']
             subprocess.call(command, shell=False)
             command = ['sudo', 'service', 'wlm-api', 'restart']
             subprocess.call(command, shell=False)
@@ -3702,7 +3796,7 @@ def start_scheduler():
     # Python code here to configure scheduler
     try:
         if config_data['nodetype'] == 'controller':
-	    command = ['sudo', 'systemctl', 'enable', 'wlm-scheduler']
+            command = ['sudo', 'systemctl', 'enable', 'wlm-scheduler']
             subprocess.call(command, shell=False)
             command = ['sudo', 'service', 'wlm-scheduler', 'restart']
             # shell=FALSE for sudo to work.
@@ -3720,7 +3814,7 @@ def start_scheduler():
 def start_service():
     # Python code here to configure workloadmgr
     try:
-	command = ['sudo', 'systemctl', 'enable', 'wlm-workloads']
+        command = ['sudo', 'systemctl', 'enable', 'wlm-workloads']
         subprocess.call(command, shell=False)
         command = ['sudo', 'service', 'wlm-workloads', 'restart']
         # shell=FALSE for sudo to work.
@@ -3733,12 +3827,12 @@ def start_service():
     return {'status': 'Success'}
 
 
-@bottle.route('/start_swift_service')
+@bottle.route('/start_object_store_service')
 @authorize()
-def start_swift_service():
+def start_object_store_service():
     try:
         try:
-            command = ['sudo', 'service', 'tvault-swift', 'stop']
+            command = ['sudo', 'service', 'tvault-object-store', 'stop']
             subprocess.call(command, shell=False)
         except BaseException:
             pass
@@ -3778,7 +3872,7 @@ def start_swift_service():
             WLM_USER,
             '/etc/fuse.conf']
         subprocess.call(command, shell=False)
-        command = ['sudo', 'service', 'tvault-swift', 'restart']
+        command = ['sudo', 'service', 'tvault-object-store', 'restart']
         subprocess.call(command, shell=False)
     except Exception as exception:
         bottle.request.environ['beaker.session']['error_message'] = "Error: %(exception)s" % {
@@ -4210,7 +4304,7 @@ def configure_openstack():
             if 'storage-nfs-options' in config_inputs:
                 config_data['storage_nfs_options'] = config_inputs['storage-nfs-options'].strip()
 
-        else:
+        elif config_data['backup_target_type'].lower() == 'swift':
             config_data['swift_auth_version'] = config_inputs['swift-auth-version']
 
             if config_data['swift_auth_version'] == 'TEMPAUTH':
@@ -4225,6 +4319,30 @@ def configure_openstack():
                 config_data['swift_password'] = config_data['admin_password']
                 config_data['swift_tenantname'] = config_data['admin_tenant_name']
                 config_data['swift_domain_id'] = config_data['domain_name']
+
+        elif config_data['backup_target_type'].lower() == 's3':
+            config_data['s3_backend_type'] = config_inputs['s3-backend-type'].lower()
+            config_data['vault_s3_access_key_id'] = config_inputs['s3-access-key']
+            config_data['vault_s3_secret_access_key'] = config_inputs['s3-secret-key']
+            config_data['vault_s3_region_name'] = config_inputs['s3-region']
+            config_data['vault_s3_bucket'] = config_inputs['s3-bucket']
+
+            # Set the "default" settings to ones that work with amazon
+            config_data['vault_s3_ssl'] = 'True'
+            config_data['vault_s3_signature_version'] = 'default'
+            config_data['vault_s3_support_empty_dir'] = 'False'
+            config_data['vault_s3_endpoint_url'] = ''
+
+            if config_data['s3_backend_type'].lower() != 'amazon':
+                config_data['vault_s3_endpoint_url'] = config_inputs['s3-endpoint-url']
+                config_data['vault_s3_ssl'] = config_inputs['s3-use-ssl']
+
+            if config_data['s3_backend_type'].lower() == 'minio':
+                config_data['vault_s3_signature_version'] = 's3v4'
+                config_data['vault_s3_support_empty_dir'] = 'True'
+
+        else:
+            raise Exception("Unsupported backend storage selected.")
 
         config_data['workloads_import'] = config_inputs.get(
             'workloads-import', "off").strip().rstrip() == 'on'
@@ -4463,6 +4581,73 @@ def validate_nfs_share():
         return bottle.HTTPResponse(status=500, body=body)
 
 
+@bottle.route('/validate_s3_credentials')
+@authorize()
+def validate_s3_credentials():
+    """ Validate the S3 credentials.
+
+    Validate all of the S3 credentials by attempting to get some bucket information.
+
+    Returns:
+        Success will be returned otherwise error 403, 404, or 500 will be retured
+        with any relevent information.
+    """
+
+    s3_access_key_id = bottle.request.query['s3_access_key_id']
+    s3_secret_access_key = urllib.unquote(bottle.request.query['s3_secret_access_key'])
+    s3_endpoint = bottle.request.query['s3_endpoint']
+    # If the endpoint is empty, set it to None because amazon defaults to an endpoint
+    # from the region and bucket values. - cjk
+    if s3_endpoint == '':
+        s3_endpoint = None
+
+    s3_ssl = bottle.request.query['s3_ssl']
+    s3_region = bottle.request.query['s3_region']
+    s3_bucket = bottle.request.query['s3_bucket']
+    s3_signature_version = bottle.request.query['s3_signature']
+    s3_backend_type = bottle.request.query['s3_backend_type']
+    s3_config_object = None
+    if s3_signature_version != 'default' and s3_signature_version != '':
+        s3_config_object = botocore.client.Config(signature_version=s3_signature_version)
+
+    try:
+        s3_client = boto3.client('s3',
+                                 region_name=s3_region,
+                                 use_ssl=s3_ssl,
+                                 aws_access_key_id=s3_access_key_id,
+                                 aws_secret_access_key=s3_secret_access_key,
+                                 endpoint_url=s3_endpoint,
+                                 config=s3_config_object)
+
+        bucket_info = s3_client.head_bucket(Bucket=s3_bucket)
+    except ConnectionError as error:
+        return bottle.HTTPResponse(status=500, body='Connection Error: Verify endpoint URL, region, and SSL settings if applicable.')
+
+    except ClientError as error:
+        if error.response['ResponseMetadata']['HTTPStatusCode'] == 404:
+            return bottle.HTTPResponse(status=404, body='S3 bucket not found: Verify bucket name.')
+        elif error.response['ResponseMetadata']['HTTPStatusCode'] == 403:
+            return bottle.HTTPResponse(status=403, body='Authorization error: Verify keys and bucket values.')
+        else:
+            return bottle.HTTPResponse(status=500, body=str(error))
+
+    # Add a check to see if the current file system on the OSD(s) will support
+    # our path length.
+    if s3_backend_type == 'Ceph':
+        try:
+            long_key = 'tvault_config/workload_f5190be6-7f80-4856-8c24-149cb40500c5/snapshot_f2e5c6a7-3c21-4b7f-969c-915bb408c64f/vm_id_e81d1ac8-b49a-4ccf-9d92-5f1ef358f1be/vm_res_id_72477d99-c475-4a5d-90ae-2560f5f3b319_vda/deac2b8a-dca9-4415-adc1-f3c6598204ed-segments/0000000000000000.00000000'
+            s3_client.put_object(Bucket=s3_bucket, Key=long_key, Body='Test Data')
+        except ClientError as error:
+            if error.response['Error']['Code'] == 'UnknownError':
+                return bottle.HTTPResponse(status=500, body='Error: Ceph object store does not support object names greater than 256 characters.')
+            else:
+                return bottle.HTTPResponse(status=500, body=str(error))
+
+        s3_client.delete_object(Bucket=s3_bucket, Key=long_key)
+
+    return {'status': 'Success'}
+
+
 def findXmlSection(dom, sectionName):
     sections = dom.getElementsByTagName(sectionName)
     return sections[0]
@@ -4633,22 +4818,22 @@ def main():
             prev_hostname = 'none'
 
         if prev_hostname != socket.gethostname() or \
-            fully_configured == 'false':
+           fully_configured == 'false':
 
             if os.path.exists("/etc/tvault/ssl/%s.crt" % prev_hostname):
-                shutil.move( "/etc/tvault/ssl/%s.crt" % prev_hostname,
-                             "/etc/tvault/ssl/%s_bak.crt" % prev_hostname)
+                shutil.move("/etc/tvault/ssl/%s.crt" % prev_hostname,
+                            "/etc/tvault/ssl/%s_bak.crt" % prev_hostname)
             if os.path.exists("/etc/tvault/ssl/%s.key" % prev_hostname):
-                shutil.move( "/etc/tvault/ssl/%s.key" % prev_hostname,
-                             "/etc/tvault/ssl/%s_bak.key" % prev_hostname)
+                shutil.move("/etc/tvault/ssl/%s.key" % prev_hostname,
+                            "/etc/tvault/ssl/%s_bak.key" % prev_hostname)
 
             shutil.copy2("/opt/stack/workloadmgr/etc/gen-cer",
                          "/etc/tvault/ssl/")
             os.chmod('/etc/tvault/ssl/gen-cer', 0o554)
             command = ['sudo', 'sh', 'gen-cer', socket.gethostname()]
             subprocess.call(command, shell=False, cwd="/etc/tvault/ssl")
-            command = [ 'sudo', 'rm', '-rf',
-                        os.path.join("/etc/tvault/ssl/",
+            command = ['sudo', 'rm', '-rf',
+                       os.path.join("/etc/tvault/ssl/",
                                      socket.gethostname() + ".csr")]
             subprocess.call(command, shell=False, cwd="/etc/tvault/ssl")
             Config.set(None, 'hostname', socket.gethostname())
@@ -4656,9 +4841,9 @@ def main():
             # create hostkeys
             command = ['sudo', 'rm', "/etc/ssh/ssh_host_rsa_key"]
             subprocess.call(command, shell=False)
-            command = [ 'sudo', 'ssh-keygen', '-f',
-                        "/etc/ssh/ssh_host_rsa_key", '-b', '4096', '-t',
-                        'rsa', '-q', '-N', ""]
+            command = ['sudo', 'ssh-keygen', '-f',
+                       "/etc/ssh/ssh_host_rsa_key", '-b', '4096', '-t',
+                       'rsa', '-q', '-N', ""]
             subprocess.call(command, shell=False)
 
             Config.set(None, 'fully_configured', 'true')

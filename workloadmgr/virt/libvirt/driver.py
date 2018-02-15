@@ -665,7 +665,7 @@ class LibvirtDriver(driver.ComputeDriver):
 
                 now = timeutils.utcnow()
                 if (now - start_time) > datetime.timedelta(
-                        minutes=5) and CONF.vault_storage_type == 'swift-s':
+                        minutes=5) and CONF.vault_storage_type.lower() in ('swift-s', 's3'):
                     try:
                         async_task_status_swift = compute_service.vast_async_task_status(
                             cntx, instance_id, {'metadata': progress_tracker_metadata, 'fetched': True})

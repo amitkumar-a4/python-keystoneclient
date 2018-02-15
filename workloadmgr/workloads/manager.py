@@ -1494,7 +1494,7 @@ class WorkloadMgrManager(manager.SchedulerDependentManager):
                 pervmdisks[vm.vm_id] = {'vm_name': vm.vm_name,
                                         'vault_path': []}
 
-            if FLAGS.vault_storage_type not in ("nfs", "local", "swift-s"):
+            if FLAGS.vault_storage_type.lower() not in ("nfs", "local", "swift-s", "s3"):
 
                 context_dict = dict([('%s' % key, value) for (
                     key, value) in cntx.to_dict().iteritems()])
@@ -1749,7 +1749,7 @@ class WorkloadMgrManager(manager.SchedulerDependentManager):
                     # always cleanup as much as possible
                     LOG.exception(ex)
                     pass
-            if FLAGS.vault_storage_type not in ("nfs", "local", "swift-s"):
+            if FLAGS.vault_storage_type.lower() not in ("nfs", "local", "swift-s", "s3"):
                 for vmid, paths in devpaths.iteritems():
                     try:
                         os.remove(paths.keys()[0])
