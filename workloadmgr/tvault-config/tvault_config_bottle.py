@@ -4623,6 +4623,9 @@ def validate_s3_credentials():
     except ConnectionError as error:
         return bottle.HTTPResponse(status=500, body='Connection Error: Verify endpoint URL, region, and SSL settings if applicable.')
 
+    except ValueError as error:
+        return bottle.HTTPResponse(status=500, body=str(error) + '<br/>Verify endpoint URL, region, and SSL settings if applicable.')
+
     except ClientError as error:
         if error.response['ResponseMetadata']['HTTPStatusCode'] == 404:
             return bottle.HTTPResponse(status=404, body='S3 bucket not found: Verify bucket name.')
