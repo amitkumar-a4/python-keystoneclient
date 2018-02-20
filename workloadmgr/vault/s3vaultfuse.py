@@ -729,7 +729,12 @@ class BackendRepository(ObjectRepository):
            flags == os.O_RDWR or flags in (int('8002', 16), int('8802', 16)):
 
             # load manifest
-            manifest = self._read_object_manifest(object_name)
+            try:
+                manifest = self._read_object_manifest(object_name)
+            except BaseException:
+                self.__manifest_lock.release()
+                raise
+
             # manifest = json.loads(manifest)
             for seg in manifest:
                 offstr = seg['name'].split('-segments/')[1].split('.')[0]
