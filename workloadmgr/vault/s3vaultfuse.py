@@ -716,66 +716,65 @@ class BackendRepository(ObjectRepository):
         return metadata
 
     def object_open(self, object_name, flags):
-        self.__manifest_lock.acquire()
-        container, prefix = self.split_head_tail(object_name)
-        full_path = self._full_path(object_name)
+        with self.__manifest_lock:
+            container, prefix = self.split_head_tail(object_name)
+            full_path = self._full_path(object_name)
 
-        self.manifest[object_name] = {}
-        self.manifest[object_name]['readonly'] = flags == os.O_RDONLY or flags in (
-            int('8000', 16), int('8800', 16))
+            self.manifest[object_name] = {}
+            self.manifest[object_name]['readonly'] = flags == os.O_RDONLY or flags in (
+                int('8000', 16), int('8800', 16))
 
-        if flags == os.O_RDONLY or flags in (int('8000', 16), int('8800', 16)) or \
-           flags == int('8401', 16) or \
-           flags == os.O_RDWR or flags in (int('8002', 16), int('8802', 16)):
+            if flags == os.O_RDONLY or flags in (int('8000', 16), int('8800', 16)) or \
+               flags == int('8401', 16) or \
+               flags == os.O_RDWR or flags in (int('8002', 16), int('8802', 16)):
 
-            # load manifest
-            try:
-                manifest = self._read_object_manifest(object_name)
-            except BaseException:
-                self.__manifest_lock.release()
-                raise
-
-            # manifest = json.loads(manifest)
-            for seg in manifest:
-                offstr = seg['name'].split('-segments/')[1].split('.')[0]
-                offset = int(offstr, 16)
-                seg['modified'] = False
-                self.manifest[object_name][offset] = seg
-
-            metadata = self._get_object_metadata(object_name)
-            self.manifest[object_name]['segments-dir'] = \
-                metadata['segments-dir']
-
-            try:
-                segment_dir = self._full_path(
-                    self.manifest[object_name]['segments-dir'])
-                os.makedirs(segment_dir)
-            except BaseException:
-                pass
-
-            with open(full_path, "w") as f:
-                f.write(json.dumps(manifest))
-
-        else:
-            # this is either write or create request
-            if flags in (int('8001', 16), int('8801', 16), int('0001', 16)):
+                # load manifest
                 try:
-                    self.object_unlink(object_name)
+                    manifest = self._read_object_manifest(object_name)
+                except Exception as ex:
+                    LOG.info('File %s not found.' % object_name)
+                    raise
+
+                # manifest = json.loads(manifest)
+                for seg in manifest:
+                    offstr = seg['name'].split('-segments/')[1].split('.')[0]
+                    offset = int(offstr, 16)
+                    seg['modified'] = False
+                    self.manifest[object_name][offset] = seg
+
+                metadata = self._get_object_metadata(object_name)
+                self.manifest[object_name]['segments-dir'] = \
+                    metadata['segments-dir']
+
+                try:
+                    segment_dir = self._full_path(
+                        self.manifest[object_name]['segments-dir'])
+                    os.makedirs(segment_dir)
                 except BaseException:
                     pass
 
-            if flags & os.O_WRONLY:
                 with open(full_path, "w") as f:
+                    f.write(json.dumps(manifest))
+
+            else:
+                # this is either write or create request
+                if flags in (int('8001', 16), int('8801', 16), int('0001', 16)):
+                    try:
+                        self.object_unlink(object_name)
+                    except BaseException:
+                        pass
+
+                if flags & os.O_WRONLY:
+                    with open(full_path, "w") as f:
+                        pass
+
+                try:
+                    segment_dir = self._full_path(object_name + "-segments")
+                    os.makedirs(segment_dir)
+                except BaseException:
                     pass
 
-            try:
-                segment_dir = self._full_path(object_name + "-segments")
-                os.makedirs(segment_dir)
-            except BaseException:
-                pass
-        self.__manifest_lock.release()
-
-        return os.open(full_path, flags)
+            return os.open(full_path, flags)
 
     def __purge_old_segments_task(self, backend, container, segment_list):
         """ Utility method to be dispatched to a worker thread in order to clean up old segments.
