@@ -907,6 +907,8 @@ class WorkloadMgrsController(wsgi.Controller):
                 part2 = MIMEText(html, 'html')
                 msg.attach(part2)
                 try:
+                    reload(socket)
+                    reload(smtplib)
                     socket.setdefaulttimeout(
                         int(settings_module.get_settings(context).get('smtp_timeout')))
                     s = smtplib.SMTP(
@@ -934,8 +936,6 @@ class WorkloadMgrsController(wsgi.Controller):
                 LOG.exception(error)
                 msg = error
                 try:
-                    if hasattr(error, 'message') and error.message[0] == -5:
-                        msg = 'smtp_server_name is not valid'
                     if hasattr(error, 'errno') and int(error.errno) == -3:
                         msg = 'SMTP server is unreachable'
                     if hasattr(error, 'message') and error.message.__class__.__name__ == 'timeout':
