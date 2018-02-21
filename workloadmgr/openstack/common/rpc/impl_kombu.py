@@ -62,7 +62,7 @@ kombu_opts = [
                 default=False,
                 help='connect over SSL for RabbitMQ'),
     cfg.StrOpt('rabbit_userid',
-               default='guest',
+               default='triliovault',
                help='the RabbitMQ userid'),
     cfg.StrOpt('rabbit_password',
                default='guest',
@@ -176,7 +176,7 @@ class ConsumerBase(object):
         """Cancel the consuming from the queue, if it has started"""
         try:
             self.queue.cancel(self.tag)
-        except KeyError, e:
+        except KeyError as e:
             # NOTE(comstud): Kludge to get around a amqplib bug
             if str(e) != "u'%s'" % self.tag:
                 raise
@@ -318,6 +318,7 @@ class Publisher(object):
 
 class DirectPublisher(Publisher):
     """Publisher class for 'direct'"""
+
     def __init__(self, conf, channel, msg_id, **kwargs):
         """init a 'direct' publisher.
 
@@ -334,6 +335,7 @@ class DirectPublisher(Publisher):
 
 class TopicPublisher(Publisher):
     """Publisher class for 'topic'"""
+
     def __init__(self, conf, channel, topic, **kwargs):
         """init a 'topic' publisher.
 
@@ -353,6 +355,7 @@ class TopicPublisher(Publisher):
 
 class FanoutPublisher(Publisher):
     """Publisher class for 'fanout'"""
+
     def __init__(self, conf, channel, topic, **kwargs):
         """init a 'fanout' publisher.
 
@@ -478,7 +481,7 @@ class Connection(object):
         """
         if self.connection:
             LOG.info(_("Reconnecting to AMQP server on "
-                     "%(hostname)s:%(port)d") % params)
+                       "%(hostname)s:%(port)d") % params)
             try:
                 self.connection.release()
             except self.connection_errors:
@@ -520,7 +523,7 @@ class Connection(object):
                 return
             except (IOError, self.connection_errors) as e:
                 pass
-            except Exception, e:
+            except Exception as e:
                 # NOTE(comstud): Unfortunately it's possible for amqplib
                 # to return an error not covered by its transport
                 # connection_errors in the case of a timeout waiting for
@@ -561,10 +564,10 @@ class Connection(object):
         while True:
             try:
                 return method(*args, **kwargs)
-            except (self.connection_errors, socket.timeout, IOError), e:
+            except (self.connection_errors, socket.timeout, IOError) as e:
                 if error_callback:
                     error_callback(e)
-            except Exception, e:
+            except Exception as e:
                 # NOTE(comstud): Unfortunately it's possible for amqplib
                 # to return an error not covered by its transport
                 # connection_errors in the case of a timeout waiting for
@@ -607,7 +610,7 @@ class Connection(object):
         def _connect_error(exc):
             log_info = {'topic': topic, 'err_str': str(exc)}
             LOG.error(_("Failed to declare consumer for topic '%(topic)s': "
-                      "%(err_str)s") % log_info)
+                        "%(err_str)s") % log_info)
 
         def _declare_consumer():
             consumer = consumer_cls(self.conf, self.channel, topic, callback,
@@ -668,7 +671,7 @@ class Connection(object):
         def _error_callback(exc):
             log_info = {'topic': topic, 'err_str': str(exc)}
             LOG.exception(_("Failed to publish message to topic "
-                          "'%(topic)s': %(err_str)s") % log_info)
+                            "'%(topic)s': %(err_str)s") % log_info)
 
         def _publish():
             publisher = cls(self.conf, self.channel, topic, **kwargs)

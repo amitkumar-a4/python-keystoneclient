@@ -20,7 +20,9 @@ from nova.virt import driver
 
 CONF = cfg.CONF
 
-authorize_show = extensions.extension_authorizer('compute', 'resourcepool:show')
+authorize_show = extensions.extension_authorizer(
+    'compute', 'resourcepool:show')
+
 
 def make_resourcepool(elem):
     elem.set('name', 'resourcepool')
@@ -34,7 +36,7 @@ def make_resourcepool(elem):
 
     dcsElem = xmlutil.SubTemplateElement(elem, 'datastores', selector=1)
     dcElem = xmlutil.SubTemplateElement(elem, 'datastore',
-                                         selector=xmlutil.get_items)
+                                        selector=xmlutil.get_items)
     dcElem.set('name', 0)
 
     networksElem = xmlutil.SubTemplateElement(elem, 'networks', selector=1)
@@ -46,14 +48,15 @@ def make_resourcepool(elem):
     svcStateElem.set('active')
     svcStateElem.set('updated_at')
 
+
 class resourcepoolTemplate(xmlutil.TemplateBuilder):
     def construct(self):
         root = xmlutil.TemplateElement('resourcepool')
-        resourcepoolElem = xmlutil.SubTemplateElement(root, 'resourcepool',
-                                                    selector='resourcepoolInfo')
+        resourcepoolElem = xmlutil.SubTemplateElement(
+            root, 'resourcepool', selector='resourcepoolInfo')
         make_resourcepool(resourcepoolElem)
         return xmlutil.MasterTemplate(root, 1, nsmap={
-                                       resourcepool.alias: resourcepool.namespace})
+            resourcepool.alias: resourcepool.namespace})
 
 
 class resourcepoolController(wsgi.Controller):
@@ -71,7 +74,8 @@ class resourcepoolController(wsgi.Controller):
 
         return {'resourcepoolInfo': resourcepool}
 
-    def _describe_resourcepool_verbose(self, context, resourcepoolref, **kwargs):
+    def _describe_resourcepool_verbose(
+            self, context, resourcepoolref, **kwargs):
         ctxt = context.elevated()
         resourcepool = self.api.resourcepool(ctxt, resourcepoolref)
 
@@ -98,7 +102,7 @@ class Resourcepool(extensions.ExtensionDescriptor):
         resources = []
 
         res = extensions.ResourceExtension('os-resourcepool',
-                                       resourcepoolController())
+                                           resourcepoolController())
         resources.append(res)
 
         return resources

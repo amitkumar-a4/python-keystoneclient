@@ -19,51 +19,67 @@ settings_file_dir = '/var/triliovault/settings/'
 settings_file_name = 'workloadmgr-settings.conf'
 
 default_settings = {
-'cassandra_discovery_timeout' : '120',
-'mongodb_discovery_timeout' : '120',
-'smtp_email_enable' : 'no',
-'smtp_server_name' : 'localhost',
-'smtp_default_recipient' : 'administrator@tvault.com',
-'smtp_default_sender' : 'administrator@tvault.com',
-'smtp_port' : '587',
-'smtp_server_username' : '',
-'smtp_server_password' : '',
-'smtp_timeout' : '10',
+    'cassandra_discovery_timeout': '120',
+    'mongodb_discovery_timeout': '120',
+    'smtp_email_enable': 'no',
+    'smtp_server_name': 'localhost',
+    'smtp_default_recipient': 'administrator@tvault.com',
+    'smtp_default_sender': 'administrator@tvault.com',
+    'smtp_port': '587',
+    'smtp_server_username': '',
+    'smtp_server_password': '',
+    'smtp_timeout': '10',
 }
 
-def get_settings(context=None, get_hidden=False, get_smtp_settings=False):                           
+
+def get_settings(context=None, get_hidden=False, get_smtp_settings=False):
     """get settings"""
     from workloadmgr import workloads as workloadAPI
+
     @workloadAPI.api.wrap_check_policy
-    def get_setting(workloadAPI, context=None, get_hidden=False, get_smtp_settings=False):
+    def get_setting(workloadAPI, context=None, get_hidden=False,
+                    get_smtp_settings=False):
         try:
             copy_settings = {}
-            if context.is_admin is True or get_smtp_settings is True:
+            is_admin = context.is_admin
+            #If get_smtp_settings is True then changing context to admin
+            #because smtp settings belongs to admin project.
+            if get_smtp_settings is True:
+               context.is_admin = True
                copy_settings = default_settings
             persisted_settings = {}
-            persisted_setting_objs = db.setting_get_all(context, read_deleted = 'no',get_hidden = get_hidden)
+            persisted_setting_objs = db.setting_get_all(
+                context, read_deleted='no', get_hidden=get_hidden)
+            context.is_admin = is_admin
             for persisted_setting in persisted_setting_objs:
-                if get_smtp_settings is False: 
-                   persisted_settings[persisted_setting.name] = persisted_setting.value
+                if get_smtp_settings is False:
+                    #Filtering smtp_snable setting for corrent context
+                    if persisted_setting.name == 'smtp_email_enable':
+                        if persisted_setting.project_id == context.project_id:
+                            persisted_settings[persisted_setting.name] = persisted_setting.value
+                    else:
+                        persisted_settings[persisted_setting.name] = persisted_setting.value
                 elif get_smtp_settings is True and 'smtp' in persisted_setting.name:
-                     persisted_settings[persisted_setting.name] = persisted_setting.value
+                    persisted_settings[persisted_setting.name] = persisted_setting.value
             for setting, value in copy_settings.iteritems():
                 if setting not in persisted_settings:
-                   persisted_settings[setting] = value
+                    persisted_settings[setting] = value
             return persisted_settings
-            
+
         except Exception as ex:
-               LOG.exception(ex)
-               raise ex
+            LOG.exception(ex)
+            raise ex
     try:
         return get_setting(workloadAPI, context, get_hidden, get_smtp_settings)
     except Exception as ex:
-           LOG.exception(ex)
-           raise ex
+        LOG.exception(ex)
+        raise ex
 
-def set_settings(context, new_settings):                           
+
+def set_settings(context, new_settings):
     """set settings"""
     from workloadmgr import workloads as workloadAPI
+
     @workloadAPI.api.upload_settings
     def upload_settings(name, context):
         pass
@@ -73,17 +89,25 @@ def set_settings(context, new_settings):
             name_found = False
             for persisted_setting in persisted_setting_objs:
                 if persisted_setting.name == name:
-                    db.setting_update(context, name, {'value' : value})
-                    name_found = True
-                    break
-            if name_found == False:
-                db.setting_create(context, {'name' : name, 
-                                            'value' : value,
+                    if name == 'smtp_email_enable':
+                        if persisted_setting.project_id == context.project_id:
+                            db.setting_update(context, name, {'value' : value}, cloud_setting=False)
+                            name_found = True
+                            break
+                    else:
+                        db.setting_update(context, name, {'value' : value}, cloud_setting=True)
+                        name_found = True
+                        break
+            if not name_found:
+                db.setting_create(context, {'name': name,
+                                            'value': value,
                                             'user_id': context.user_id,
-                                            'project_id': context.project_id,                                             
-                                            'status': 'available'})
+                                            'project_id': context.project_id,
+                                            'status': 'available',
+                                            'type': "email_settings" if "smtp" in name else None })
+
         upload_settings(name, context)
-        return get_settings() 
+        return get_settings(context)
     except Exception as ex:
         LOG.exception(ex)
         return default_settings

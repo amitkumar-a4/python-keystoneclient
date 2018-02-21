@@ -7,6 +7,7 @@
         "workload:get_contego_status": "rule:admin_api",
         "workload:workload_get_all_by_admin": "rule:admin_api",
         "workload:get_storage_usage": "rule:admin_api",
+        "workload:get_tenants_usage": "rule:admin_api",
 
         "workload:get_import_workloads_list": "rule:admin_api",
         "workload:import_workloads": "rule:admin_api",
@@ -72,5 +73,13 @@
         "restore:restore_delete": "rule:admin_or_owner",
         "restore:restore_cancel": "rule:admin_or_owner",
 
-        "filesearch:search": "rule:admin_or_owner"
+        "filesearch:search": "rule:admin_or_owner",
+
+        "workload:policy_create": "rule:admin_api",
+        "workload:policy_update": "rule:admin_api",
+        "workload:policy_delete": "rule:admin_api",
+        "workload:policy_apply": "rule:admin_api",
+        "workload:policy_remove": "rule:admin_api",
+        "workload:policy_field_create": "rule:admin_api"
+
 }

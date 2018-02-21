@@ -57,7 +57,7 @@ def find_st(session, data, cluster=None):
                       "config.storageDevice.scsiTopology",
                       "config.storageDevice.scsiLun"]
     prop_dict = session._call_method(vim_util, "get_dynamic_properties",
-                       host_mor, "HostSystem", lst_properties)
+                                     host_mor, "HostSystem", lst_properties)
     result = (None, None)
     hbas_ret = None
     scsi_topology = None

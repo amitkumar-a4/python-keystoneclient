@@ -29,7 +29,7 @@ function loadXMLDoc(url, callback)
         if (document.getElementById("authenticate_with_swift") == null && url == 'authenticate_with_swift') {
            return
         }
-        if (document.getElementById("start_swift_service") == null && url == 'start_swift_service') {
+        if (document.getElementById("start_object_store_service") == null && url == 'start_object_store_service') {
            return
         }
         flag = $('#'+url).css('display')
@@ -72,8 +72,8 @@ function taskfunction()
 		  document.getElementById("configure_host").children[0].classList.add("glyphicon-ok");
 	   }
 	   else
-	   {		
-	   return redirectToConf(xmlhttp);				  
+	   {
+	   return redirectToConf(xmlhttp);
 	   }
 	   // Call authenticate with keystone
 	   loadXMLDoc("authenticate_with_keystone", function() {
@@ -88,9 +88,9 @@ function taskfunction()
 	      }
 	      else
 	      {
-		    return redirectToConf(xmlhttp);	
-			
-	      }  
+		    return redirectToConf(xmlhttp);
+
+	      }
 
                  loadXMLDoc("authenticate_with_swift", function() {
                  document.getElementById("authenticate_with_swift").children[0].classList.add("glyphicon-refresh");
@@ -106,10 +106,10 @@ function taskfunction()
                       {
                          return redirectToConf(xmlhttp);
                       }
-                
+
 		  // Call register_service api
 		  loadXMLDoc("register_service", function() {
-			
+
 	   	   	 document.getElementById("register_service").children[0].classList.add("glyphicon-refresh");
 	      	 if (xmlhttp.readyState != 4) return;
 	      	 document.getElementById("register_service").children[0].classList.remove("glyphicon-refresh");
@@ -120,10 +120,10 @@ function taskfunction()
 		     }
 		     else
 		     {
-			 	return redirectToConf(xmlhttp);	
+			 	return redirectToConf(xmlhttp);
 		     }
 		     // Call configure_api
-		     loadXMLDoc("configure_api",function() {				
+		     loadXMLDoc("configure_api",function() {
 		   	   	document.getElementById("configure_api").children[0].classList.add("glyphicon-refresh");
 		      	if (xmlhttp.readyState != 4) return;
 		      	document.getElementById("configure_api").children[0].classList.remove("glyphicon-refresh");
@@ -134,7 +134,7 @@ function taskfunction()
 		        }
 		        else
 		        {
-			 	   return redirectToConf(xmlhttp);	
+			 	   return redirectToConf(xmlhttp);
 		        }
 		        // Call configure_scheduler
 		        loadXMLDoc("configure_scheduler",function() {
@@ -148,10 +148,10 @@ function taskfunction()
 		           }
 		           else
 		           {
-			 		  return redirectToConf(xmlhttp);	
+			 		  return redirectToConf(xmlhttp);
 		           }
 		           // Call configure_service
-		           loadXMLDoc("configure_service",function() {	
+		           loadXMLDoc("configure_service",function() {
 		   	   	      document.getElementById("configure_service").children[0].classList.add("glyphicon-refresh");
 		      	      if (xmlhttp.readyState != 4) return;
 		      	      document.getElementById("configure_service").children[0].classList.remove("glyphicon-refresh");
@@ -162,16 +162,16 @@ function taskfunction()
 		              }
 		              else
 		              {
-						 return redirectToConf(xmlhttp);	
+						 return redirectToConf(xmlhttp);
 		              }
-                              loadXMLDoc("start_swift_service",function() {
-                                       document.getElementById("start_swift_service").children[0].classList.add("glyphicon-refresh");
+                              loadXMLDoc("start_object_store_service",function() {
+                                       document.getElementById("start_object_store_service").children[0].classList.add("glyphicon-refresh");
                                        if (xmlhttp.readyState != 4) return;
-                                       document.getElementById("start_swift_service").children[0].classList.remove("glyphicon-refresh");
+                                       document.getElementById("start_object_store_service").children[0].classList.remove("glyphicon-refresh");
                                        if (xmlhttp.readyState==4 && xmlhttp.status==200)
                                        {
-                                          document.getElementById("start_swift_service").classList.add("list-group-item-success");
-                                          document.getElementById("start_swift_service").children[0].classList.add("glyphicon-ok");
+                                          document.getElementById("start_object_store_service").classList.add("list-group-item-success");
+                                          document.getElementById("start_object_store_service").children[0].classList.add("glyphicon-ok");
                                        }
                                        else
                                        {
@@ -190,7 +190,7 @@ function taskfunction()
 		                 }
 		                 else
 		                 {
-			 				return redirectToConf(xmlhttp);	
+			 				return redirectToConf(xmlhttp);
 		                 }
 		                 // Call start_scheduler
 		                 loadXMLDoc("start_scheduler",function() {
@@ -204,7 +204,7 @@ function taskfunction()
 		                    }
 		                    else
 		                    {
-			 				   return redirectToConf(xmlhttp);	
+			 				   return redirectToConf(xmlhttp);
 		                    }
 		                    // Call start_service
 		                    loadXMLDoc("start_service",function() {
@@ -218,7 +218,7 @@ function taskfunction()
 		                       }
 		                       else
 		                       {
-				          return redirectToConf(xmlhttp);	
+				          return redirectToConf(xmlhttp);
 		                       }
 
 		                       loadXMLDoc("register_workloadtypes",function() {
@@ -232,7 +232,7 @@ function taskfunction()
 		                          }
 		                          else
 		                          {
-			 						return redirectToConf(xmlhttp);	
+			 						return redirectToConf(xmlhttp);
 		                          }
                                           if (document.getElementById("workloads_import") != null) {
 		                             loadXMLDoc("workloads_import",function() {
@@ -246,7 +246,7 @@ function taskfunction()
 		                                }
 		                                else
 		                                {
-			 				return redirectToConf(xmlhttp);	
+			 				return redirectToConf(xmlhttp);
 		                                }
 		                                document.getElementById("final_status").innerHTML = ntp_note+'<b>Congratulations !!!. Configuration successfully completed. Install tvault-contego and horizon plugin to complete TrilioVault installation </a> </b>';
 		                             });
@@ -321,11 +321,14 @@ $( document ).ready(function() {
                 Configuring tVault service </li>
 
     %if 'swift_auth_url' in locals() and len(locals()['swift_auth_url']) > 0:
-    <li id="start_swift_service" class="list-group-item"><span class="glyphicon"></span>
-               Starting swift mount service</li>
+    <li id="start_object_store_service" class="list-group-item"><span class="glyphicon"></span>
+               Starting Swift object store mount service</li>
+    %elif 'vault_s3_secret_access_key' in locals() and len(locals()['vault_s3_secret_access_key']) > 0:
+    <li id="start_object_store_service" class="list-group-item"><span class="glyphicon"></span>
+               Starting S3 object store mount service</li>
     %else:
-    <li id="start_swift_service" class="list-group-item" style="display:None"><span class="glyphicon"></span>
-             Starting swift mount service</li>
+    <li id="start_object_store_service" class="list-group-item" style="display:None"><span class="glyphicon"></span>
+             Starting object store mount service</li>
     %end
     <li id="start_api" class="list-group-item"><span class="glyphicon"></span>
                 Starting tVault API service</li>

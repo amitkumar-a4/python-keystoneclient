@@ -19,7 +19,8 @@ from workloadmgr.apscheduler.threadpool import ThreadPool
 
 logger = getLogger(__name__)
 
-CONF=cfg.CONF
+CONF = cfg.CONF
+
 
 class SchedulerAlreadyRunningError(Exception):
     """
@@ -99,7 +100,7 @@ class Scheduler(object):
             raise SchedulerAlreadyRunningError
 
         # Create a RAMJobStore as the default if there is no default job store
-        if not 'default' in self._jobstores:
+        if 'default' not in self._jobstores:
             self.add_jobstore(RAMJobStore(), 'default', True)
 
         # Schedule all pending jobs
@@ -239,7 +240,7 @@ class Scheduler(object):
             if event.code & mask:
                 try:
                     cb(event)
-                except:
+                except BaseException:
                     logger.exception('Error notifying listener')
 
     def _real_add_job(self, job, jobstore, wakeup):
@@ -255,9 +256,9 @@ class Scheduler(object):
                 raise KeyError('No such job store: %s' % jobstore)
             try:
                 store.add_job(job)
-            except:
-                   #Retry Mysql going away
-                   store.add_job(job)
+            except BaseException:
+                # Retry Mysql going away
+                store.add_job(job)
         finally:
             self._jobstores_lock.release()
 
@@ -323,9 +324,19 @@ class Scheduler(object):
         trigger = SimpleTrigger(date)
         return self.add_job(trigger, func, args, kwargs, **options)
 
-    def add_interval_job(self, func, start_time, weeks=0, days=0, hours=0, minutes=0,
-                         seconds=0, start_date=None, args=None, kwargs=None,
-                         **options):
+    def add_interval_job(
+            self,
+            func,
+            start_time,
+            weeks=0,
+            days=0,
+            hours=0,
+            minutes=0,
+            seconds=0,
+            start_date=None,
+            args=None,
+            kwargs=None,
+            **options):
         """
         Schedules a job to be completed on specified intervals.
         Any extra keyword arguments are passed along to the constructor of the
@@ -352,7 +363,7 @@ class Scheduler(object):
         trigger = IntervalTrigger(interval, start_time, start_date)
         return self.add_job(trigger, func, args, kwargs, **options)
 
-    def add_workloadmgr_job(self, func, jobschedule, args=None, 
+    def add_workloadmgr_job(self, func, jobschedule, args=None,
                             kwargs=None, **options):
         """
         Schedules a job to be completed on specified intervals.
@@ -442,9 +453,9 @@ class Scheduler(object):
         try:
             config_job = None
             if 'config_jobstore' in self._jobstores:
-                 config_jobstore = self._jobstores['config_jobstore']
-                 for job in config_jobstore.jobs:
-                     if job.kwargs['workload_id'] == CONF.cloud_unique_id:
+                config_jobstore = self._jobstores['config_jobstore']
+                for job in config_jobstore.jobs:
+                    if job.kwargs['workload_id'] == CONF.cloud_unique_id:
                         config_job = job
                         break
             return config_job
@@ -477,12 +488,13 @@ class Scheduler(object):
                     self._remove_job(job, alias, jobstore)
                     return
         except Exception as ex:
-            # retry for OperationalError: (OperationalError) (2006, 'MySQL server has gone away')  
+            # retry for OperationalError: (OperationalError) (2006, 'MySQL
+            # server has gone away')
             logger.exception(ex)
             for alias, jobstore in iteritems(self._jobstores):
                 if job in list(jobstore.jobs):
                     self._remove_job(job, alias, jobstore)
-                    return        
+                    return
         finally:
             self._jobstores_lock.release()
 
@@ -562,7 +574,7 @@ class Scheduler(object):
 
                 try:
                     retval = job.func(*job.args, **job.kwargs)
-                except:
+                except BaseException:
                     # Notify listeners about the exception
                     exc, tb = sys.exc_info()[1:]
                     event = JobEvent(EVENT_JOB_ERROR, job, run_time,
@@ -636,13 +648,13 @@ class Scheduler(object):
             if next_wakeup_time is not None:
                 wait_seconds = time_difference(next_wakeup_time, now)
                 logger.info('Next wakeup is due at %s (in %f seconds)',
-                             next_wakeup_time, wait_seconds)
+                            next_wakeup_time, wait_seconds)
                 try:
                     self._wakeup.wait(wait_seconds)
                 except IOError:  # Catch errno 514 on some Linux kernels
                     pass
                 except Exception as ex:
-                    logger.exception(ex)            
+                    logger.exception(ex)
                 self._wakeup.clear()
             elif self.standalone:
                 logger.info('No jobs left; shutting down scheduler')
@@ -655,7 +667,7 @@ class Scheduler(object):
                 except IOError:  # Catch errno 514 on some Linux kernels
                     pass
                 except Exception as ex:
-                    logger.exception(ex)   
+                    logger.exception(ex)
                 self._wakeup.clear()
 
         logger.info('Scheduler has been shut down')
@@ -672,7 +684,8 @@ class Scheduler(object):
                 self._remove_job(job, 'config_jobstore', config_jobstore)
                 return
         except Exception as ex:
-            # retry for OperationalError: (OperationalError) (2006, 'MySQL server has gone away')
+            # retry for OperationalError: (OperationalError) (2006, 'MySQL
+            # server has gone away')
             logger.exception(ex)
             config_jobstore = self._jobstores['config_jobstore']
             for job in config_jobstore.jobs:
@@ -680,6 +693,5 @@ class Scheduler(object):
                 return
         finally:
             self._jobstores_lock.release()
-    
-        raise KeyError('config backup job is not scheduled.')
 
+        raise KeyError('config backup job is not scheduled.')

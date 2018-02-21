@@ -12,4 +12,4 @@ class WorkloadmgrUnicodeTest(volume_base.BaseVolumeTest):
 
     @classmethod
     def resource_setup(cls):
-        pass 
+        pass

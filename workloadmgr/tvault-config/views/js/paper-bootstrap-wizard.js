@@ -3,13 +3,13 @@
  =========================================================
  * Paper Bootstrap Wizard - v1.0.2
  =========================================================
- 
+
  * Product Page: https://www.creative-tim.com/product/paper-bootstrap-wizard
  * Copyright 2017 Creative Tim (http://www.creative-tim.com)
  * Licensed under MIT (https://github.com/creativetimofficial/paper-bootstrap-wizard/blob/master/LICENSE.md)
- 
+
  =========================================================
- 
+
  * The above copyright notice and this permission notice shall be included in all copies or substantial portions of the Software.
  */
 
@@ -47,7 +47,7 @@ transparent = true;
                 'previousSelector': '.btn-previous',
 
 
-                onNext: function(tab, navigation, index) {                       
+                onNext: function(tab, navigation, index) {
                 	var $valid = $('.wizard-card form').valid();
                 	if(!$valid) {
                 		$validator.focusInvalid();
@@ -66,13 +66,17 @@ transparent = true;
                         }
                         else if(index == 5 && Invalid == true) {
                              elms = document.getElementsByName("backup_target_type")
-                             for(var i = 0; i < elms.length; i++) { 
+                             for(var i = 0; i < elms.length; i++) {
                                    if(elms[i].checked) {
                                        elm = elms[i]
                                    }
                              }
                              if(typeof elm != 'undefined' && elm.value == 'SWIFT') {
                                  validate_swift_credentials(elm)
+                                 return false
+                             }
+                             if(typeof elm != 'undefined' && elm.value == 'S3') {
+                                 validate_s3_credentials(elm)
                                  return false
                              }
                         }

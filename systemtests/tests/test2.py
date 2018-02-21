@@ -3,6 +3,7 @@ Description = 'Test2:                                       \n'\
               '      Create Parallel workload using VM1     \n'\
               '      Delete the workload that is created      '
 
+
 class test2(WorkloadMgrSystemTest):
 
     def __init__(self, testshell):
@@ -11,16 +12,18 @@ class test2(WorkloadMgrSystemTest):
     """
     Setup the conditions for test to run
     """
+
     def prepare(self, *args, **kwargs):
         # Cleanup swift first
         super(test2, self).prepare(args, kwargs)
-        # Make sure vm as specified in the argument vm1 exists 
+        # Make sure vm as specified in the argument vm1 exists
         # on the production
         pass
-     
+
     """
     run the test
     """
+
     def run(self, *args, **kwargs):
         # Create parallel workload with the VM
         pass
@@ -30,7 +33,7 @@ class test2(WorkloadMgrSystemTest):
     """
     cleanup the test
     """
+
     def cleanup(self, *args, **kwargs):
-        #Delete the workload that is created
+        # Delete the workload that is created
         pass
-        

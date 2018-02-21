@@ -48,34 +48,37 @@ swift_delete = None
 swift_post = None
 swift_cap = None
 
+
 def immediate_exit(signum, frame):
     stderr.write(" Aborted\n")
     os_exit(2)
+
 
 def st_delete(args, options):
     _opts = dict(options)
     global swift_delete
     if swift_delete is None:
-       swift_delete = SwiftService(options=_opts)
+        swift_delete = SwiftService(options=_opts)
 
     try:
         if not args:
-           del_iter = swift_delete.delete(options=_opts)
+            del_iter = swift_delete.delete(options=_opts)
         else:
-             container = args[0]
-             if '/' in container:
+            container = args[0]
+            if '/' in container:
                 raise Exception(
-                        'WARNING: / in container name; you '
-                        "might have meant '%s' instead of '%s'." %
-                        (container.replace('/', ' ', 1), container)
-                    )
+                    'WARNING: / in container name; you '
+                    "might have meant '%s' instead of '%s'." %
+                    (container.replace('/', ' ', 1), container)
+                )
                 return
-             objects = args[1:]
-             if objects:
+            objects = args[1:]
+            if objects:
                 del_iter = swift_delete.delete(container=container,
-                                            objects=objects, options=_opts)
-             else:
-                  del_iter = swift_delete.delete(container=container, options=_opts)
+                                               objects=objects, options=_opts)
+            else:
+                del_iter = swift_delete.delete(
+                    container=container, options=_opts)
 
         for r in del_iter:
             c = r.get('container', '')
@@ -83,26 +86,26 @@ def st_delete(args, options):
             a = r.get('attempts')
 
         if r['success']:
-           if options.verbose:
-              a = ' [after {0} attempts]'.format(a) if a > 1 else ''
+            if options.verbose:
+                a = ' [after {0} attempts]'.format(a) if a > 1 else ''
 
-              if r['action'] == 'delete_object':
-                 if options.yes_all:
+                if r['action'] == 'delete_object':
+                    if options.yes_all:
+                        p = '{0}/{1}'.format(c, o)
+                    else:
+                        p = o
+                elif r['action'] == 'delete_segment':
                     p = '{0}/{1}'.format(c, o)
-                 else:
-                      p = o
-              elif r['action'] == 'delete_segment':
-                   p = '{0}/{1}'.format(c, o)
-              elif r['action'] == 'delete_container':
-                   p = c
+                elif r['action'] == 'delete_container':
+                    p = c
 
-              print('{0}{1}'.format(p, a))
+                print('{0}{1}'.format(p, a))
         else:
-             p = '{0}/{1}'.format(c, o) if o else c
-             raise Exception('Error Deleting: {0}: {1}'
-                                    .format(p, r['error']))
+            p = '{0}/{1}'.format(c, o) if o else c
+            raise Exception('Error Deleting: {0}: {1}'
+                            .format(p, r['error']))
     except SwiftError as err:
-           raise Exception(err.value)
+        raise Exception(err.value)
 
 
 def st_download(args, options):
@@ -117,7 +120,8 @@ def st_download(args, options):
         options.remove_prefix = False
 
     if options.out_directory and len(args) == 2:
-        raise Exception('Please use -o option for single file downloads and renames')
+        raise Exception(
+            'Please use -o option for single file downloads and renames')
 
     if (not args and not options.yes_all) or (args and options.yes_all):
         raise Exception('Usage: %s download %s\n%s', BASENAME,
@@ -126,91 +130,94 @@ def st_download(args, options):
 
     _opts = dict(options).copy()
     if swift_download is None:
-       swift_download = SwiftService(options=_opts)
+        swift_download = SwiftService(options=_opts)
     try:
         if not args:
-           down_iter = swift_download.download(options=_opts)
+            down_iter = swift_download.download(options=_opts)
         else:
-             container = args[0]
-             if '/' in container:
+            container = args[0]
+            if '/' in container:
                 raise Exception(
-                        'WARNING: / in container name; you '
-                        "might have meant '%s' instead of '%s'." %
-                        (container.replace('/', ' ', 1), container)
-                 )
+                    'WARNING: / in container name; you '
+                    "might have meant '%s' instead of '%s'." %
+                    (container.replace('/', ' ', 1), container)
+                )
                 return
-             objects = args[1:]
-             if not objects:
+            objects = args[1:]
+            if not objects:
                 down_iter = swift_download.download(container, options=_opts)
-             else:
-                  down_iter = swift_download.download(container, objects, options=_opts)
+            else:
+                down_iter = swift_download.download(
+                    container, objects, options=_opts)
 
         for down in down_iter:
             if options.out_file == '-' and 'contents' in down:
-               contents = down['contents']
-               for chunk in contents:
-                   print(chunk)
+                contents = down['contents']
+                for chunk in contents:
+                    print(chunk)
             else:
-                 if down['success']:
+                if down['success']:
                     if options.verbose:
-                       start_time = down['start_time']
-                       headers_receipt = \
-                                down['headers_receipt'] - start_time
-                       auth_time = down['auth_end_time'] - start_time
-                       finish_time = down['finish_time']
-                       read_length = down['read_length']
-                       attempts = down['attempts']
-                       total_time = finish_time - start_time
-                       down_time = total_time - auth_time
-                       _mega = 1000000
-                       if down['pseudodir']:
-                          time_str = (
-                                    'auth %.3fs, headers %.3fs, total %.3fs, '
-                                    'pseudo' % (
-                                        auth_time, headers_receipt,
-                                        total_time
-                                    )
-                           )
-                       else:
+                        start_time = down['start_time']
+                        headers_receipt = \
+                            down['headers_receipt'] - start_time
+                        auth_time = down['auth_end_time'] - start_time
+                        finish_time = down['finish_time']
+                        read_length = down['read_length']
+                        attempts = down['attempts']
+                        total_time = finish_time - start_time
+                        down_time = total_time - auth_time
+                        _mega = 1000000
+                        if down['pseudodir']:
+                            time_str = (
+                                'auth %.3fs, headers %.3fs, total %.3fs, '
+                                'pseudo' % (
+                                    auth_time, headers_receipt,
+                                    total_time
+                                )
+                            )
+                        else:
                             speed = float(read_length) / down_time / _mega
                             time_str = (
-                                    'auth %.3fs, headers %.3fs, total %.3fs, '
-                                    '%.3f MB/s' % (
-                                        auth_time, headers_receipt,
-                                        total_time, speed
-                                    )
-                             )
-                       path = down['path']
-                       if attempts > 1:
-                          print('%s [%s after %d attempts]' % (
-                                    path, time_str, attempts))
-                       else:
+                                'auth %.3fs, headers %.3fs, total %.3fs, '
+                                '%.3f MB/s' % (
+                                    auth_time, headers_receipt,
+                                    total_time, speed
+                                )
+                            )
+                        path = down['path']
+                        if attempts > 1:
+                            print('%s [%s after %d attempts]' % (
+                                path, time_str, attempts))
+                        else:
                             print('%s [%s]' % (path, time_str))
-                 else:
-                      error = down['error']
-                      path = down['path']
-                      container = down['container']
-                      obj = down['object']
-                      if isinstance(error, ClientException):
-                         if error.http_status == 304 and \
-                                    options.skip_identical:
-                            print("Skipped identical file '%s'"  % path)
+                else:
+                    error = down['error']
+                    path = down['path']
+                    container = down['container']
+                    obj = down['object']
+                    if isinstance(error, ClientException):
+                        if error.http_status == 304 and \
+                                options.skip_identical:
+                            print("Skipped identical file '%s'" % path)
                             continue
-                         if error.http_status == 404:
-                            raise Exception("Object '%s/%s' not found", container, obj)
+                        if error.http_status == 404:
+                            raise Exception(
+                                "Object '%s/%s' not found", container, obj)
                             continue
-                      raise Exception(
-                            "Error downloading object '%s/%s': %s",
-                            container, obj, error)
+                    raise Exception(
+                        "Error downloading object '%s/%s': %s",
+                        container, obj, error)
 
     except SwiftError as e:
-           raise
+        raise
     except Exception as e:
-           raise
+        raise
 
 
 def st_list(args, options):
     global swift_list
+
     def _print_stats(options, stats):
         total_count = total_bytes = 0
         container = stats.get("container", None)
@@ -232,8 +239,8 @@ def st_list(args, options):
                         datestamp = '????-??-?? ??:??:??'
                     if not options.totals:
                         print(
-                            "%5s %s %s %s" % ( count, byte_str,
-                            datestamp, item_name))
+                            "%5s %s %s %s" % (count, byte_str,
+                                              datestamp, item_name))
                 else:    # list container contents
                     subdir = item.get('subdir')
                     content_type = item.get('content_type')
@@ -258,7 +265,7 @@ def st_list(args, options):
             if not container:
                 print(
                     "%5s %s" % (prt_bytes(total_count, True),
-                    prt_bytes(total_bytes, options.human)))
+                                prt_bytes(total_bytes, options.human)))
             else:
                 print(
                     prt_bytes(total_bytes, options.human))
@@ -277,28 +284,29 @@ def st_list(args, options):
         return
 
     if swift_list is None:
-       swift_list = SwiftService(options=_opts)
+        swift_list = SwiftService(options=_opts)
     try:
         if not args:
-           stats_parts_gen = swift_list.list(options=_opts)
+            stats_parts_gen = swift_list.list(options=_opts)
         else:
-             container = args[0]
-             args = args[1:]
-             if "/" in container or args:
+            container = args[0]
+            args = args[1:]
+            if "/" in container or args:
                 raise Exception('Usage error')
                 return
-             else:
-                  stats_parts_gen = swift_list.list(container=container, options=_opts)
+            else:
+                stats_parts_gen = swift_list.list(
+                    container=container, options=_opts)
 
         for stats in stats_parts_gen:
             if stats["success"]:
-               return [item.get('name') for item in stats["listing"]]
+                return [item.get('name') for item in stats["listing"]]
             else:
-                 raise stats["error"]
+                raise stats["error"]
         return []
 
     except SwiftError as e:
-           raise
+        raise
 
 
 def st_stat(args, options):
@@ -306,89 +314,91 @@ def st_stat(args, options):
     _opts = dict(options).copy()
 
     if swift_stat is None:
-       swift_stat = SwiftService(options=_opts)
+        swift_stat = SwiftService(options=_opts)
 
     try:
         if not args:
-           stat_result = swift_stat.stat(options=_opts)
-           if not stat_result['success']:
-              raise stat_result['error']
-           return stat_result
+            stat_result = swift_stat.stat(options=_opts)
+            if not stat_result['success']:
+                raise stat_result['error']
+            return stat_result
         else:
-             container = args[0]
-             if '/' in container:
+            container = args[0]
+            if '/' in container:
                 raise Exception(
-                      'WARNING: / in container name; you might have '
-                      "meant '%s' instead of '%s'." %
-                      (container.replace('/', ' ', 1), container))
+                    'WARNING: / in container name; you might have '
+                    "meant '%s' instead of '%s'." %
+                    (container.replace('/', ' ', 1), container))
                 return
-             args = args[1:]
-             if not args:
-                stat_result = swift_stat.stat(container=container, options=_opts)
+            args = args[1:]
+            if not args:
+                stat_result = swift_stat.stat(
+                    container=container, options=_opts)
                 if not stat_result['success']:
-                   raise stat_result['error']
+                    raise stat_result['error']
                 return stat_result
-             else:
-                  if len(args) == 1:
-                     objects = [args[0]]
-                     stat_results = swift_stat.stat(
-                          container=container, objects=objects, options=_opts)
-                     for stat_result in stat_results:  # only 1 result
-                         if stat_result["success"]:
+            else:
+                if len(args) == 1:
+                    objects = [args[0]]
+                    stat_results = swift_stat.stat(
+                        container=container, objects=objects, options=_opts)
+                    for stat_result in stat_results:  # only 1 result
+                        if stat_result["success"]:
                             return stat_result
-                         else:
-                              raise(stat_result["error"])
-                  else:
-                       raise Exception(
-                          'Usage: %s stat %s\n%s', BASENAME,
-                          st_stat_options, st_stat_help)
+                        else:
+                            raise stat_result
+                else:
+                    raise Exception(
+                        'Usage: %s stat %s\n%s', BASENAME,
+                        st_stat_options, st_stat_help)
 
     except SwiftError as e:
-           raise
+        raise
 
 
 def st_post(args, options):
     global swift_post
     if (options.read_acl or options.write_acl or options.sync_to or
             options.sync_key) and not args:
-        raise Exception('-r, -w, -t, and -k options only allowed for containers')
+        raise Exception(
+            '-r, -w, -t, and -k options only allowed for containers')
 
     _opts = dict(options).copy()
 
     if swift_post is None:
-       swift_post = SwiftService(options=_opts)
+        swift_post = SwiftService(options=_opts)
 
     try:
         if not args:
-           result = swift_post.post(options=_opts)
+            result = swift_post.post(options=_opts)
         else:
-             container = args[0]
-             if '/' in container:
+            container = args[0]
+            if '/' in container:
                 raise Exception(
-                        'WARNING: / in container name; you might have '
-                        "meant '%s' instead of '%s'." %
-                        (args[0].replace('/', ' ', 1), args[0]))
+                    'WARNING: / in container name; you might have '
+                    "meant '%s' instead of '%s'." %
+                    (args[0].replace('/', ' ', 1), args[0]))
                 return
-             args = args[1:]
-             if args:
+            args = args[1:]
+            if args:
                 if len(args) == 1:
-                   objects = [args[0]]
-                   results_iterator = swift_post.post(
-                            container=container, objects=objects, options=_opts
+                    objects = [args[0]]
+                    results_iterator = swift_post.post(
+                        container=container, objects=objects, options=_opts
                     )
-                   result = next(results_iterator)
+                    result = next(results_iterator)
                 else:
-                     raise Exception(
-                            'Usage: %s post %s\n%s', BASENAME,
-                            st_post_options, st_post_help)
-                     return
-             else:
-                  result = swift_post.post(container=container, options=_opts)
+                    raise Exception(
+                        'Usage: %s post %s\n%s', BASENAME,
+                        st_post_options, st_post_help)
+                    return
+            else:
+                result = swift_post.post(container=container, options=_opts)
         if not result["success"]:
-           raise(result["error"])
+            raise result
 
     except SwiftError as e:
-           raise
+        raise
 
 
 def st_upload(args, options):
@@ -420,78 +430,79 @@ def st_upload(args, options):
             return
     _opts = dict(options).copy()
     if swift_upload is None:
-       swift_upload = SwiftService(options=_opts)
+        swift_upload = SwiftService(options=_opts)
 
     try:
         objs = []
         dir_markers = []
         for f in files:
             if isfile(f):
-               objs.append(f)
+                objs.append(f)
             elif isdir(f):
-                  for (_dir, _ds, _fs) in walk(f):
-                      if not (_ds + _fs):
-                         dir_markers.append(_dir)
-                      else:
-                           objs.extend([join(_dir, _f) for _f in _fs])
+                for (_dir, _ds, _fs) in walk(f):
+                    if not (_ds + _fs):
+                        dir_markers.append(_dir)
+                    else:
+                        objs.extend([join(_dir, _f) for _f in _fs])
             else:
-                 raise Exception("Local file '%s' not found" % f)
+                raise Exception("Local file '%s' not found" % f)
 
         # Now that we've collected all the required files and dir markers
         # build the tuples for the call to upload
         if options.object_name is not None:
-           objs = [
-                    SwiftUploadObject(
-                        o, object_name=o.replace(
-                            orig_path, options.object_name, 1
-                        )
-                    ) for o in objs
-                ]
-           dir_markers = [
-                    SwiftUploadObject(
-                        None, object_name=d.replace(
-                            orig_path, options.object_name, 1
-                        ), options={'dir_marker': True}
-                    ) for d in dir_markers
-                ]
+            objs = [
+                SwiftUploadObject(
+                    o, object_name=o.replace(
+                        orig_path, options.object_name, 1
+                    )
+                ) for o in objs
+            ]
+            dir_markers = [
+                SwiftUploadObject(
+                    None, object_name=d.replace(
+                        orig_path, options.object_name, 1
+                    ), options={'dir_marker': True}
+                ) for d in dir_markers
+            ]
 
-        for r in swift_upload.upload(container, objs + dir_markers, options=_opts):
+        for r in swift_upload.upload(
+                container, objs + dir_markers, options=_opts):
             if r['success']:
-               if options.verbose:
-                  if 'attempts' in r and r['attempts'] > 1:
-                     if 'object' in r:
-                        print(
-                                    '%s [after %d attempts]' %
-                                    (r['object'],
-                                     r['attempts'])
-                                )
-                     else:
-                          if 'object' in r:
-                             print (r['object'])
-                          elif 'for_object' in r:
-                               print(
+                if options.verbose:
+                    if 'attempts' in r and r['attempts'] > 1:
+                        if 'object' in r:
+                            print(
+                                '%s [after %d attempts]' %
+                                (r['object'],
+                                 r['attempts'])
+                            )
+                        else:
+                            if 'object' in r:
+                                print (r['object'])
+                            elif 'for_object' in r:
+                                print(
                                     '%s segment %s' % (r['for_object'],
                                                        r['segment_index'])
                                 )
-               else:
+                else:
                     error = r['error']
                     if 'action' in r and r['action'] == "create_container":
-                        # it is not an error to be unable to create the
-                        # container so print a warning and carry on
+                            # it is not an error to be unable to create the
+                            # container so print a warning and carry on
                         if isinstance(error, ClientException):
                             if (r['headers'] and
                                     'X-Storage-Policy' in r['headers']):
                                 msg = ' with Storage Policy %s' % \
                                       r['headers']['X-Storage-Policy'].strip()
                             else:
-                                 msg = ' '.join(str(x) for x in (
+                                msg = ' '.join(str(x) for x in (
                                     error.http_status, error.http_reason)
-                                 )
-                                 if error.http_response_content:
+                                )
+                                if error.http_response_content:
                                     if msg:
                                         msg += ': '
                                     msg += error.http_response_content[:60]
-                                 msg = ': %s' % msg
+                                msg = ': %s' % msg
                         else:
                             msg = ': %s' % error
                         raise Exception(
@@ -508,11 +519,12 @@ def st_upload(args, options):
                                 "to chunk the object")
 
     except SwiftError as e:
-           raise
+        raise
 
 
 def st_capabilities(args, options):
     global swift_cap
+
     def _print_compo_cap(name, capabilities):
         for feature, options in sorted(capabilities.items(),
                                        key=lambda x: x[0]):
@@ -531,22 +543,22 @@ def st_capabilities(args, options):
 
     _opts = dict(options).copy()
     if swift_cap is None:
-       swift_cap = SwiftService(options=_opts)
+        swift_cap = SwiftService(options=_opts)
 
     try:
         if len(args) == 2:
-           url = args[1]
-           capabilities_result = swift_cap.capabilities(url)
-           capabilities = capabilities_result['capabilities']
+            url = args[1]
+            capabilities_result = swift_cap.capabilities(url)
+            capabilities = capabilities_result['capabilities']
         else:
-             capabilities_result = swift_cap.capabilities()
-             capabilities = capabilities_result['capabilities']
+            capabilities_result = swift_cap.capabilities()
+            capabilities = capabilities_result['capabilities']
 
         _print_compo_cap('Core', {'swift': capabilities['swift']})
         del capabilities['swift']
         _print_compo_cap('Additional middleware', capabilities)
     except SwiftError as e:
-           raise
+        raise
 
 
 def st_auth(args, options):
@@ -591,5 +603,3 @@ def st_tempurl(args, options):
     url = generate_temp_url(path, seconds, key, method,
                             absolute=options.absolute_expiry)
     print(url)
-
-

@@ -5,6 +5,7 @@ Description = 'Test7:                                       \n'\
               '      Create new workload type               \n'\
               '      Delete workload type that is created     '
 
+
 class test7(WorkloadMgrSystemTest):
 
     def __init__(self, testshell):
@@ -13,14 +14,16 @@ class test7(WorkloadMgrSystemTest):
     """
     Setup the conditions for test to run
     """
+
     def prepare(self, *args, **kwargs):
         # Cleanup swift first
         super(test7, self).prepare(args, kwargs)
         pass
-     
+
     """
     run the test
     """
+
     def run(self, *args, **kwargs):
         # Create new workload type of various metadata components
         pass
@@ -30,7 +33,7 @@ class test7(WorkloadMgrSystemTest):
     """
     cleanup the test
     """
+
     def cleanup(self, *args, **kwargs):
-        #Delete the workloadtype that is created
+        # Delete the workloadtype that is created
         pass
-        

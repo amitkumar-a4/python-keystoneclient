@@ -74,7 +74,7 @@ imagecache_opts = [
     cfg.IntOpt('checksum_interval_seconds',
                default=3600,
                help='How frequently to checksum base images'),
-    ]
+]
 
 CONF = cfg.CONF
 CONF.register_opts(imagecache_opts)
@@ -99,7 +99,7 @@ def get_cache_fname(images, key):
     assume this.
     """
     image_id = str(images[key])
-    #giri
+    # giri
     return image_id
 
     if not CONF.remove_unused_kernels and key in ['kernel_id', 'ramdisk_id']:
@@ -497,8 +497,8 @@ class ImageCacheManager(object):
         if base_file in self.unexplained_images:
             self.unexplained_images.remove(base_file)
 
-        if (base_file and os.path.exists(base_file)
-                and os.path.isfile(base_file)):
+        if (base_file and os.path.exists(base_file) and
+                os.path.isfile(base_file)):
             # _verify_checksum returns True if the checksum is ok, and None if
             # there is no checksum file
             checksum_result = self._verify_checksum(img_id, base_file)

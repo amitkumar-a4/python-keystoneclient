@@ -2,11 +2,11 @@
 	<!-- Latest compiled and minified CSS -->
 	<link rel="stylesheet" href="css/bootstrap.min.css">
 	<link rel="stylesheet" href="css/jumbotron.css" type="text/css">
-		
+
 	<!-- Optional theme -->
 	<link rel="stylesheet" href="css/bootstrap-theme.min.css">
         <link href="css/paper-bootstrap-wizard.css" rel="stylesheet" />
-	
+
 </head>
 
 <body>
@@ -41,22 +41,22 @@
 }
 
 /* active & hover links */
-.bs-docs-sidebar .nav>.active>a, 
-.bs-docs-sidebar .nav>li>a:hover, 
+.bs-docs-sidebar .nav>.active>a,
+.bs-docs-sidebar .nav>li>a:hover,
 .bs-docs-sidebar .nav>li>a:focus {
-    color: #563d7c;                 
-    text-decoration: none;          
-    background-color: transparent;  
-    border-left-color: #563d7c; 
+    color: #563d7c;
+    text-decoration: none;
+    background-color: transparent;
+    border-left-color: #563d7c;
 }
 /* all active links */
-.bs-docs-sidebar .nav>.active>a, 
+.bs-docs-sidebar .nav>.active>a,
 .bs-docs-sidebar .nav>.active:hover>a,
 .bs-docs-sidebar .nav>.active:focus>a {
     font-weight: 700;
 }
 /* nested active links */
-.bs-docs-sidebar .nav .nav>.active>a, 
+.bs-docs-sidebar .nav .nav>.active>a,
 .bs-docs-sidebar .nav .nav>.active:hover>a,
 .bs-docs-sidebar .nav .nav>.active:focus>a {
     font-weight: 500;
@@ -119,17 +119,17 @@
                             <a href="/home" target="_blank">http://floating-ipaddress-of-triliovault-vm/home</a>
                         </div>
                     </li>
-                    
+
                     <li"GroupBSub2">Configure OS Controller and Compute Nodes
                         <br>
                         <br>
                         <div class="well">
                             <b>Download <a href="/tvault-contego-install.sh">tvault-contego-install.sh</a> and run as sudo...</b><br>
                             <b>Download <a href="/tvault-contego-install.answers">tvault-contego-install.answers</a></b><br>
-                        </div>                    
+                        </div>
                     </li>
-                   
-                    <!-- Enable deb and rpm packages later on 
+
+                    <!-- Enable deb and rpm packages later on
                     <li>Configure OS Controller</li>
                     <br>
                     <div class="well">
@@ -152,7 +152,7 @@
                         <br>
                     </div>
                     -->
-                    
+
                 </ol>
                 <h3 id="GroupC">Dashboard</h3>
                 <ol>
@@ -161,9 +161,9 @@
                         <br>
                         <div class="well">
                             <b>Download <a href="/tvault-horizon-plugin-install.sh">tvault-horizon-plugin-install.sh</a> and run as sudo...</b><br>
-                        </div>                    
+                        </div>
                     </li>
-               
+
                     <!--li>Horizon Dashboard on Appliance
                         <br>
                         <br>
@@ -172,7 +172,7 @@
                         </div>
                     </li-->
 
-                    <!-- Enable deb and rpm packages later on 
+                    <!-- Enable deb and rpm packages later on
                     <li>Horizon Dashboard Plugin</li>
                     <br>
                     <div class="well">
@@ -192,8 +192,8 @@
                          <br>
                         <script>document.write("pip install http://" + window.location.host + ":8081/packages/python-workloadmgrclient-")</script>{{version}}<script>document.write(".tar.gz")</script>
                     </div>
-                </ol>                
-                
+                </ol>
+
                 <h3 id="GroupE">Ansible Scripts</h3>
                 <ol>
                     <div class="well">
@@ -205,8 +205,8 @@
                 <h3 id="GroupF">TrilioVault Documentation</h3>
                 <ol>
                     <div class="well">
-                        <b>Product Documentation Portal 
-                           <script>document.write("<a href=http://" + window.location.host + ":8181/doc/index.php/Main_Page>")</script>
+                        <b>Product Documentation Portal
+                           <script>document.write("<a href=http://ns544114.ip-144-217-78.net/index.html>")</script>
                            {{version}}</a></b><br>
                          <br>
                     </div>
@@ -214,7 +214,8 @@
 
                 <h3 id="GroupH">Support</h3>
                 <ol>
-                    <div class="well"><a>support@triliodata.com</a>
+                    <div class="well">
+                        <b><script>document.write("<a href=https://trilio.force.com/io/login>")</script>Support Portal</a></b>
                     </div>
                 </ol>
             </div>
