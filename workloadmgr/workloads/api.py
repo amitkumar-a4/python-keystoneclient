@@ -153,10 +153,11 @@ def _snapshot_create_callback(*args, **kwargs):
                 # check full backup policy here
                 num_of_incr_in_current_chain = 0
                 for snap in snapshots:
-                    if snap.snapshot_type == 'full':
-                        break
-                    else:
-                        num_of_incr_in_current_chain = num_of_incr_in_current_chain + 1
+                    if snap.status == 'available':
+                        if snap.snapshot_type == 'full':
+                            break;
+                        else:
+                            num_of_incr_in_current_chain = num_of_incr_in_current_chain + 1
 
                 if num_of_incr_in_current_chain >= int(
                         jobscheduler['fullbackup_interval']):
