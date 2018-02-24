@@ -1065,6 +1065,13 @@ class API(base.Base):
         unpause_workload = False
         options = {}
 
+        # Always update the user_id from the context. This will handle the case where
+        # a user creates the workload, user gets deleted and a new user assigned to
+        # take up that role. old workload job schedulers won't run because they
+        # are executed based on the user_id that is saved in workload record.
+        # By forcing user_id update, the new user can switch the job scheduler
+        # to generate token based on his trust.
+        options['user_id'] = context.user_id
         if 'name' in workload and workload['name']:
             options['display_name'] = workload['name']
 
