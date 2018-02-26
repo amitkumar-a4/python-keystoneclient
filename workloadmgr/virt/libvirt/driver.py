@@ -603,6 +603,13 @@ class LibvirtDriver(driver.ComputeDriver):
             raise ex
         return status
 
+    def _truncate_tracking_file(self, reason, progress_tracking_file_path):
+        if progress_tracking_file_path:
+            with open(progress_tracking_file_path, 'w') as progress_tracking_file:
+                LOG.info('Progress status: [%s], Reset tracking file: %s ' %
+                         (reason, progress_tracking_file_path))
+                pass
+
     def _wait_for_remote_nova_process(self, cntx, compute_service,
                                       progress_tracker_metadata,
                                       instance_id, backup_endpoint,
@@ -655,12 +662,15 @@ class LibvirtDriver(driver.ComputeDriver):
                         async_task_status['status']):
                     for line in async_task_status['status']:
                         if 'Down' in line:
+                            self._truncate_tracking_file('Down', progress_tracking_file_path)
                             raise Exception(
                                 "Contego service Unreachable - " + line)
                         if 'Error' in line:
+                            self._truncate_tracking_file('Error', progress_tracking_file_path)
                             raise Exception("Data transfer failed - " + line)
                         if 'Completed' in line:
                             operation_completed = True
+                            self._truncate_tracking_file('Completed', progress_tracking_file_path)
                             return True
 
                 now = timeutils.utcnow()
@@ -885,7 +895,7 @@ class LibvirtDriver(driver.ComputeDriver):
                     snapshot_vm_resource_metadata['min_disk'] = glance_image['min_disk']
 
                     d = {}
-                    for prop in  glance_image['properties'].keys():
+                    for prop in glance_image['properties'].keys():
                         if prop != 'hw_qemu_guest_agent':
                             d[prop] = glance_image['properties'][prop]
                     if len(d) > 0:

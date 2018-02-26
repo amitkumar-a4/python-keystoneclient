@@ -300,8 +300,9 @@ class S3Backend(object):
                         #     else:
                         #         continue
 
-                        # Trim ".manifest" and everything after it if that is in the name.
-                        object_set.add(object_name.split(".manifest", 1)[0])
+                        if path == prefix:
+                            # Trim ".manifest" and everything after it if that is in the name.
+                            object_set.add(object_name.split(".manifest", 1)[0])
 
                 if 'CommonPrefixes' in objects:
                     for object_prefix in objects['CommonPrefixes']:
