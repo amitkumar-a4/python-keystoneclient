@@ -509,7 +509,8 @@ def _convert_to_string(metadata):
 def _extract_attributes(image):
     ATTRIBUTES_TO_REMOVE = ['is_public', 'visibility', 'changes',
                             '__original__', 'resolver', 'schema',
-                            'direct_url', 'file', 'virtual_size']
+                            'direct_url', 'file', 'virtual_size',
+                            'locations',]
     IMAGE_ATTRIBUTES = ['size', 'disk_format', 'owner',
                         'container_format', 'checksum', 'id',
                         'name', 'created_at', 'updated_at',
@@ -532,11 +533,12 @@ def _extract_attributes(image):
 
 
 def _remove_read_only(image_meta):
-    IMAGE_ATTRIBUTES = ['status', 'updated_at', 'created_at', 'deleted_at']
+    IMAGE_ATTRIBUTES = ['status', 'updated_at', 'created_at', 'deleted_at',
+                        'locations']
     output = copy.deepcopy(image_meta)
     for attr in IMAGE_ATTRIBUTES:
-        if attr in output:
-            del output[attr]
+        output.pop(attr, None)
+        output.get('properties', {}).pop(attr, None)
     return output
 
 
