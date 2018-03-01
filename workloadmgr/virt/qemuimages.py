@@ -310,8 +310,7 @@ def get_effective_size(path, run_as_root=False):
     # Sometimes after uploading the image from contego side
     # It takes time to reflect on Tvault storage backend.
     # In that case waiting for 60 seconds.
-    i = 0
-    while i < 12:
+    for i in range(1, 12):
         if not os.path.exists(path):
             time.sleep(5)
         else:
@@ -328,6 +327,6 @@ def get_effective_size(path, run_as_root=False):
             if line['zero'] is False:
                 restore_size += int(line['length'])
 
-        return  restore_size
+        return restore_size
     except Exception as ex:
         return qemuinfo.virtual_size
