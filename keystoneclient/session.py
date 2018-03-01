@@ -25,6 +25,7 @@ from oslo_utils import strutils
 import requests
 import six
 from six.moves import urllib
+from urlparse import urlparse
 
 from keystoneclient import exceptions
 from keystoneclient.i18n import _, _LI, _LW
@@ -415,6 +416,11 @@ class Session(object):
 
         try:
             try:
+                reload(socket)
+                url_obj = urlparse(url)
+                hostname = url_obj.hostname
+                host_ip = socket.gethostbyname(hostname)
+                url = url.replace(hostname, host_ip)
                 resp = self.session.request(method, url, **kwargs)
             except requests.exceptions.SSLError as e:
                 msg = _('SSL exception connecting to %(url)s: '
