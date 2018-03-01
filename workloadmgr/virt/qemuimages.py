@@ -310,7 +310,7 @@ def get_effective_size(path, run_as_root=False):
     # Sometimes after uploading the image from contego side
     # It takes time to reflect on Tvault storage backend.
     # In that case waiting for 60 seconds.
-    for i in range(1, 12):
+    for i in range(0, 12):
         if not os.path.exists(path):
             time.sleep(5)
         else:
