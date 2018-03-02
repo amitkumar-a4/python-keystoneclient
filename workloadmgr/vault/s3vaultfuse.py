@@ -1337,7 +1337,7 @@ class BackendRepository(ObjectRepository):
                 new, new_manifest, metadata={
                     'segments-dir': segments_dir,
                     'segments': old_metadata['segments'],
-                    'total-size': old_metadata['total_size']})
+                    'total-size': old_metadata['total-size']})
             self.object_unlink(old, leave_segments=True)
         except BaseException:
             self.object_unlink(new, leave_segments=True)
