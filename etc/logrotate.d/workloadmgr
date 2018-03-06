@@ -31,3 +31,16 @@
   size=25M
   rotate 12
 }
+
+/var/triliovault-mounts/*/*.log {
+  su root nova
+  monthly
+  missingok
+  compress
+  delaycompress
+  notifempty
+  copytruncate
+  size=25M
+  rotate 12
+}
+
