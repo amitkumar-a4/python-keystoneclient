@@ -417,7 +417,7 @@ class S3Backend(object):
                     if 'x-object-meta' in key:
                         stat_data['headers'][key] = value
 
-                if stat_data['headers']['Metadata'].get('x-object-meta-segments', 0) > 0:
+                if stat_data['headers']['Metadata'].get('x-object-meta-segment-count', 0) > 0:
                     stat_data['size'] = stat_data['headers']['Metadata'].get(
                         'x-object-meta-total-size', 0)
                 else:
