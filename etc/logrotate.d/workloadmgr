@@ -8,7 +8,8 @@
   compress
 }
 
-/opt/stack/data/wlm/auditlogs/*.log {
+/var/triliovault/auditlogs/*.log {
+  su root nova
   monthly
   missingok
   compress
@@ -19,12 +20,27 @@
   rotate 12
 }
 
-/tmp/vmware-root/*.log {
-  hourly
+/var/triliovault-mounts/*/*/*.log {
+  su root nova
+  monthly
   missingok
-  rotate 1
-  lastaction
-    sudo rm -rf /tmp/vmware-root/*.log
-    sudo rm -rf /tmp/vmware-root/*.log.1    
-  endscript  
+  compress
+  delaycompress
+  notifempty
+  copytruncate
+  size=25M
+  rotate 12
 }
+
+/var/triliovault-mounts/*/*.log {
+  su root nova
+  monthly
+  missingok
+  compress
+  delaycompress
+  notifempty
+  copytruncate
+  size=25M
+  rotate 12
+}
+
