@@ -859,7 +859,7 @@ class BackendRepository(ObjectRepository):
                 self._write_object_manifest(
                     object_name, object_manifest, metadata={
                         'segments-dir': segments_dir,
-                        'segments': str(segments),
+                        'segment-count': str(segments),
                         'total-size': str(total_size)})
 
                 offset = 0
@@ -1336,7 +1336,7 @@ class BackendRepository(ObjectRepository):
             self._write_object_manifest(
                 new, new_manifest, metadata={
                     'segments-dir': segments_dir,
-                    'segments': old_metadata['segments'],
+                    'segment-count': old_metadata['segment-count'],
                     'total-size': old_metadata['total-size']})
             self.object_unlink(old, leave_segments=True)
         except BaseException:
