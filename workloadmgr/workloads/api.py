@@ -3272,34 +3272,38 @@ class API(base.Base):
     @wrap_check_policy
     def trust_create(self, context, role_name):
 
-        # create trust
-        cntx = wlm_context.RequestContext(
-            trustor_user_id=context.user_id,
-            auth_token=context.auth_token,
-            tenant_id=context.project_id,
-            roles=[role_name],
-            is_admin=False)
-        clients.initialise()
-        keystoneclient = clients.Clients(cntx).client("keystone")
-        trust_context = keystoneclient.create_trust_context()
-
-        setting = {u'category': "identity",
-                   u'name': "trust-%s" % str(uuid.uuid4()),
-                   u'description': u'token id for user %s project %s' %
-                                   (context.user_id, context.project_id),
-                   u'value': trust_context.trust_id,
-                   u'user_id': context.user_id,
-                   u'is_public': False,
-                   u'is_hidden': True,
-                   u'metadata': {'role_name': role_name},
-                   u'type': "trust_id", }
-        created_settings = []
         try:
-            created_settings.append(self.db.setting_create(context, setting))
+            # create trust
+            cntx = wlm_context.RequestContext(
+                trustor_user_id=context.user_id,
+                auth_token=context.auth_token,
+                tenant_id=context.project_id,
+                roles=[role_name],
+                is_admin=False)
+            clients.initialise()
+            keystoneclient = clients.Clients(cntx).client("keystone")
+            trust_context = keystoneclient.create_trust_context()
+
+            setting = {u'category': "identity",
+                       u'name': "trust-%s" % str(uuid.uuid4()),
+                       u'description': u'token id for user %s project %s' %
+                                       (context.user_id, context.project_id),
+                       u'value': trust_context.trust_id,
+                       u'user_id': context.user_id,
+                       u'is_public': False,
+                       u'is_hidden': True,
+                       u'metadata': {'role_name': role_name},
+                       u'type': "trust_id", }
+            created_settings = []
+            try:
+                created_settings.append(self.db.setting_create(context, setting))
+            except Exception as ex:
+                LOG.exception(ex)
+
+            return created_settings
         except Exception as ex:
             LOG.exception(ex)
-
-        return created_settings
+            raise ex
 
     @autolog.log_method(logger=Logger)
     @upload_settings
